@@ -51,25 +51,27 @@ const RowCard: React.FC<RowCardProps> = ({ row }) => {
     setIsEditDialogOpen(false);
   };
   
-  const handleDelete = async () => {
-    // Prevent multiple clicks while processing
-    if (isDeleting) return;
+  // Modified delete handler to fix freezing issues
+  const handleDelete = () => {
+    setIsDeleting(true);
+    setIsDeleteDialogOpen(false);
     
-    try {
-      setIsDeleting(true);
-      // Close dialog first
-      setIsDeleteDialogOpen(false);
-      
-      // Small delay to ensure dialog animation completes
-      setTimeout(async () => {
-        // Then perform the delete operation
-        await deleteRow(row.id);
-        setIsDeleting(false);
-      }, 100);
-    } catch (error) {
-      console.error("Error deleting row:", error);
-      setIsDeleting(false);
-    }
+    // Use requestAnimationFrame to ensure UI updates before deletion
+    requestAnimationFrame(() => {
+      // Use setTimeout to provide extra time for the UI to update
+      setTimeout(() => {
+        try {
+          // Then perform the delete operation
+          deleteRow(row.id)
+            .finally(() => {
+              setIsDeleting(false);
+            });
+        } catch (error) {
+          console.error("Error deleting row:", error);
+          setIsDeleting(false);
+        }
+      }, 150); // Slightly longer delay
+    });
   };
   
   return (
@@ -133,7 +135,7 @@ const RowCard: React.FC<RowCardProps> = ({ row }) => {
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
+      </Dialog>
       
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>

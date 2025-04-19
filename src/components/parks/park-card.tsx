@@ -52,25 +52,27 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
     setIsEditDialogOpen(false);
   };
   
-  const handleDelete = async () => {
-    // Prevent multiple clicks while processing
-    if (isDeleting) return;
+  // Modified delete handler to fix freezing issues
+  const handleDelete = () => {
+    setIsDeleting(true);
+    setIsDeleteDialogOpen(false);
     
-    try {
-      setIsDeleting(true);
-      // Close dialog first
-      setIsDeleteDialogOpen(false);
-      
-      // Small delay to ensure dialog animation completes
-      setTimeout(async () => {
-        // Then perform the delete operation
-        await deletePark(park.id);
-        setIsDeleting(false);
-      }, 100);
-    } catch (error) {
-      console.error("Error deleting park:", error);
-      setIsDeleting(false);
-    }
+    // Use requestAnimationFrame to ensure UI updates before deletion
+    requestAnimationFrame(() => {
+      // Use setTimeout to provide extra time for the UI to update
+      setTimeout(() => {
+        try {
+          // Then perform the delete operation
+          deletePark(park.id)
+            .finally(() => {
+              setIsDeleting(false);
+            });
+        } catch (error) {
+          console.error("Error deleting park:", error);
+          setIsDeleting(false);
+        }
+      }, 150); // Slightly longer delay
+    });
   };
   
   return (
