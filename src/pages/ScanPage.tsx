@@ -20,10 +20,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Barcode } from 'lucide-react';
+import { Barcode, Plus } from 'lucide-react';
 
 const ScanPage = () => {
-  const { parks, getRowsByParkId, addBarcode } = useDB();
+  const { parks, getRowsByParkId, addBarcode, addRow } = useDB();
   const [selectedParkId, setSelectedParkId] = useState<string>("");
   const [selectedRowId, setSelectedRowId] = useState<string>("");
   const [barcodeInput, setBarcodeInput] = useState<string>("");
@@ -35,6 +35,15 @@ const ScanPage = () => {
   const handleParkChange = (value: string) => {
     setSelectedParkId(value);
     setSelectedRowId("");
+  };
+
+  const handleAddRow = async () => {
+    if (selectedParkId) {
+      const newRow = await addRow(selectedParkId);
+      if (newRow) {
+        setSelectedRowId(newRow.id);
+      }
+    }
   };
 
   const handleBarcodeSubmit = async () => {
@@ -93,7 +102,20 @@ const ScanPage = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Select Row</label>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Select Row</label>
+              {selectedParkId && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddRow}
+                  className="h-8"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Row
+                </Button>
+              )}
+            </div>
             <Select
               value={selectedRowId}
               onValueChange={setSelectedRowId}
