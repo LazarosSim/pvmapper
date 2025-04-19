@@ -51,9 +51,12 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
     setIsEditDialogOpen(false);
   };
   
-  const handleDelete = () => {
-    deletePark(park.id);
+  const handleDelete = async () => {
+    // First close the dialog to prevent UI freeze
     setIsDeleteDialogOpen(false);
+    
+    // Then perform the delete operation
+    await deletePark(park.id);
   };
   
   return (
