@@ -41,6 +41,7 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
   const [editName, setEditName] = React.useState(park.name);
+  const [isDeleting, setIsDeleting] = React.useState(false);
   
   const rowCount = getRowsByParkId(park.id).length;
   const barcodeCount = countBarcodesInPark(park.id);
@@ -52,11 +53,24 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
   };
   
   const handleDelete = async () => {
-    // First close the dialog to prevent UI freeze
-    setIsDeleteDialogOpen(false);
+    // Prevent multiple clicks while processing
+    if (isDeleting) return;
     
-    // Then perform the delete operation
-    await deletePark(park.id);
+    try {
+      setIsDeleting(true);
+      // Close dialog first
+      setIsDeleteDialogOpen(false);
+      
+      // Small delay to ensure dialog animation completes
+      setTimeout(async () => {
+        // Then perform the delete operation
+        await deletePark(park.id);
+        setIsDeleting(false);
+      }, 100);
+    } catch (error) {
+      console.error("Error deleting park:", error);
+      setIsDeleting(false);
+    }
   };
   
   return (
@@ -78,6 +92,7 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
               <DropdownMenuItem 
                 onClick={() => setIsDeleteDialogOpen(true)}
                 className="text-destructive focus:text-destructive"
+                disabled={isDeleting}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
@@ -111,8 +126,12 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              className="bg-destructive text-destructive-foreground"
+              disabled={isDeleting}
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
