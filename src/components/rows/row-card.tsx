@@ -41,7 +41,6 @@ const RowCard: React.FC<RowCardProps> = ({ row }) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
   const [editName, setEditName] = React.useState(row.name);
-  const [isDeleting, setIsDeleting] = React.useState(false);
   
   const barcodeCount = countBarcodesInRow(row.id);
   const createdAt = formatDistanceToNow(new Date(row.createdAt), { addSuffix: true });
@@ -51,27 +50,9 @@ const RowCard: React.FC<RowCardProps> = ({ row }) => {
     setIsEditDialogOpen(false);
   };
   
-  // Modified delete handler to fix freezing issues
   const handleDelete = () => {
-    setIsDeleting(true);
+    deleteRow(row.id);
     setIsDeleteDialogOpen(false);
-    
-    // Use requestAnimationFrame to ensure UI updates before deletion
-    requestAnimationFrame(() => {
-      // Use setTimeout to provide extra time for the UI to update
-      setTimeout(() => {
-        try {
-          // Then perform the delete operation
-          deleteRow(row.id)
-            .finally(() => {
-              setIsDeleting(false);
-            });
-        } catch (error) {
-          console.error("Error deleting row:", error);
-          setIsDeleting(false);
-        }
-      }, 150); // Slightly longer delay
-    });
   };
   
   return (
@@ -93,7 +74,6 @@ const RowCard: React.FC<RowCardProps> = ({ row }) => {
               <DropdownMenuItem 
                 onClick={() => setIsDeleteDialogOpen(true)}
                 className="text-destructive focus:text-destructive"
-                disabled={isDeleting}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
@@ -125,17 +105,13 @@ const RowCard: React.FC<RowCardProps> = ({ row }) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDelete} 
-              className="bg-destructive text-destructive-foreground"
-              disabled={isDeleting}
-            >
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </Dialog>
+      </AlertDialog>
       
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
