@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Save, FileUp, AlertTriangle, FileExcel } from 'lucide-react';
+import { Download, Save, FileUp, AlertTriangle, FileText } from 'lucide-react';
 
 const BackupPage = () => {
   const { parks, rows, barcodes, importData, exportData } = useDB();
@@ -141,8 +141,13 @@ const BackupPage = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <Button onClick={handleExportExcel} className="w-full">
-              <FileExcel className="mr-2 h-4 w-4" />
+              <FileText className="mr-2 h-4 w-4" />
               Export to Excel
+            </Button>
+            
+            <Button onClick={handleExport} variant="outline" className="w-full">
+              <Download className="mr-2 h-4 w-4" />
+              Export Backup (JSON)
             </Button>
           </CardContent>
         </Card>
