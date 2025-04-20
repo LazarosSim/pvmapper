@@ -3,11 +3,18 @@ import React, { useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useDB } from '@/lib/db-provider';
 import Layout from '@/components/layout/layout';
-import BarcodeCard from '@/components/barcodes/barcode-card';
 import { Button } from '@/components/ui/button';
 import { Plus, RotateCcw } from 'lucide-react';
 import AddBarcodeDialog from '@/components/dialog/add-barcode-dialog';
 import { Input } from '@/components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,9 +73,28 @@ const RowDetail = () => {
         </div>
 
         {filteredBarcodes.length > 0 ? (
-          filteredBarcodes.map(barcode => (
-            <BarcodeCard key={barcode.id} barcode={barcode} />
-          ))
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-20">No.</TableHead>
+                  <TableHead>Barcode</TableHead>
+                  <TableHead className="w-40">Timestamp</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredBarcodes.map((barcode, index) => (
+                  <TableRow key={barcode.id}>
+                    <TableCell className="font-medium">{index + 1}</TableCell>
+                    <TableCell>{barcode.code}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(barcode.timestamp).toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         ) : (
           <div className="text-center py-8">
             <p className="text-muted-foreground mb-4">
@@ -112,4 +138,3 @@ const RowDetail = () => {
 };
 
 export default RowDetail;
-

@@ -15,7 +15,7 @@ import { FolderOpen, Plus } from 'lucide-react';
 
 const ScanParkPage = () => {
   const { parkId } = useParams<{ parkId: string }>();
-  const { parks, getRowsByParkId, getParkById, addRow } = useDB();
+  const { parks, getRowsByParkId, getParkById, addRow, countBarcodesInRow } = useDB();
   const navigate = useNavigate();
 
   if (!parkId || !parks.some(p => p.id === parkId)) {
@@ -38,7 +38,12 @@ const ScanParkPage = () => {
         {rows.map(row => (
           <Card key={row.id} className="hover:shadow-md transition-shadow">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-semibold">{row.name}</CardTitle>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-lg font-semibold">{row.name}</CardTitle>
+                <span className="text-sm text-muted-foreground">
+                  {countBarcodesInRow(row.id)} barcodes
+                </span>
+              </div>
               <CardDescription>
                 Select this row to scan barcodes
               </CardDescription>

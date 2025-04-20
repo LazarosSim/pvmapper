@@ -17,7 +17,7 @@ import { Barcode } from 'lucide-react';
 
 const ScanRowPage = () => {
   const { rowId } = useParams<{ rowId: string }>();
-  const { rows, getRowById, getParkById, addBarcode, getBarcodesByRowId } = useDB();
+  const { rows, getRowById, getParkById, addBarcode, getBarcodesByRowId, countBarcodesInRow } = useDB();
   const [barcodeInput, setBarcodeInput] = useState('');
   const [success, setSuccess] = useState<boolean | null>(null);
 
@@ -28,6 +28,7 @@ const ScanRowPage = () => {
   const row = getRowById(rowId);
   const park = row ? getParkById(row.parkId) : undefined;
   const recentBarcodes = getBarcodesByRowId(rowId).slice(-5).reverse();
+  const totalBarcodes = countBarcodesInRow(rowId);
   
   const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
 
@@ -50,10 +51,15 @@ const ScanRowPage = () => {
     <Layout title={breadcrumb || 'Scan Barcode'} showBack>
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <Barcode className="mr-2 h-5 w-5 text-inventory-primary" />
-            Scan Barcode
-          </CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle className="flex items-center">
+              <Barcode className="mr-2 h-5 w-5 text-inventory-primary" />
+              Scan Barcode
+            </CardTitle>
+            <span className="text-sm font-medium bg-secondary px-3 py-1 rounded-full">
+              {totalBarcodes} barcodes
+            </span>
+          </div>
           <CardDescription>
             Scan or enter a barcode to add it to this row
           </CardDescription>
