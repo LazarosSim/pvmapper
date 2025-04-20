@@ -405,5 +405,3 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
 
   return <DBContext.Provider value={value}>{children}</DBContext.Provider>;
 };
-
-export { DBContext, DBProvider, useDB };
