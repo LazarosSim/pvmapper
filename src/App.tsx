@@ -9,6 +9,8 @@ import Index from "./pages/Index";
 import ParkDetail from "./pages/ParkDetail";
 import RowDetail from "./pages/RowDetail";
 import ScanPage from "./pages/ScanPage";
+import ScanParkPage from "./pages/ScanParkPage";
+import ScanRowPage from "./pages/ScanRowPage";
 import SearchPage from "./pages/SearchPage";
 import BackupPage from "./pages/BackupPage";
 import NotFound from "./pages/NotFound";
@@ -27,6 +29,8 @@ const App = () => (
             <Route path="/park/:parkId" element={<ParkDetail />} />
             <Route path="/row/:rowId" element={<RowDetail />} />
             <Route path="/scan" element={<ScanPage />} />
+            <Route path="/scan/park/:parkId" element={<ScanParkPage />} />
+            <Route path="/scan/row/:rowId" element={<ScanRowPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/backup" element={<BackupPage />} />
             <Route path="*" element={<NotFound />} />
