@@ -7,6 +7,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { utils as XLSXUtils, writeFile as writeXLSXFile } from 'xlsx';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -16,23 +23,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Save, FileUp, AlertTriangle, FileText } from 'lucide-react';
+import { Download, Save, FileUp, AlertTriangle, FileText, RefreshCw } from 'lucide-react';
 
 const BackupPage = () => {
   const { parks, rows, barcodes, importData, exportData } = useDB();
   const [importContent, setImportContent] = useState('');
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [selectedParkId, setSelectedParkId] = useState<string>('all');
 
   const handleExportExcel = () => {
     try {
-      // Create worksheets for each park
       const workbook = XLSXUtils.book_new();
       
-      parks.forEach(park => {
-        // Get rows for this park
+      const parksToExport = selectedParkId === 'all' 
+        ? parks 
+        : parks.filter(park => park.id === selectedParkId);
+      
+      parksToExport.forEach(park => {
         const parkRows = rows.filter(row => row.parkId === park.id);
         
-        // Get barcodes for all rows in this park
         const parkBarcodeData = parkRows.flatMap(row => {
           const rowBarcodes = barcodes.filter(barcode => barcode.rowId === row.id);
           return rowBarcodes.map(barcode => ({
@@ -43,15 +52,17 @@ const BackupPage = () => {
           }));
         });
 
-        // Create worksheet only if park has data
         if (parkBarcodeData.length > 0) {
           const worksheet = XLSXUtils.json_to_sheet(parkBarcodeData);
-          XLSXUtils.book_append_sheet(workbook, worksheet, park.name.slice(0, 31)); // Excel sheet names limited to 31 chars
+          XLSXUtils.book_append_sheet(workbook, worksheet, park.name.slice(0, 31));
         }
       });
 
-      // Save the file
-      writeXLSXFile(workbook, `inventory-export-${new Date().toISOString().split('T')[0]}.xlsx`);
+      const fileName = selectedParkId === 'all' 
+        ? `inventory-export-${new Date().toISOString().split('T')[0]}.xlsx`
+        : `${parks.find(p => p.id === selectedParkId)?.name}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      writeXLSXFile(workbook, fileName);
       toast.success("Excel file exported successfully");
     } catch (error) {
       console.error("Export failed:", error);
@@ -62,7 +73,6 @@ const BackupPage = () => {
   const handleExport = () => {
     const data = exportData();
     
-    // Create a download link for the JSON file
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(data);
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
@@ -76,7 +86,6 @@ const BackupPage = () => {
 
   const handleImport = () => {
     try {
-      // Validate the import data before opening the confirmation dialog
       JSON.parse(importContent);
       setIsImportDialogOpen(true);
     } catch (e) {
@@ -140,10 +149,29 @@ const BackupPage = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button onClick={handleExportExcel} className="w-full">
-              <FileText className="mr-2 h-4 w-4" />
-              Export to Excel
-            </Button>
+            <div className="space-y-2">
+              <Select
+                value={selectedParkId}
+                onValueChange={setSelectedParkId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a park to export" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Parks</SelectItem>
+                  {parks.map((park) => (
+                    <SelectItem key={park.id} value={park.id}>
+                      {park.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button onClick={handleExportExcel} className="w-full">
+                <FileText className="mr-2 h-4 w-4" />
+                Export to Excel
+              </Button>
+            </div>
             
             <Button onClick={handleExport} variant="outline" className="w-full">
               <Download className="mr-2 h-4 w-4" />

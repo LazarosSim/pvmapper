@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { toast } from "sonner";
 
@@ -45,6 +44,7 @@ interface DBContextType {
   searchBarcodes: (query: string) => Barcode[];
   countBarcodesInRow: (rowId: string) => number;
   countBarcodesInPark: (parkId: string) => number;
+  resetRow: (rowId: string) => Promise<boolean>;
 }
 
 const DBContext = createContext<DBContextType | undefined>(undefined);
@@ -364,6 +364,19 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     );
   };
 
+  const resetRow = async (rowId: string): Promise<boolean> => {
+    try {
+      // Delete all barcodes in this row but keep the row itself
+      setBarcodes(prev => prev.filter(barcode => barcode.rowId !== rowId));
+      toast.success("Row data has been reset");
+      return true;
+    } catch (error) {
+      console.error("Failed to reset row:", error);
+      toast.error("Failed to reset row");
+      return false;
+    }
+  };
+
   const value = {
     parks,
     rows,
@@ -386,8 +399,11 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     importData,
     searchBarcodes,
     countBarcodesInRow,
-    countBarcodesInPark
+    countBarcodesInPark,
+    resetRow
   };
 
   return <DBContext.Provider value={value}>{children}</DBContext.Provider>;
 };
+
+export { DBContext, DBProvider, useDB };
