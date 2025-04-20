@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Layout from '@/components/layout/layout';
 import { useDB } from '@/lib/db-provider';
@@ -6,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { utils as XLSXUtils, writeFile as writeXLSXFile } from 'xlsx';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,12 +16,48 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Save, FileUp, AlertTriangle } from 'lucide-react';
+import { Download, Save, FileUp, AlertTriangle, FileExcel } from 'lucide-react';
 
 const BackupPage = () => {
-  const { exportData, importData, parks, rows, barcodes } = useDB();
+  const { parks, rows, barcodes, importData, exportData } = useDB();
   const [importContent, setImportContent] = useState('');
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+
+  const handleExportExcel = () => {
+    try {
+      // Create worksheets for each park
+      const workbook = XLSXUtils.book_new();
+      
+      parks.forEach(park => {
+        // Get rows for this park
+        const parkRows = rows.filter(row => row.parkId === park.id);
+        
+        // Get barcodes for all rows in this park
+        const parkBarcodeData = parkRows.flatMap(row => {
+          const rowBarcodes = barcodes.filter(barcode => barcode.rowId === row.id);
+          return rowBarcodes.map(barcode => ({
+            'Park Name': park.name,
+            'Row Name': row.name,
+            'Barcode': barcode.code,
+            'Scanned At': new Date(barcode.timestamp).toLocaleString(),
+          }));
+        });
+
+        // Create worksheet only if park has data
+        if (parkBarcodeData.length > 0) {
+          const worksheet = XLSXUtils.json_to_sheet(parkBarcodeData);
+          XLSXUtils.book_append_sheet(workbook, worksheet, park.name.slice(0, 31)); // Excel sheet names limited to 31 chars
+        }
+      });
+
+      // Save the file
+      writeXLSXFile(workbook, `inventory-export-${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success("Excel file exported successfully");
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast.error("Failed to export Excel file");
+    }
+  };
 
   const handleExport = () => {
     const data = exportData();
@@ -100,13 +136,13 @@ const BackupPage = () => {
               Export Data
             </CardTitle>
             <CardDescription>
-              Download a backup of your inventory data
+              Download your inventory data
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Button onClick={handleExport} className="w-full">
-              <Download className="mr-2 h-4 w-4" />
-              Export Backup File
+          <CardContent className="space-y-4">
+            <Button onClick={handleExportExcel} className="w-full">
+              <FileExcel className="mr-2 h-4 w-4" />
+              Export to Excel
             </Button>
           </CardContent>
         </Card>
