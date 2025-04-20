@@ -5,14 +5,25 @@ import { useDB } from '@/lib/db-provider';
 import Layout from '@/components/layout/layout';
 import BarcodeCard from '@/components/barcodes/barcode-card';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, RotateCcw } from 'lucide-react';
 import AddBarcodeDialog from '@/components/dialog/add-barcode-dialog';
 import { Input } from '@/components/ui/input';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const RowDetail = () => {
   const { rowId } = useParams<{ rowId: string }>();
-  const { rows, getRowById, getBarcodesByRowId, getParkById } = useDB();
+  const { rows, getRowById, getBarcodesByRowId, getParkById, resetRow } = useDB();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   if (!rowId || !rows.some(r => r.id === rowId)) {
@@ -29,16 +40,29 @@ const RowDetail = () => {
   
   const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
 
+  const handleReset = async () => {
+    await resetRow(rowId);
+    setIsResetDialogOpen(false);
+  };
+
   return (
     <Layout title={breadcrumb || 'Row Detail'} showBack>
       <div className="flex flex-col">
-        <div className="flex items-center space-x-2 mb-6">
+        <div className="flex items-center justify-between mb-6">
           <Input
             placeholder="Search barcodes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1"
+            className="flex-1 mr-2"
           />
+          <Button 
+            variant="outline"
+            onClick={() => setIsResetDialogOpen(true)}
+            className="gap-2"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Reset Row
+          </Button>
         </div>
 
         {filteredBarcodes.length > 0 ? (
@@ -65,9 +89,27 @@ const RowDetail = () => {
           onOpenChange={setIsDialogOpen} 
           rowId={rowId}
         />
+
+        <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will delete all barcodes in this row. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleReset} className="bg-destructive text-destructive-foreground">
+                Reset Row
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );
 };
 
 export default RowDetail;
+
