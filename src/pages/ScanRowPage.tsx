@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
 import { useDB } from '@/lib/db-provider';
@@ -15,11 +15,18 @@ import {
 } from "@/components/ui/card";
 import { Barcode } from 'lucide-react';
 
+// base64 beep notification sound (very short "ding")
+const NOTIF_SOUND =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAABCxAgAEABAAZGF0YaQAAACAgICAgICAgICAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgAAAAAAAAAA==";
+
 const ScanRowPage = () => {
   const { rowId } = useParams<{ rowId: string }>();
   const { rows, getRowById, getParkById, addBarcode, getBarcodesByRowId, countBarcodesInRow } = useDB();
   const [barcodeInput, setBarcodeInput] = useState('');
   const [success, setSuccess] = useState<boolean | null>(null);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   if (!rowId || !rows.some(r => r.id === rowId)) {
     return <Navigate to="/scan" replace />;
@@ -29,21 +36,41 @@ const ScanRowPage = () => {
   const park = row ? getParkById(row.parkId) : undefined;
   const recentBarcodes = getBarcodesByRowId(rowId).slice(-5).reverse();
   const totalBarcodes = countBarcodesInRow(rowId);
-  
+
   const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const registerBarcode = async () => {
     if (!barcodeInput.trim()) return;
-
     const result = await addBarcode(barcodeInput.trim(), rowId);
     setSuccess(!!result);
-    
+
     if (result) {
       setBarcodeInput('');
+      // Play notification sound
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play();
+      }
+      // autofocus for next scan (after a delay to allow setting state)
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 200);
       setTimeout(() => {
         setSuccess(null);
       }, 2000);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await registerBarcode();
+  };
+
+  const handleInputKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      // Prevent extra newlines (important for hardware scanners that send ENTER)
+      e.preventDefault();
+      await registerBarcode();
     }
   };
 
@@ -68,14 +95,16 @@ const ScanRowPage = () => {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Input
+                ref={inputRef}
                 value={barcodeInput}
                 onChange={(e) => setBarcodeInput(e.target.value)}
+                onKeyDown={handleInputKeyDown}
                 placeholder="Scan or enter barcode"
                 className="text-lg"
                 autoFocus
               />
+              <audio ref={audioRef} src={NOTIF_SOUND} />
             </div>
-
             {recentBarcodes.length > 0 && (
               <div className="space-y-2">
                 <h3 className="text-sm font-medium">Recent Scans</h3>
@@ -106,3 +135,4 @@ const ScanRowPage = () => {
 };
 
 export default ScanRowPage;
+

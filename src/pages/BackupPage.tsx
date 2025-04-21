@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import Layout from '@/components/layout/layout';
 import { useDB } from '@/lib/db-provider';
@@ -23,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Save, FileUp, AlertTriangle, FileText, RefreshCw } from 'lucide-react';
+import { Download, Save, FileUp, AlertTriangle, FileText, RefreshCw, Mail } from 'lucide-react';
 
 const BackupPage = () => {
   const { parks, rows, barcodes, importData, exportData } = useDB();
@@ -34,11 +35,10 @@ const BackupPage = () => {
   const handleExportExcel = () => {
     try {
       const workbook = XLSXUtils.book_new();
-      
       const parksToExport = selectedParkId === 'all' 
         ? parks 
         : parks.filter(park => park.id === selectedParkId);
-      
+
       parksToExport.forEach(park => {
         const parkRows = rows.filter(row => row.parkId === park.id);
         
@@ -64,24 +64,39 @@ const BackupPage = () => {
 
       writeXLSXFile(workbook, fileName);
       toast.success("Excel file exported successfully");
+      return fileName;
     } catch (error) {
       console.error("Export failed:", error);
       toast.error("Failed to export Excel file");
+      return null;
     }
   };
 
-  const handleExport = () => {
-    const data = exportData();
-    
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(data);
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", `inventory-backup-${new Date().toISOString().split('T')[0]}.json`);
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
-    
-    toast.success("Backup exported successfully");
+  // NEW EMAIL EXPORT: exports and opens mail client for attachment
+  const handleExportAndEmail = () => {
+    const fileName = handleExportExcel();
+    if (fileName) {
+      setTimeout(() => {
+        toast.info(
+          <>
+            <span className='font-medium'>To send the file via email:</span>
+            <ul className="list-disc list-inside mt-1 text-muted-foreground text-xs">
+              <li>Open your email client by clicking the button below.</li>
+              <li>Attach the exported Excel file (<b>{fileName}</b>) to the email draft.</li>
+              <li>Send to recipient.</li>
+            </ul>
+            <a
+              href={`mailto:?subject=Inventory Export&body=Please find the exported inventory Excel file attached.&attach=${fileName}`}
+              className="block mt-3 underline text-inventory-primary"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open Email Client
+            </a>
+          </>
+        );
+      }, 800);
+    }
   };
 
   const handleImport = () => {
@@ -166,17 +181,16 @@ const BackupPage = () => {
                   ))}
                 </SelectContent>
               </Select>
-
               <Button onClick={handleExportExcel} className="w-full">
                 <FileText className="mr-2 h-4 w-4" />
                 Export to Excel
               </Button>
+              <Button onClick={handleExportAndEmail} className="w-full" variant="secondary">
+                <Mail className="mr-2 h-4 w-4" />
+                Export & Email (Instructions)
+              </Button>
             </div>
-            
-            <Button onClick={handleExport} variant="outline" className="w-full">
-              <Download className="mr-2 h-4 w-4" />
-              Export Backup (JSON)
-            </Button>
+            {/* Removed Export as JSON button */}
           </CardContent>
         </Card>
 
@@ -234,3 +248,4 @@ const BackupPage = () => {
 };
 
 export default BackupPage;
+
