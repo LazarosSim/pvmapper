@@ -1,4 +1,3 @@
-
 import React, { useRef, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -15,9 +14,8 @@ import {
 } from "@/components/ui/card";
 import { Barcode } from 'lucide-react';
 
-// base64 beep notification sound (very short "ding")
 const NOTIF_SOUND =
-  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAABCxAgAEABAAZGF0YaQAAACAgICAgICAgICAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgAAAAAAAAAA==";
+  "data:audio/wav;base64,UklGRpQAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YdAAANiEhPz8CBAUGBgYGBQYEBQUFBAUFBQUFBAUFDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0N///+AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAA==";
 
 const ScanRowPage = () => {
   const { rowId } = useParams<{ rowId: string }>();
@@ -46,12 +44,10 @@ const ScanRowPage = () => {
 
     if (result) {
       setBarcodeInput('');
-      // Play notification sound
       if (audioRef.current) {
         audioRef.current.currentTime = 0;
         audioRef.current.play();
       }
-      // autofocus for next scan (after a delay to allow setting state)
       setTimeout(() => {
         inputRef.current?.focus();
       }, 200);
@@ -68,7 +64,6 @@ const ScanRowPage = () => {
 
   const handleInputKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      // Prevent extra newlines (important for hardware scanners that send ENTER)
       e.preventDefault();
       await registerBarcode();
     }
@@ -135,4 +130,3 @@ const ScanRowPage = () => {
 };
 
 export default ScanRowPage;
-
