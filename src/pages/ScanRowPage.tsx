@@ -15,114 +15,124 @@ import {
 } from "@/components/ui/card";
 import { Barcode } from 'lucide-react';
 
-// Louder and longer Mario Coin sound (base64 encoded)
-const NOTIF_SOUND = 
-  "data:audio/wav;base64,UklGRuQEAABXQVZFZm10IBAAAAABAAEARKwAABCxAgAEABAAZGF0YZAAAAD/IwCEQDAgBYQ0tDyEPbQ8tDuEO7Q6RDpEOIQ3RDeENoQ3hDaEN4Q2hDaENYQ1hDWENYQ1hDWENIQ0hDOEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQyhDKEMoQy";
+// base64 beep notification sound (very short "ding")
+const NOTIF_SOUND =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAABCxAgAEABAAZGF0YaQAAACAgICAgICAgICAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgAAAAAAAAAA==";
 
-const ScanRowPage: React.FC = () => {
+const ScanRowPage = () => {
   const { rowId } = useParams<{ rowId: string }>();
-  const { getBarcodesByRowId, addBarcode, getRowById } = useDB();
-  const [input, setInput] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const { rows, getRowById, getParkById, addBarcode, getBarcodesByRowId, countBarcodesInRow } = useDB();
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [success, setSuccess] = useState<boolean | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  if (!rowId) {
-    return <Navigate to="/scan" />;
+  if (!rowId || !rows.some(r => r.id === rowId)) {
+    return <Navigate to="/scan" replace />;
   }
 
   const row = getRowById(rowId);
-  if (!row) {
-    return <Navigate to="/scan" />;
-  }
+  const park = row ? getParkById(row.parkId) : undefined;
+  const recentBarcodes = getBarcodesByRowId(rowId).slice(-5).reverse();
+  const totalBarcodes = countBarcodesInRow(rowId);
 
-  const existingBarcodes = getBarcodesByRowId(rowId);
-  const currentCount = existingBarcodes.length;
+  const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(e.target.value);
-    setError(null);
-  };
+  const registerBarcode = async () => {
+    if (!barcodeInput.trim()) return;
+    const result = await addBarcode(barcodeInput.trim(), rowId);
+    setSuccess(!!result);
 
-  const handleSubmit = async () => {
-    if (!input.trim()) {
-      setError('Please enter a barcode');
-      return;
-    }
-
-    const result = await addBarcode(input.trim(), rowId);
     if (result) {
+      setBarcodeInput('');
       // Play notification sound
       if (audioRef.current) {
-        audioRef.current.play().catch(e => console.error('Error playing sound:', e));
+        audioRef.current.currentTime = 0;
+        audioRef.current.play();
       }
-      setInput('');
-      inputRef.current?.focus();
+      // autofocus for next scan (after a delay to allow setting state)
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 200);
+      setTimeout(() => {
+        setSuccess(null);
+      }, 2000);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await registerBarcode();
+  };
+
+  const handleInputKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      // Prevent extra newlines (important for hardware scanners that send ENTER)
       e.preventDefault();
-      handleSubmit();
+      await registerBarcode();
     }
   };
 
   return (
-    <Layout
-      title={`Scan ${row.name}`}
-      back={`/row/${rowId}`}
-      showScan={false}
-    >
-      <audio ref={audioRef} src={NOTIF_SOUND} />
-
-      <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Scan Barcodes</CardTitle>
-            <CardDescription>
-              Scan barcodes for {row.name}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="barcode" className="text-sm font-medium">
-                  Barcode
-                </label>
-                <div className="flex space-x-2 mt-1">
-                  <Input
-                    id="barcode"
-                    ref={inputRef}
-                    value={input}
-                    onChange={handleInputChange}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Enter or scan barcode"
-                    className="flex-1"
-                    autoFocus
-                  />
-                  <Button onClick={handleSubmit}>
-                    <Barcode className="mr-2 h-4 w-4" />
-                    Add
-                  </Button>
-                </div>
-                {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
-              </div>
-
-              <div className="bg-slate-100 p-3 rounded-md">
-                <p className="font-medium">Current count: {currentCount}</p>
-              </div>
+    <Layout title={breadcrumb || 'Scan Barcode'} showBack>
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle className="flex items-center">
+              <Barcode className="mr-2 h-5 w-5 text-inventory-primary" />
+              Scan Barcode
+            </CardTitle>
+            <span className="text-sm font-medium bg-secondary px-3 py-1 rounded-full">
+              {totalBarcodes} barcodes
+            </span>
+          </div>
+          <CardDescription>
+            Scan or enter a barcode to add it to this row
+          </CardDescription>
+        </CardHeader>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Input
+                ref={inputRef}
+                value={barcodeInput}
+                onChange={(e) => setBarcodeInput(e.target.value)}
+                onKeyDown={handleInputKeyDown}
+                placeholder="Scan or enter barcode"
+                className="text-lg"
+                autoFocus
+              />
+              <audio ref={audioRef} src={NOTIF_SOUND} />
             </div>
+            {recentBarcodes.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">Recent Scans</h3>
+                <div className="space-y-1">
+                  {recentBarcodes.map(barcode => (
+                    <div key={barcode.id} className="text-sm text-muted-foreground">
+                      {barcode.code}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
-          <CardFooter>
-            <p className="text-sm text-gray-500">
-              Press Enter after each scan to register the barcode
-            </p>
+          <CardFooter className="justify-between">
+            {success !== null && (
+              <p className={`text-sm ${success ? "text-green-500" : "text-red-500"}`}>
+                {success ? "Barcode added successfully" : "Failed to add barcode"}
+              </p>
+            )}
+            <Button type="submit" disabled={!barcodeInput.trim()}>
+              Add Barcode
+            </Button>
           </CardFooter>
-        </Card>
-      </div>
+        </form>
+      </Card>
     </Layout>
   );
 };
 
 export default ScanRowPage;
+
