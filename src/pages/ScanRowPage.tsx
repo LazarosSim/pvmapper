@@ -1,4 +1,3 @@
-
 import React, { useRef, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -13,17 +12,27 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Barcode } from 'lucide-react';
+import { Barcode, RotateCcw } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-// base64 beep notification sound (very short "ding")
 const NOTIF_SOUND =
   "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAABCxAgAEABAAZGF0YaQAAACAgICAgICAgICAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgAAAAAAAAAA==";
 
 const ScanRowPage = () => {
   const { rowId } = useParams<{ rowId: string }>();
-  const { rows, getRowById, getParkById, addBarcode, getBarcodesByRowId, countBarcodesInRow } = useDB();
+  const { rows, getRowById, getParkById, addBarcode, getBarcodesByRowId, countBarcodesInRow, resetRow } = useDB();
   const [barcodeInput, setBarcodeInput] = useState('');
   const [success, setSuccess] = useState<boolean | null>(null);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -46,12 +55,10 @@ const ScanRowPage = () => {
 
     if (result) {
       setBarcodeInput('');
-      // Play notification sound
       if (audioRef.current) {
         audioRef.current.currentTime = 0;
         audioRef.current.play();
       }
-      // autofocus for next scan (after a delay to allow setting state)
       setTimeout(() => {
         inputRef.current?.focus();
       }, 200);
@@ -68,10 +75,14 @@ const ScanRowPage = () => {
 
   const handleInputKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      // Prevent extra newlines (important for hardware scanners that send ENTER)
       e.preventDefault();
       await registerBarcode();
     }
+  };
+
+  const handleReset = async () => {
+    await resetRow(rowId);
+    setIsResetDialogOpen(false);
   };
 
   return (
@@ -83,9 +94,18 @@ const ScanRowPage = () => {
               <Barcode className="mr-2 h-5 w-5 text-inventory-primary" />
               Scan Barcode
             </CardTitle>
-            <span className="text-sm font-medium bg-secondary px-3 py-1 rounded-full">
-              {totalBarcodes} barcodes
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium bg-secondary px-3 py-1 rounded-full">
+                {totalBarcodes} barcodes
+              </span>
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={() => setIsResetDialogOpen(true)}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
           <CardDescription>
             Scan or enter a barcode to add it to this row
@@ -130,9 +150,25 @@ const ScanRowPage = () => {
           </CardFooter>
         </form>
       </Card>
+
+      <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete all barcodes in this row. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReset} className="bg-destructive text-destructive-foreground">
+              Reset Row
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 };
 
 export default ScanRowPage;
-
