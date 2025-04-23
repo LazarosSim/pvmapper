@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -55,6 +54,18 @@ const RowCard: React.FC<RowCardProps> = ({ row }) => {
     setIsDeleteDialogOpen(false);
   };
   
+  const handleRename = () => {
+    if (editName.trim() && editName !== row.name) {
+      updateRow(row.id, editName);
+    }
+    setIsEditDialogOpen(false);
+  };
+
+  const openEditDialog = () => {
+    setEditName(row.name);
+    setIsEditDialogOpen(true);
+  };
+
   return (
     <>
       <Card className="mb-4 hover:shadow-md transition-shadow">
@@ -67,9 +78,9 @@ const RowCard: React.FC<RowCardProps> = ({ row }) => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)}>
+              <DropdownMenuItem onClick={openEditDialog}>
                 <Edit className="mr-2 h-4 w-4" />
-                Edit
+                Rename
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={() => setIsDeleteDialogOpen(true)}
@@ -116,7 +127,7 @@ const RowCard: React.FC<RowCardProps> = ({ row }) => {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Row</DialogTitle>
+            <DialogTitle>Rename Row</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <Input
@@ -124,13 +135,14 @@ const RowCard: React.FC<RowCardProps> = ({ row }) => {
               onChange={(e) => setEditName(e.target.value)}
               placeholder="Row name"
               className="w-full"
+              autoFocus
             />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleEdit} disabled={!editName.trim()}>
+            <Button onClick={handleRename} disabled={!editName.trim() || editName === row.name}>
               Save Changes
             </Button>
           </DialogFooter>

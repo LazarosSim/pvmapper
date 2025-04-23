@@ -62,7 +62,6 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
   const [rows, setRows] = useState<Row[]>([]);
   const [barcodes, setBarcodes] = useState<Barcode[]>([]);
 
-  // Load data from localStorage on initial render
   useEffect(() => {
     try {
       const savedParks = localStorage.getItem("parks");
@@ -78,7 +77,6 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  // Save data to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem("parks", JSON.stringify(parks));
   }, [parks]);
@@ -92,7 +90,6 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
   }, [barcodes]);
 
   const addPark = async (name: string): Promise<Park | null> => {
-    // Check if park with same name exists
     if (parks.some(park => park.name.toLowerCase() === name.toLowerCase())) {
       toast.error("A park with this name already exists");
       return null;
@@ -117,16 +114,23 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
 
   const addRow = async (parkId: string): Promise<Row | null> => {
     try {
-      // Get park
       const park = parks.find(p => p.id === parkId);
       if (!park) {
         toast.error("Park not found");
         return null;
       }
 
-      // Count existing rows in this park to name the new one
       const parkRows = rows.filter(row => row.parkId === parkId);
-      const rowNumber = parkRows.length + 1;
+      const highestNumber = parkRows.reduce((max, row) => {
+        const match = row.name.match(/Row (\d+)/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          return num > max ? num : max;
+        }
+        return max;
+      }, 0);
+      
+      const rowNumber = highestNumber + 1;
       const rowName = `Row ${rowNumber}`;
 
       const newRow: Row = {
@@ -147,7 +151,6 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const addBarcode = async (code: string, rowId: string): Promise<Barcode | null> => {
-    // Check if barcode with same code exists
     if (barcodes.some(barcode => barcode.code === code)) {
       toast.error("This barcode already exists");
       return null;
@@ -173,20 +176,15 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
 
   const deletePark = async (parkId: string): Promise<boolean> => {
     try {
-      // Get all rows in this park
       const parkRows = rows.filter(row => row.parkId === parkId);
       
-      // Get all barcodes in these rows
       const rowIds = parkRows.map(row => row.id);
       const parkBarcodes = barcodes.filter(barcode => rowIds.includes(barcode.rowId));
       
-      // Delete all associated barcodes
       setBarcodes(prev => prev.filter(barcode => !parkBarcodes.some(pb => pb.id === barcode.id)));
       
-      // Delete all associated rows
       setRows(prev => prev.filter(row => row.parkId !== parkId));
       
-      // Delete the park
       setParks(prev => prev.filter(park => park.id !== parkId));
       
       toast.success("Park deleted");
@@ -200,10 +198,8 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
 
   const deleteRow = async (rowId: string): Promise<boolean> => {
     try {
-      // Delete all barcodes in this row
       setBarcodes(prev => prev.filter(barcode => barcode.rowId !== rowId));
       
-      // Delete the row
       setRows(prev => prev.filter(row => row.id !== rowId));
       
       toast.success("Row deleted");
@@ -228,7 +224,6 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const updatePark = async (parkId: string, name: string): Promise<boolean> => {
-    // Check if another park with same name exists
     if (parks.some(park => park.id !== parkId && park.name.toLowerCase() === name.toLowerCase())) {
       toast.error("Another park with this name already exists");
       return false;
@@ -266,7 +261,6 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const updateBarcode = async (barcodeId: string, code: string): Promise<boolean> => {
-    // Check if another barcode with same code exists
     if (barcodes.some(barcode => barcode.id !== barcodeId && barcode.code === code)) {
       toast.error("Another barcode with this code already exists");
       return false;
@@ -366,7 +360,6 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
 
   const resetRow = async (rowId: string): Promise<boolean> => {
     try {
-      // Delete all barcodes in this row but keep the row itself
       setBarcodes(prev => prev.filter(barcode => barcode.rowId !== rowId));
       toast.success("Row data has been reset");
       return true;
