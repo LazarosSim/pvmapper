@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -7,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { LogOut, BarChart3, User, Award, Star, Trophy, Medal } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { Progress } from '@/components/ui/progress';
 
 const ProfilePage = () => {
   const { currentUser, logout, getUserDailyScans, getUserTotalScans, getUserBarcodesScanned } = useDB();
@@ -41,20 +39,23 @@ const ProfilePage = () => {
       description: "Scan 600 panels in under 60 minutes",
       progress: Math.min(100, Math.round((dailyScans / 600) * 100)),
       completed: dailyScans >= 600,
+      showProgress: true
     },
     {
       icon: Star,
       title: "Pattern Finder",
-      description: "Find a barcode with 4 consecutive identical digits",
-      progress: 0, // This would need actual logic to determine
-      completed: false, // Placeholder, would need real logic
+      description: "Found barcodes with 4 consecutive identical digits",
+      count: 0, // This would need actual logic to determine
+      completed: false,
+      showProgress: false
     },
     {
       icon: Medal,
       title: "Straight Spotter",
-      description: "Find a barcode with a 5-digit straight sequence",
-      progress: 0, // This would need actual logic to determine
-      completed: false, // Placeholder, would need real logic
+      description: "Found barcodes with a 5-digit straight sequence",
+      count: 0, // This would need actual logic to determine
+      completed: false,
+      showProgress: false
     },
   ];
 
@@ -133,15 +134,24 @@ const ProfilePage = () => {
                   <div className="flex-1">
                     <div className="flex justify-between">
                       <span className="font-medium">{achievement.title}</span>
-                      <span>{achievement.completed ? 'Completed!' : `${achievement.progress}%`}</span>
+                      <span>
+                        {achievement.showProgress 
+                          ? achievement.completed 
+                            ? 'Completed!' 
+                            : `${achievement.progress}%`
+                          : `Found: ${achievement.count}`
+                        }
+                      </span>
                     </div>
                     <p className="text-sm text-muted-foreground">{achievement.description}</p>
                   </div>
                 </div>
-                <Progress 
-                  value={achievement.progress} 
-                  className={`h-2 ${achievement.completed ? 'bg-amber-100' : ''}`}
-                />
+                {achievement.showProgress && (
+                  <Progress 
+                    value={achievement.progress} 
+                    className={`h-2 ${achievement.completed ? 'bg-amber-100' : ''}`}
+                  />
+                )}
               </div>
             ))}
           </CardContent>
