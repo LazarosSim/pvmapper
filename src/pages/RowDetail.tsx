@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useDB } from '@/lib/db-provider';
@@ -115,9 +114,7 @@ const RowDetail = () => {
     if (insertCode.trim() && insertAfterIndex !== null) {
       setIsInserting(true);
       try {
-        // Add 1 to insertAfterIndex since we want to insert after this index
-        const position = insertAfterIndex + 1;
-        const result = await addBarcode(insertCode.trim(), rowId, position);
+        const result = await addBarcode(insertCode.trim(), rowId, insertAfterIndex);
         
         if (result) {
           toast.success("Barcode inserted successfully");

@@ -214,38 +214,36 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      const timestamp = new Date().toISOString();
       const newBarcode: Barcode = {
         id: crypto.randomUUID(),
         code,
         rowId,
         userId: currentUser.id,
-        timestamp
+        timestamp: new Date().toISOString()
       };
 
       // Get row barcodes to handle position-based insertion
       const rowBarcodes = barcodes.filter(barcode => barcode.rowId === rowId);
       
-      if (position !== undefined && position >= 0 && position < rowBarcodes.length) {
-        // Insert at specific position
-        setBarcodes(prev => {
+      setBarcodes(prev => {
+        if (position !== undefined && position >= 0 && position <= rowBarcodes.length) {
           const updatedBarcodes = [...prev];
           let insertIndex = 0;
-          let currentRowIndex = -1;
+          let currentRowIndex = 0;
           
-          // Find the exact insert position among all barcodes
+          // Find the exact insert position
           for (let i = 0; i < updatedBarcodes.length; i++) {
             if (updatedBarcodes[i].rowId === rowId) {
-              currentRowIndex++;
               if (currentRowIndex === position) {
-                insertIndex = i + 1; // Insert after the current position
+                insertIndex = i;
                 break;
               }
+              currentRowIndex++;
             }
           }
           
           // If we didn't find a matching position, add to the end of row barcodes
-          if (insertIndex === 0 && rowBarcodes.length > 0) {
+          if (currentRowIndex < position && rowBarcodes.length > 0) {
             const lastRowBarcodeIndex = updatedBarcodes.findIndex(
               b => b.id === rowBarcodes[rowBarcodes.length - 1].id
             );
@@ -254,16 +252,16 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
           
           updatedBarcodes.splice(insertIndex, 0, newBarcode);
           return updatedBarcodes;
-        });
-      } else {
-        // Add to the end (default behavior)
-        setBarcodes(prev => [...prev, newBarcode]);
-      }
-      
+        }
+        
+        return [...prev, newBarcode];
+      });
+
       // Update daily scans counter
       const today = new Date().toISOString().split('T')[0];
       const existingDailyScan = dailyScans.find(scan => 
-        scan.date === today && scan.userId === currentUser.id);
+        scan.date === today && scan.userId === currentUser.id
+      );
       
       if (existingDailyScan) {
         setDailyScans(prev => prev.map(scan => 

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -72,53 +71,52 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
     try {
       setIsExporting(true);
       const rows = getRowsByParkId(park.id);
-      const rowData = rows.map(row => {
-        const barcodes = getBarcodesByRowId(row.id);
-        return {
-          rowName: row.name,
-          barcodes: barcodes.map(bc => ({
-            code: bc.code,
-            timestamp: new Date(bc.timestamp).toLocaleString()
-          }))
-        };
-      });
-
+      
+      // Create workbook and add summary sheet
       const wb = XLSX.utils.book_new();
       
+      // Add summary sheet
       const summaryData = [
         ["Park Name", park.name],
         ["Created", new Date(park.createdAt).toLocaleString()],
-        ["Total Rows", rowCount.toString()],
+        ["Total Rows", rows.length.toString()],
         ["Total Barcodes", barcodeCount.toString()],
         ["Expected Barcodes", park.expectedBarcodes.toString()],
         ["Completion", `${progress.percentage}%`]
       ];
-      
       const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
-      XLSX.utils.book_append_sheet(wb, summaryWs, "Park Summary");
-      
-      rowData.forEach(row => {
-        if (row.barcodes.length > 0) {
-          const data = [["Barcode", "Timestamp"]];
-          row.barcodes.forEach(bc => {
-            data.push([bc.code, bc.timestamp]);
-          });
+      XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
+
+      // Add sheet for each row with barcodes
+      rows.forEach(row => {
+        const barcodes = getBarcodesByRowId(row.id);
+        if (barcodes.length > 0) {
+          const rowData = [
+            ["Barcode", "Timestamp"]
+          ];
           
-          const ws = XLSX.utils.aoa_to_sheet(data);
-          XLSX.utils.book_append_sheet(wb, ws, row.rowName.substring(0, 31));
+          barcodes.forEach(barcode => {
+            rowData.push([
+              barcode.code,
+              new Date(barcode.timestamp).toLocaleString()
+            ]);
+          });
+
+          const ws = XLSX.utils.aoa_to_sheet(rowData);
+          const safeSheetName = row.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 31);
+          XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
         }
       });
+
+      // Generate file name and create blob
+      const fileName = `${park.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
       
-      // Generate safe filename
-      const safeFileName = `${sanitizeFileName(park.name)}_mapped.xlsx`;
-      
-      // Use writeFile to download the file
-      XLSX.writeFile(wb, safeFileName);
-      
+      // Write file directly
+      XLSX.writeFile(wb, fileName);
       toast.success("Park data exported successfully");
     } catch (error) {
       console.error("Export failed:", error);
-      toast.error("Failed to export data: " + (error instanceof Error ? error.message : "Unknown error"));
+      toast.error("Failed to export data");
     } finally {
       setIsExporting(false);
     }
