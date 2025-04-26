@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useDB } from '@/lib/db-provider';
@@ -115,34 +114,32 @@ const RowDetail = () => {
     }
   };
 
+  const titleContent = editingRowName ? (
+    <div className="flex items-center space-x-2">
+      <Input
+        value={rowName}
+        onChange={(e) => setRowName(e.target.value)}
+        className="w-40"
+        autoFocus
+      />
+      <Button variant="ghost" size="icon" onClick={saveRowName} className="h-8 w-8">
+        <Check className="h-4 w-4 text-green-500" />
+      </Button>
+      <Button variant="ghost" size="icon" onClick={() => setEditingRowName(false)} className="h-8 w-8">
+        <X className="h-4 w-4 text-red-500" />
+      </Button>
+    </div>
+  ) : (
+    <div className="flex items-center space-x-2">
+      <span>{breadcrumb || 'Row Detail'}</span>
+      <Button variant="ghost" size="icon" onClick={startRowRename} className="h-6 w-6">
+        <Edit className="h-3 w-3 text-muted-foreground" />
+      </Button>
+    </div>
+  );
+
   return (
-    <Layout title={
-      <>
-        {editingRowName ? (
-          <div className="flex items-center space-x-2">
-            <Input
-              value={rowName}
-              onChange={(e) => setRowName(e.target.value)}
-              className="w-40"
-              autoFocus
-            />
-            <Button variant="ghost" size="icon" onClick={saveRowName} className="h-8 w-8">
-              <Check className="h-4 w-4 text-green-500" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => setEditingRowName(false)} className="h-8 w-8">
-              <X className="h-4 w-4 text-red-500" />
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center space-x-2">
-            <span>{breadcrumb || 'Row Detail'}</span>
-            <Button variant="ghost" size="icon" onClick={startRowRename} className="h-6 w-6">
-              <Edit className="h-3 w-3 text-muted-foreground" />
-            </Button>
-          </div>
-        )}
-      </>
-    } showBack>
+    <Layout title={breadcrumb || 'Row Detail'} showBack titleAction={titleContent}>
       <div className="flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <Input

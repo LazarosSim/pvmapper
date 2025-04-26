@@ -1,4 +1,3 @@
-
 import React, { useRef, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -113,35 +112,33 @@ const ScanRowPage = () => {
     }
   };
 
+  const titleContent = isEditingRowName ? (
+    <div className="flex items-center space-x-2">
+      <Input
+        value={rowName}
+        onChange={(e) => setRowName(e.target.value)}
+        className="w-40"
+        autoFocus
+      />
+      <Button variant="ghost" size="icon" onClick={saveRowName}>
+        <Check className="h-4 w-4 text-green-500" />
+      </Button>
+      <Button variant="ghost" size="icon" onClick={() => setIsEditingRowName(false)}>
+        <X className="h-4 w-4 text-red-500" />
+      </Button>
+    </div>
+  ) : (
+    <div className="flex items-center space-x-2">
+      <span>{breadcrumb || 'Scan Barcode'}</span>
+      <Button variant="ghost" size="icon" onClick={startEditingName}>
+        <Edit className="h-4 w-4 text-muted-foreground" />
+      </Button>
+    </div>
+  );
+
   return (
     <AuthGuard>
-      <Layout title={
-        <>
-          {isEditingRowName ? (
-            <div className="flex items-center space-x-2">
-              <Input
-                value={rowName}
-                onChange={(e) => setRowName(e.target.value)}
-                className="w-40"
-                autoFocus
-              />
-              <Button variant="ghost" size="icon" onClick={saveRowName}>
-                <Check className="h-4 w-4 text-green-500" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => setIsEditingRowName(false)}>
-                <X className="h-4 w-4 text-red-500" />
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center space-x-2">
-              <span>{breadcrumb || 'Scan Barcode'}</span>
-              <Button variant="ghost" size="icon" onClick={startEditingName}>
-                <Edit className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            </div>
-          )}
-        </>
-      } showBack>
+      <Layout title={breadcrumb || 'Scan Barcode'} showBack titleAction={titleContent}>
         <Card className="glass-card">
           <CardHeader>
             <div className="flex justify-between items-center">
