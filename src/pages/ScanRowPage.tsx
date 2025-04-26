@@ -117,7 +117,7 @@ const ScanRowPage = () => {
       <Input
         value={rowName}
         onChange={(e) => setRowName(e.target.value)}
-        className="w-40"
+        className="w-40 bg-white text-gray-900 border-gray-300"
         autoFocus
       />
       <Button variant="ghost" size="icon" onClick={saveRowName}>

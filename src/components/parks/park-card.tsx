@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,10 +63,7 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
 
   const handleExportExcel = () => {
     try {
-      // Get all rows for this park
       const rows = getRowsByParkId(park.id);
-      
-      // Collect all barcodes organized by row
       const rowData = rows.map(row => {
         const barcodes = getBarcodesByRowId(row.id);
         return {
@@ -79,10 +75,8 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
         };
       });
 
-      // Prepare workbook and worksheet
       const wb = XLSX.utils.book_new();
       
-      // Create a worksheet for park summary
       const summaryData = [
         ["Park Name", park.name],
         ["Created", new Date(park.createdAt).toLocaleString()],
@@ -91,13 +85,12 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
         ["Expected Barcodes", park.expectedBarcodes.toString()],
         ["Completion", `${progress.percentage}%`]
       ];
+      
       const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
       XLSX.utils.book_append_sheet(wb, summaryWs, "Park Summary");
       
-      // Create worksheet for each row
       rowData.forEach(row => {
         if (row.barcodes.length > 0) {
-          // Convert barcodes to array of arrays format
           const data = [["Barcode", "Timestamp"]];
           row.barcodes.forEach(bc => {
             data.push([bc.code, bc.timestamp]);
@@ -108,9 +101,8 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
         }
       });
       
-      // Generate Excel file
-      XLSX.writeFile(wb, `${park.name}-export.xlsx`);
-      toast.success("Park data exported to Excel");
+      XLSX.writeFile(wb, `${park.name}_mapped.xlsx`);
+      toast.success("Park data exported successfully");
     } catch (error) {
       console.error("Export failed:", error);
       toast.error("Failed to export data");

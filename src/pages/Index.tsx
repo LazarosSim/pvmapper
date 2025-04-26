@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useDB } from '@/lib/db-provider';
 import Layout from '@/components/layout/layout';
@@ -18,7 +17,11 @@ const Index = () => {
   );
 
   return (
-    <Layout title="Inventory Hub">
+    <Layout title={
+      <span className="font-montserrat text-xl bg-gradient-to-r from-white to-white/80 bg-clip-text">
+        XP Energy PV Mapper
+      </span>
+    }>
       <div className="flex flex-col">
         <div className="flex items-center space-x-2 mb-6">
           <Input

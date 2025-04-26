@@ -107,6 +107,11 @@ const RowDetail = () => {
     if (insertCode.trim() && insertAfterIndex !== null) {
       const result = await addBarcode(insertCode.trim(), rowId);
       if (result) {
+        setBarcodes(prev => {
+          const newBarcodes = [...prev];
+          newBarcodes.splice(insertAfterIndex + 1, 0, result);
+          return newBarcodes;
+        });
         toast.success("Barcode inserted successfully");
         setInsertCode('');
         setIsInsertDialogOpen(false);
