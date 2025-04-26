@@ -7,9 +7,10 @@ import { ArrowLeft, Database } from 'lucide-react';
 interface HeaderProps {
   title: string;
   showBack?: boolean;
+  titleAction?: React.ReactNode;
 }
 
-const Header: React.FC<HeaderProps> = ({ title, showBack = false }) => {
+const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -28,7 +29,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBack = false }) => {
         )}
         <div className="flex items-center">
           <Database className="h-6 w-6 mr-2" />
-          <h1 className="text-xl font-semibold">{title}</h1>
+          {titleAction ? titleAction : <h1 className="text-xl font-semibold">{title}</h1>}
         </div>
       </div>
     </header>
