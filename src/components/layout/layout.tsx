@@ -5,7 +5,7 @@ import BottomNav from './bottom-nav';
 
 interface LayoutProps {
   children: React.ReactNode;
-  title: string;
+  title: React.ReactNode; // Changed from string to ReactNode
   showBack?: boolean;
   titleAction?: React.ReactNode;
 }
