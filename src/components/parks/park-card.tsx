@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
@@ -7,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Edit, Trash2, MoreVertical, FolderOpen, FileDown } from 'lucide-react';
+import { Edit, Trash2, MoreVertical, FolderOpen, FileDown, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDB, Park } from '@/lib/db-provider';
 import { formatDistanceToNow } from 'date-fns';
@@ -45,6 +46,7 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
   const [editName, setEditName] = React.useState(park.name);
   const [editExpectedBarcodes, setEditExpectedBarcodes] = React.useState(park.expectedBarcodes);
+  const [isExporting, setIsExporting] = useState(false);
   
   const rowCount = getRowsByParkId(park.id).length;
   const barcodeCount = countBarcodesInPark(park.id);
@@ -61,8 +63,14 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
     setIsDeleteDialogOpen(false);
   };
 
+  // Helper function to sanitize filename
+  const sanitizeFileName = (name: string): string => {
+    return name.replace(/[\\/:*?"<>|]/g, '_');
+  };
+
   const handleExportExcel = () => {
     try {
+      setIsExporting(true);
       const rows = getRowsByParkId(park.id);
       const rowData = rows.map(row => {
         const barcodes = getBarcodesByRowId(row.id);
@@ -101,11 +109,18 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
         }
       });
       
-      XLSX.writeFile(wb, `${park.name}_mapped.xlsx`);
+      // Generate safe filename
+      const safeFileName = `${sanitizeFileName(park.name)}_mapped.xlsx`;
+      
+      // Use writeFile to download the file
+      XLSX.writeFile(wb, safeFileName);
+      
       toast.success("Park data exported successfully");
     } catch (error) {
       console.error("Export failed:", error);
-      toast.error("Failed to export data");
+      toast.error("Failed to export data: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -121,9 +136,14 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
               variant="outline" 
               size="icon"
               onClick={handleExportExcel}
+              disabled={isExporting}
               className="text-inventory-secondary hover:text-inventory-secondary/80"
             >
-              <FileDown className="h-4 w-4" />
+              {isExporting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileDown className="h-4 w-4" />
+              )}
             </Button>
             {isManager && (
               <DropdownMenu>

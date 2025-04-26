@@ -1,9 +1,10 @@
+
 import React, { useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useDB } from '@/lib/db-provider';
 import Layout from '@/components/layout/layout';
 import { Button } from '@/components/ui/button';
-import { Plus, RotateCcw, Edit, Check, X, ArrowDown } from 'lucide-react';
+import { Plus, RotateCcw, Edit, Check, X, ArrowDown, Loader2 } from 'lucide-react';
 import AddBarcodeDialog from '@/components/dialog/add-barcode-dialog';
 import { Input } from '@/components/ui/input';
 import {
@@ -46,6 +47,8 @@ const RowDetail = () => {
   const [editingBarcode, setEditingBarcode] = useState<{id: string, code: string} | null>(null);
   const [editingRowName, setEditingRowName] = useState(false);
   const [rowName, setRowName] = useState('');
+  const [isInserting, setIsInserting] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   if (!rowId || !rows.some(r => r.id === rowId)) {
     return <Navigate to="/" replace />;
@@ -62,8 +65,13 @@ const RowDetail = () => {
   const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
 
   const handleReset = async () => {
-    await resetRow(rowId);
-    setIsResetDialogOpen(false);
+    setIsResetting(true);
+    try {
+      await resetRow(rowId);
+      setIsResetDialogOpen(false);
+    } finally {
+      setIsResetting(false);
+    }
   };
   
   const handleEditBarcode = (id: string, code: string) => {
@@ -105,11 +113,22 @@ const RowDetail = () => {
   
   const handleInsertBarcode = async () => {
     if (insertCode.trim() && insertAfterIndex !== null) {
-      const result = await addBarcode(insertCode.trim(), rowId);
-      if (result) {
-        toast.success("Barcode inserted successfully");
-        setInsertCode('');
-        setIsInsertDialogOpen(false);
+      setIsInserting(true);
+      try {
+        // Add 1 to insertAfterIndex since we want to insert after this index
+        const position = insertAfterIndex + 1;
+        const result = await addBarcode(insertCode.trim(), rowId, position);
+        
+        if (result) {
+          toast.success("Barcode inserted successfully");
+          setInsertCode('');
+          setIsInsertDialogOpen(false);
+        }
+      } catch (error) {
+        console.error("Error inserting barcode:", error);
+        toast.error("Failed to insert barcode");
+      } finally {
+        setIsInserting(false);
       }
     }
   };
@@ -151,9 +170,14 @@ const RowDetail = () => {
           <Button 
             variant="outline"
             onClick={() => setIsResetDialogOpen(true)}
+            disabled={isResetting}
             className="gap-2 text-inventory-secondary border-inventory-secondary/30 hover:bg-inventory-secondary/10"
           >
-            <RotateCcw className="h-4 w-4" />
+            {isResetting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RotateCcw className="h-4 w-4" />
+            )}
             Reset Row
           </Button>
         </div>
@@ -257,7 +281,14 @@ const RowDetail = () => {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleReset} className="bg-destructive text-destructive-foreground">
+              <AlertDialogAction 
+                onClick={handleReset} 
+                disabled={isResetting}
+                className="bg-destructive text-destructive-foreground"
+              >
+                {isResetting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : null}
                 Reset Row
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -281,6 +312,11 @@ const RowDetail = () => {
                   autoFocus
                 />
               </div>
+              {insertAfterIndex !== null && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  This barcode will be inserted after item #{insertAfterIndex + 1}
+                </p>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsInsertDialogOpen(false)}>
@@ -288,10 +324,17 @@ const RowDetail = () => {
               </Button>
               <Button 
                 onClick={handleInsertBarcode} 
-                disabled={!insertCode.trim()}
+                disabled={!insertCode.trim() || isInserting}
                 className="bg-inventory-primary hover:bg-inventory-primary/90"
               >
-                Insert Barcode
+                {isInserting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Inserting...
+                  </>
+                ) : (
+                  'Insert Barcode'
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
