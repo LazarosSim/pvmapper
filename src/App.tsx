@@ -15,7 +15,6 @@ import ScanRowPage from "./pages/ScanRowPage";
 import ProfilePage from "./pages/ProfilePage";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
-import BackupPage from "./pages/BackupPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,7 +38,6 @@ const App = () => (
             <Route path="/scan/park/:parkId" element={<AuthGuard><ScanParkPage /></AuthGuard>} />
             <Route path="/scan/row/:rowId" element={<AuthGuard><ScanRowPage /></AuthGuard>} />
             <Route path="/profile" element={<AuthGuard><ProfilePage /></AuthGuard>} />
-            <Route path="/backup" element={<AuthGuard><BackupPage /></AuthGuard>} />
             
             {/* Manager-only route */}
             <Route path="/dashboard" element={<AuthGuard requireManager={true}><DashboardPage /></AuthGuard>} />

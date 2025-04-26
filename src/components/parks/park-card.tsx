@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Edit, Trash2, MoreVertical, FolderOpen } from 'lucide-react';
+import { Edit, Trash2, MoreVertical, FolderOpen, FileDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDB, Park } from '@/lib/db-provider';
 import { formatDistanceToNow } from 'date-fns';
@@ -32,6 +32,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 
 interface ParkCardProps {
   park: Park;
@@ -39,7 +41,7 @@ interface ParkCardProps {
 
 const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
   const navigate = useNavigate();
-  const { countBarcodesInPark, getRowsByParkId, deletePark, updatePark, getParkProgress, currentUser } = useDB();
+  const { countBarcodesInPark, getRowsByParkId, deletePark, updatePark, getParkProgress, currentUser, getBarcodesByRowId } = useDB();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
   const [editName, setEditName] = React.useState(park.name);
@@ -60,35 +62,100 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
     setIsDeleteDialogOpen(false);
   };
 
+  const handleExportExcel = () => {
+    try {
+      // Get all rows for this park
+      const rows = getRowsByParkId(park.id);
+      
+      // Collect all barcodes organized by row
+      const rowData = rows.map(row => {
+        const barcodes = getBarcodesByRowId(row.id);
+        return {
+          rowName: row.name,
+          barcodes: barcodes.map(bc => ({
+            code: bc.code,
+            timestamp: new Date(bc.timestamp).toLocaleString()
+          }))
+        };
+      });
+
+      // Prepare workbook and worksheet
+      const wb = XLSX.utils.book_new();
+      
+      // Create a worksheet for park summary
+      const summaryData = [
+        ["Park Name", park.name],
+        ["Created", new Date(park.createdAt).toLocaleString()],
+        ["Total Rows", rowCount.toString()],
+        ["Total Barcodes", barcodeCount.toString()],
+        ["Expected Barcodes", park.expectedBarcodes.toString()],
+        ["Completion", `${progress.percentage}%`]
+      ];
+      const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(wb, summaryWs, "Park Summary");
+      
+      // Create worksheet for each row
+      rowData.forEach(row => {
+        if (row.barcodes.length > 0) {
+          // Convert barcodes to array of arrays format
+          const data = [["Barcode", "Timestamp"]];
+          row.barcodes.forEach(bc => {
+            data.push([bc.code, bc.timestamp]);
+          });
+          
+          const ws = XLSX.utils.aoa_to_sheet(data);
+          XLSX.utils.book_append_sheet(wb, ws, row.rowName.substring(0, 31));
+        }
+      });
+      
+      // Generate Excel file
+      XLSX.writeFile(wb, `${park.name}-export.xlsx`);
+      toast.success("Park data exported to Excel");
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast.error("Failed to export data");
+    }
+  };
+
   const isManager = currentUser?.role === 'manager';
   
   return (
     <>
-      <Card className="mb-4 hover:shadow-md transition-shadow">
+      <Card className="mb-4 hover:shadow-md transition-shadow glass-card">
         <CardHeader className="pb-2 flex flex-row items-center justify-between">
-          <CardTitle className="text-lg font-semibold">{park.name}</CardTitle>
-          {isManager && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <MoreVertical className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setIsDeleteDialogOpen(true)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          <CardTitle className="text-lg font-semibold text-inventory-text">{park.name}</CardTitle>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={handleExportExcel}
+              className="text-inventory-secondary hover:text-inventory-secondary/80"
+            >
+              <FileDown className="h-4 w-4" />
+            </Button>
+            {isManager && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <MoreVertical className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="text-sm text-muted-foreground mb-2">Created {createdAt}</div>
@@ -99,7 +166,12 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
                 <span>Progress</span>
                 <span className="font-medium">{progress.percentage}%</span>
               </div>
-              <Progress value={progress.percentage} className="h-2" />
+              <Progress value={progress.percentage} className="h-2 bg-gray-200">
+                <div 
+                  className="h-full bg-gradient-to-r from-inventory-primary to-inventory-secondary rounded-full" 
+                  style={{ width: `${progress.percentage}%` }}
+                />
+              </Progress>
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>{progress.completed} scanned</span>
                 <span>{progress.total} expected</span>
@@ -113,7 +185,12 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
               <span className="mx-2 text-muted-foreground">•</span>
               <span className="text-sm font-medium">{barcodeCount} Barcodes</span>
             </div>
-            <Button variant="outline" size="sm" onClick={() => navigate(`/park/${park.id}`)}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => navigate(`/park/${park.id}`)}
+              className="bg-inventory-secondary/10 text-inventory-secondary hover:bg-inventory-secondary/20 border-inventory-secondary/30"
+            >
               <FolderOpen className="mr-2 h-4 w-4" />
               Open
             </Button>
@@ -175,6 +252,7 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
             <Button 
               onClick={handleEdit} 
               disabled={!editName.trim() || editExpectedBarcodes < 0}
+              className="bg-inventory-primary hover:bg-inventory-primary/90"
             >
               Save Changes
             </Button>

@@ -25,7 +25,7 @@ const Index = () => {
             placeholder="Search parks..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1"
+            className="flex-1 bg-white/80 backdrop-blur-sm border border-inventory-secondary/30 focus-visible:ring-inventory-primary"
           />
         </div>
 

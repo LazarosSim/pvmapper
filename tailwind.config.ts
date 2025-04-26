@@ -64,8 +64,8 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
                 inventory: {
-                    primary: '#1E40AF', // Deep blue
-                    secondary: '#10B981', // Green
+                    primary: '#F97316', // Orange
+                    secondary: '#0EA5E9', // Blue
                     highlight: '#3B82F6', // Bright blue for selections
                     background: '#F8FAFC', // Light background
                     card: '#FFFFFF',

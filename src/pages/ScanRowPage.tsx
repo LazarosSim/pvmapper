@@ -13,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Barcode, RotateCcw } from 'lucide-react';
+import { Barcode, RotateCcw, Edit, Check, X } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { toast } from 'sonner';
 import AuthGuard from '@/components/auth/auth-guard';
 
 const NOTIF_SOUND =
@@ -31,10 +32,12 @@ const NOTIF_SOUND =
 
 const ScanRowPage = () => {
   const { rowId } = useParams<{ rowId: string }>();
-  const { rows, getRowById, getParkById, addBarcode, getBarcodesByRowId, countBarcodesInRow, resetRow, currentUser } = useDB();
+  const { rows, getRowById, getParkById, addBarcode, getBarcodesByRowId, countBarcodesInRow, resetRow, currentUser, updateRow } = useDB();
   const [barcodeInput, setBarcodeInput] = useState('');
   const [success, setSuccess] = useState<boolean | null>(null);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [isEditingRowName, setIsEditingRowName] = useState(false);
+  const [rowName, setRowName] = useState('');
 
   const inputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -90,17 +93,60 @@ const ScanRowPage = () => {
     await resetRow(rowId);
     setIsResetDialogOpen(false);
   };
-
-  const dailyScans = currentUser ? currentUser.id : 0;
+  
+  const startEditingName = () => {
+    if (row) {
+      setRowName(row.name);
+      setIsEditingRowName(true);
+    }
+  };
+  
+  const saveRowName = async () => {
+    if (row && rowName.trim()) {
+      const result = await updateRow(rowId, rowName);
+      if (result) {
+        toast.success("Row name updated successfully");
+        setIsEditingRowName(false);
+      }
+    } else {
+      toast.error("Row name cannot be empty");
+    }
+  };
 
   return (
     <AuthGuard>
-      <Layout title={breadcrumb || 'Scan Barcode'} showBack>
-        <Card>
+      <Layout title={
+        <>
+          {isEditingRowName ? (
+            <div className="flex items-center space-x-2">
+              <Input
+                value={rowName}
+                onChange={(e) => setRowName(e.target.value)}
+                className="w-40"
+                autoFocus
+              />
+              <Button variant="ghost" size="icon" onClick={saveRowName}>
+                <Check className="h-4 w-4 text-green-500" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setIsEditingRowName(false)}>
+                <X className="h-4 w-4 text-red-500" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <span>{breadcrumb || 'Scan Barcode'}</span>
+              <Button variant="ghost" size="icon" onClick={startEditingName}>
+                <Edit className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </div>
+          )}
+        </>
+      } showBack>
+        <Card className="glass-card">
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle className="flex items-center">
-                <Barcode className="mr-2 h-5 w-5 text-primary" />
+                <Barcode className="mr-2 h-5 w-5 text-inventory-primary" />
                 Scan Barcode
               </CardTitle>
               <div className="flex items-center gap-2">
@@ -111,6 +157,7 @@ const ScanRowPage = () => {
                   variant="outline" 
                   size="icon"
                   onClick={() => setIsResetDialogOpen(true)}
+                  className="text-inventory-secondary hover:bg-inventory-secondary/10 border-inventory-secondary/30"
                 >
                   <RotateCcw className="h-4 w-4" />
                 </Button>
@@ -129,7 +176,7 @@ const ScanRowPage = () => {
                   onChange={(e) => setBarcodeInput(e.target.value)}
                   onKeyDown={handleInputKeyDown}
                   placeholder="Scan or enter barcode"
-                  className="text-lg"
+                  className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30"
                   autoFocus
                 />
                 <audio ref={audioRef} src={NOTIF_SOUND} />
@@ -153,7 +200,11 @@ const ScanRowPage = () => {
                   {success ? "Barcode added successfully" : "Failed to add barcode"}
                 </p>
               )}
-              <Button type="submit" disabled={!barcodeInput.trim()}>
+              <Button 
+                type="submit" 
+                disabled={!barcodeInput.trim()}
+                className="bg-inventory-primary hover:bg-inventory-primary/90"
+              >
                 Add Barcode
               </Button>
             </CardFooter>

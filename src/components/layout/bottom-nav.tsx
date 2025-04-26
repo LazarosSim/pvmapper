@@ -5,7 +5,6 @@ import {
   BarChart2, 
   Home, 
   ScanBarcode, 
-  Save,
   User
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -38,12 +37,6 @@ const BottomNav = () => {
       icon: <User className="h-5 w-5" />,
       active: location.pathname === '/profile'
     },
-    {
-      href: '/backup',
-      label: 'Backup',
-      icon: <Save className="h-5 w-5" />,
-      active: location.pathname === '/backup'
-    },
   ];
   
   // Add dashboard for managers
@@ -66,8 +59,8 @@ const BottomNav = () => {
             className={cn(
               "flex flex-col items-center px-2 py-1 rounded-md",
               link.active 
-                ? "text-primary" 
-                : "text-muted-foreground hover:text-primary transition"
+                ? "text-inventory-primary" 
+                : "text-muted-foreground hover:text-inventory-primary transition"
             )}
           >
             {link.icon}

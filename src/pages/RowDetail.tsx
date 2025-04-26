@@ -4,7 +4,7 @@ import { useParams, Navigate } from 'react-router-dom';
 import { useDB } from '@/lib/db-provider';
 import Layout from '@/components/layout/layout';
 import { Button } from '@/components/ui/button';
-import { Plus, RotateCcw } from 'lucide-react';
+import { Plus, RotateCcw, Edit, Check, X, ArrowDown } from 'lucide-react';
 import AddBarcodeDialog from '@/components/dialog/add-barcode-dialog';
 import { Input } from '@/components/ui/input';
 import {
@@ -25,13 +25,28 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { Label } from '@/components/ui/label';
 
 const RowDetail = () => {
   const { rowId } = useParams<{ rowId: string }>();
-  const { rows, getRowById, getBarcodesByRowId, getParkById, resetRow } = useDB();
+  const { rows, getRowById, getBarcodesByRowId, getParkById, resetRow, updateRow, updateBarcode, addBarcode } = useDB();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isInsertDialogOpen, setIsInsertDialogOpen] = useState(false);
+  const [insertAfterIndex, setInsertAfterIndex] = useState<number | null>(null);
+  const [insertCode, setInsertCode] = useState('');
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingBarcode, setEditingBarcode] = useState<{id: string, code: string} | null>(null);
+  const [editingRowName, setEditingRowName] = useState(false);
+  const [rowName, setRowName] = useState('');
 
   if (!rowId || !rows.some(r => r.id === rowId)) {
     return <Navigate to="/" replace />;
@@ -51,21 +66,95 @@ const RowDetail = () => {
     await resetRow(rowId);
     setIsResetDialogOpen(false);
   };
+  
+  const handleEditBarcode = (id: string, code: string) => {
+    setEditingBarcode({id, code});
+  };
+  
+  const saveEditedBarcode = async () => {
+    if (editingBarcode) {
+      const result = await updateBarcode(editingBarcode.id, editingBarcode.code);
+      if (result) {
+        toast.success("Barcode updated successfully");
+      }
+      setEditingBarcode(null);
+    }
+  };
+  
+  const cancelEditBarcode = () => {
+    setEditingBarcode(null);
+  };
+  
+  const startRowRename = () => {
+    if (row) {
+      setRowName(row.name);
+      setEditingRowName(true);
+    }
+  };
+  
+  const saveRowName = async () => {
+    if (row && rowName.trim()) {
+      const result = await updateRow(row.id, rowName.trim());
+      if (result) {
+        toast.success("Row name updated successfully");
+      }
+      setEditingRowName(false);
+    } else {
+      toast.error("Row name cannot be empty");
+    }
+  };
+  
+  const handleInsertBarcode = async () => {
+    if (insertCode.trim() && insertAfterIndex !== null) {
+      const result = await addBarcode(insertCode.trim(), rowId);
+      if (result) {
+        toast.success("Barcode inserted successfully");
+        setInsertCode('');
+        setIsInsertDialogOpen(false);
+      }
+    }
+  };
 
   return (
-    <Layout title={breadcrumb || 'Row Detail'} showBack>
+    <Layout title={
+      <>
+        {editingRowName ? (
+          <div className="flex items-center space-x-2">
+            <Input
+              value={rowName}
+              onChange={(e) => setRowName(e.target.value)}
+              className="w-40"
+              autoFocus
+            />
+            <Button variant="ghost" size="icon" onClick={saveRowName} className="h-8 w-8">
+              <Check className="h-4 w-4 text-green-500" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => setEditingRowName(false)} className="h-8 w-8">
+              <X className="h-4 w-4 text-red-500" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center space-x-2">
+            <span>{breadcrumb || 'Row Detail'}</span>
+            <Button variant="ghost" size="icon" onClick={startRowRename} className="h-6 w-6">
+              <Edit className="h-3 w-3 text-muted-foreground" />
+            </Button>
+          </div>
+        )}
+      </>
+    } showBack>
       <div className="flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <Input
             placeholder="Search barcodes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 mr-2"
+            className="flex-1 mr-2 bg-white/80 backdrop-blur-sm border border-inventory-secondary/30"
           />
           <Button 
             variant="outline"
             onClick={() => setIsResetDialogOpen(true)}
-            className="gap-2"
+            className="gap-2 text-inventory-secondary border-inventory-secondary/30 hover:bg-inventory-secondary/10"
           >
             <RotateCcw className="h-4 w-4" />
             Reset Row
@@ -73,24 +162,69 @@ const RowDetail = () => {
         </div>
 
         {filteredBarcodes.length > 0 ? (
-          <div className="rounded-md border">
+          <div className="rounded-md border glass-card overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-20">No.</TableHead>
                   <TableHead>Barcode</TableHead>
                   <TableHead className="w-40">Timestamp</TableHead>
+                  <TableHead className="w-28">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredBarcodes.map((barcode, index) => (
-                  <TableRow key={barcode.id}>
-                    <TableCell className="font-medium">{index + 1}</TableCell>
-                    <TableCell>{barcode.code}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(barcode.timestamp).toLocaleString()}
-                    </TableCell>
-                  </TableRow>
+                  <React.Fragment key={barcode.id}>
+                    <TableRow>
+                      <TableCell className="font-medium">{index + 1}</TableCell>
+                      <TableCell>
+                        {editingBarcode && editingBarcode.id === barcode.id ? (
+                          <div className="flex items-center space-x-2">
+                            <Input 
+                              value={editingBarcode.code}
+                              onChange={(e) => setEditingBarcode({...editingBarcode, code: e.target.value})}
+                              className="w-full"
+                              autoFocus
+                            />
+                            <Button variant="ghost" size="icon" onClick={saveEditedBarcode} className="text-inventory-secondary">
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={cancelEditBarcode} className="text-red-500">
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          barcode.code
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(barcode.timestamp).toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleEditBarcode(barcode.id, barcode.code)}
+                            className="h-8 w-8 text-inventory-secondary"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => {
+                              setInsertAfterIndex(index);
+                              setIsInsertDialogOpen(true);
+                            }}
+                            className="h-8 w-8 text-inventory-primary"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  </React.Fragment>
                 ))}
               </TableBody>
             </Table>
@@ -132,6 +266,39 @@ const RowDetail = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        
+        <Dialog open={isInsertDialogOpen} onOpenChange={setIsInsertDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Insert Barcode</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <div className="space-y-2">
+                <Label htmlFor="insertCode">Barcode</Label>
+                <Input
+                  id="insertCode"
+                  value={insertCode}
+                  onChange={(e) => setInsertCode(e.target.value)}
+                  placeholder="Enter barcode"
+                  className="w-full"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsInsertDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleInsertBarcode} 
+                disabled={!insertCode.trim()}
+                className="bg-inventory-primary hover:bg-inventory-primary/90"
+              >
+                Insert Barcode
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
