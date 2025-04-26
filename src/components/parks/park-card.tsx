@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -68,11 +69,13 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
   };
 
   const handleExportExcel = () => {
+    if (isExporting) return;
+    
     try {
       setIsExporting(true);
       const rows = getRowsByParkId(park.id);
       
-      // Create workbook and add summary sheet
+      // Create workbook
       const wb = XLSX.utils.book_new();
       
       // Add summary sheet
@@ -103,21 +106,44 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
           });
 
           const ws = XLSX.utils.aoa_to_sheet(rowData);
+          // Limit sheet name to 31 chars and remove invalid characters
           const safeSheetName = row.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 31);
           XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
         }
       });
 
-      // Generate file name and create blob
-      const fileName = `${park.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      // Generate safe file name
+      const safeFileName = sanitizeFileName(`${park.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
       
-      // Write file directly
-      XLSX.writeFile(wb, fileName);
-      toast.success("Park data exported successfully");
+      // Create a blob and trigger a download using a temporary link
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+      
+      // Convert binary string to ArrayBuffer
+      const buf = new ArrayBuffer(wbout.length);
+      const view = new Uint8Array(buf);
+      for (let i = 0; i < wbout.length; i++) {
+        view[i] = wbout.charCodeAt(i) & 0xFF;
+      }
+      
+      // Create Blob and download
+      const blob = new Blob([buf], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = safeFileName;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setIsExporting(false);
+        toast.success("Park data exported successfully");
+      }, 100);
     } catch (error) {
       console.error("Export failed:", error);
-      toast.error("Failed to export data");
-    } finally {
+      toast.error(`Failed to export data: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsExporting(false);
     }
   };

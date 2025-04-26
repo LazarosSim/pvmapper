@@ -226,34 +226,26 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
       const rowBarcodes = barcodes.filter(barcode => barcode.rowId === rowId);
       
       setBarcodes(prev => {
-        if (position !== undefined && position >= 0 && position <= rowBarcodes.length) {
+        if (position !== undefined && position >= 0 && position < rowBarcodes.length) {
           const updatedBarcodes = [...prev];
-          let insertIndex = 0;
-          let currentRowIndex = 0;
+          // Find all barcodes for this row
+          const rowBarcodeIndices = updatedBarcodes
+            .map((barcode, index) => barcode.rowId === rowId ? index : -1)
+            .filter(index => index !== -1);
           
-          // Find the exact insert position
-          for (let i = 0; i < updatedBarcodes.length; i++) {
-            if (updatedBarcodes[i].rowId === rowId) {
-              if (currentRowIndex === position) {
-                insertIndex = i;
-                break;
-              }
-              currentRowIndex++;
-            }
+          // Insert after the specified position
+          if (position >= 0 && position < rowBarcodeIndices.length) {
+            // +1 because we want to insert AFTER the specified position
+            const insertIndex = rowBarcodeIndices[position] + 1;
+            updatedBarcodes.splice(insertIndex, 0, newBarcode);
+            return updatedBarcodes;
           }
           
-          // If we didn't find a matching position, add to the end of row barcodes
-          if (currentRowIndex < position && rowBarcodes.length > 0) {
-            const lastRowBarcodeIndex = updatedBarcodes.findIndex(
-              b => b.id === rowBarcodes[rowBarcodes.length - 1].id
-            );
-            insertIndex = lastRowBarcodeIndex + 1;
-          }
-          
-          updatedBarcodes.splice(insertIndex, 0, newBarcode);
-          return updatedBarcodes;
+          // If position is invalid, add to the end of row barcodes
+          return [...prev, newBarcode];
         }
         
+        // If no position specified, add to the end
         return [...prev, newBarcode];
       });
 
