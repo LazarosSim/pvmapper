@@ -5,19 +5,29 @@ import Layout from '@/components/layout/layout';
 import { useDB } from '@/lib/db-provider';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Calendar } from '@/components/ui/calendar';
 import { 
   BarChart3, 
   Users, 
   Layers,
   ArrowUpRight,
-  ArrowDownRight 
+  ArrowDownRight,
+  CalendarIcon
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { format } from 'date-fns';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const DashboardPage = () => {
   const { currentUser, parks, getAllUserStats, getParkProgress } = useDB();
   const navigate = useNavigate();
   const [selectedTab, setSelectedTab] = useState('overview');
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   // Redirect if not authenticated or not a manager
   React.useEffect(() => {
@@ -45,13 +55,65 @@ const DashboardPage = () => {
   // Sort parks by completion percentage
   const sortedParks = [...parkProgress].sort((a, b) => b.percentage - a.percentage);
 
+  // Generate mock data for calendar
+  // In a real app, this would come from actual daily scan records
+  const getDailyScansForDate = (date: Date) => {
+    // Convert to string format YYYY-MM-DD for consistent comparison
+    const dateStr = format(date, 'yyyy-MM-dd');
+    
+    // For demo, generate some pattern:
+    // - More scans on weekdays
+    // - Fewer on weekends
+    // - Recent dates have more scans than older ones
+    const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const daysAgo = Math.floor((new Date().getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysAgo < 0) return 0; // Future dates have no scans
+    if (daysAgo > 30) return 0; // No data older than a month
+    
+    const base = isWeekend ? 15 : 40;
+    const recencyBonus = Math.max(0, 30 - daysAgo);
+    return Math.floor(base + recencyBonus + Math.random() * 20);
+  };
+
+  // Calendar day render function
+  const renderDay = (day: Date) => {
+    const scanCount = getDailyScansForDate(day);
+    let intensity = "bg-green-100";
+    
+    if (scanCount > 60) intensity = "bg-green-500";
+    else if (scanCount > 40) intensity = "bg-green-400";
+    else if (scanCount > 20) intensity = "bg-green-300";
+    else if (scanCount > 0) intensity = "bg-green-200";
+    
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="relative h-9 w-9 p-0">
+              <div className={`absolute inset-1 rounded-sm ${scanCount ? intensity : ""}`}></div>
+              <div className="relative z-10 flex h-full w-full items-center justify-center">
+                {format(day, "d")}
+              </div>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{scanCount} scans on {format(day, "MMM d")}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
   return (
     <Layout title="Manager Dashboard" showBack>
       <div className="space-y-6">
         <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="calendar">Calendar</TabsTrigger>
           </TabsList>
           
           <TabsContent value="overview" className="space-y-4 pt-2">
@@ -143,6 +205,44 @@ const DashboardPage = () => {
                   </div>
                 ) : (
                   <p className="text-muted-foreground text-center py-2">No users found</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="calendar" className="space-y-4 pt-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <CalendarIcon className="mr-2 h-5 w-5" />
+                  Daily Scan Overview
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex justify-center p-2">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    className="border rounded-md pointer-events-auto"
+                    components={{
+                      Day: ({ date, ...props }) => renderDay(date)
+                    }}
+                  />
+                </div>
+                
+                {selectedDate && (
+                  <div className="mt-4 border-t pt-4">
+                    <h4 className="text-sm font-medium mb-2">
+                      Scan details for {format(selectedDate, 'MMM d, yyyy')}
+                    </h4>
+                    <div className="text-2xl font-bold">
+                      {getDailyScansForDate(selectedDate)} scans
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {getDailyScansForDate(selectedDate) > 30 ? 'High activity' : 'Normal activity'}
+                    </p>
+                  </div>
                 )}
               </CardContent>
             </Card>

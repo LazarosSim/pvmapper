@@ -222,34 +222,27 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
         timestamp: new Date().toISOString()
       };
 
-      // Get row barcodes to handle position-based insertion
       const rowBarcodes = barcodes.filter(barcode => barcode.rowId === rowId);
       
       setBarcodes(prev => {
         if (position !== undefined && position >= 0 && position < rowBarcodes.length) {
           const updatedBarcodes = [...prev];
-          // Find all barcodes for this row
           const rowBarcodeIndices = updatedBarcodes
             .map((barcode, index) => barcode.rowId === rowId ? index : -1)
             .filter(index => index !== -1);
           
-          // Insert after the specified position
           if (position >= 0 && position < rowBarcodeIndices.length) {
-            // +1 because we want to insert AFTER the specified position
             const insertIndex = rowBarcodeIndices[position] + 1;
             updatedBarcodes.splice(insertIndex, 0, newBarcode);
             return updatedBarcodes;
           }
           
-          // If position is invalid, add to the end of row barcodes
           return [...prev, newBarcode];
         }
         
-        // If no position specified, add to the end
         return [...prev, newBarcode];
       });
 
-      // Update daily scans counter
       const today = new Date().toISOString().split('T')[0];
       const existingDailyScan = dailyScans.find(scan => 
         scan.date === today && scan.userId === currentUser.id
@@ -401,7 +394,7 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     
     return { completed, total, percentage };
   };
-  
+
   const addRow = async (parkId: string): Promise<Row | null> => {
     try {
       const park = parks.find(p => p.id === parkId);
@@ -441,6 +434,11 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const deletePark = async (parkId: string): Promise<boolean> => {
+    if (!currentUser || currentUser.role !== 'manager') {
+      toast.error("Only managers can delete parks");
+      return false;
+    }
+
     try {
       const parkRows = rows.filter(row => row.parkId === parkId);
       
@@ -463,6 +461,11 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const deleteRow = async (rowId: string): Promise<boolean> => {
+    if (!currentUser) {
+      toast.error("You must be logged in to delete rows");
+      return false;
+    }
+
     try {
       setBarcodes(prev => prev.filter(barcode => barcode.rowId !== rowId));
       
@@ -490,6 +493,11 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const updateRow = async (rowId: string, name: string): Promise<boolean> => {
+    if (!currentUser) {
+      toast.error("You must be logged in to update rows");
+      return false;
+    }
+
     try {
       setRows(prev => 
         prev.map(row => 

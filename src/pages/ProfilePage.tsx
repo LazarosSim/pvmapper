@@ -5,7 +5,7 @@ import Layout from '@/components/layout/layout';
 import { useDB } from '@/lib/db-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { LogOut, BarChart3, User } from 'lucide-react';
+import { LogOut, BarChart3, User, Award, Star, Trophy, Medal } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Progress } from '@/components/ui/progress';
 
@@ -33,8 +33,30 @@ const ProfilePage = () => {
     navigate('/login');
   };
 
-  const dailyGoal = 100; // Example daily goal
-  const dailyProgress = Math.min(100, Math.round((dailyScans / dailyGoal) * 100));
+  // Achievement data
+  const achievements = [
+    {
+      icon: Trophy,
+      title: "Speed Scanner",
+      description: "Scan 600 panels in under 60 minutes",
+      progress: Math.min(100, Math.round((dailyScans / 600) * 100)),
+      completed: dailyScans >= 600,
+    },
+    {
+      icon: Star,
+      title: "Pattern Finder",
+      description: "Find a barcode with 4 consecutive identical digits",
+      progress: 0, // This would need actual logic to determine
+      completed: false, // Placeholder, would need real logic
+    },
+    {
+      icon: Medal,
+      title: "Straight Spotter",
+      description: "Find a barcode with a 5-digit straight sequence",
+      progress: 0, // This would need actual logic to determine
+      completed: false, // Placeholder, would need real logic
+    },
+  ];
 
   return (
     <Layout title="Profile">
@@ -69,9 +91,8 @@ const ProfilePage = () => {
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span>Daily Scans</span>
-                <span className="font-medium">{dailyScans} / {dailyGoal}</span>
+                <span className="font-medium">{dailyScans}</span>
               </div>
-              <Progress value={dailyProgress} className="h-2" />
             </div>
             
             <div className="pt-2">
@@ -94,6 +115,35 @@ const ProfilePage = () => {
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Award className="mr-2 h-5 w-5" />
+              Achievements
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {achievements.map((achievement, index) => (
+              <div key={index} className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <achievement.icon className={`h-5 w-5 ${achievement.completed ? 'text-amber-500' : 'text-muted-foreground'}`} />
+                  <div className="flex-1">
+                    <div className="flex justify-between">
+                      <span className="font-medium">{achievement.title}</span>
+                      <span>{achievement.completed ? 'Completed!' : `${achievement.progress}%`}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{achievement.description}</p>
+                  </div>
+                </div>
+                <Progress 
+                  value={achievement.progress} 
+                  className={`h-2 ${achievement.completed ? 'bg-amber-100' : ''}`}
+                />
+              </div>
+            ))}
           </CardContent>
         </Card>
 

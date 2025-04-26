@@ -90,22 +90,19 @@ const ParkCard: React.FC<ParkCardProps> = ({ park }) => {
       const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
       XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
 
-      // Add sheet for each row with barcodes
+      // Add sheet for each row with barcodes - now starting from first row without headers
       rows.forEach(row => {
         const barcodes = getBarcodesByRowId(row.id);
         if (barcodes.length > 0) {
-          const rowData = [
-            ["Barcode", "Timestamp"]
-          ];
-          
-          barcodes.forEach(barcode => {
-            rowData.push([
-              barcode.code,
-              new Date(barcode.timestamp).toLocaleString()
-            ]);
-          });
+          // Create array with just barcode data (no headers)
+          const rowData = barcodes.map(barcode => [
+            barcode.code,
+            new Date(barcode.timestamp).toLocaleString()
+          ]);
 
+          // Create worksheet with custom options to skip headers
           const ws = XLSX.utils.aoa_to_sheet(rowData);
+          
           // Limit sheet name to 31 chars and remove invalid characters
           const safeSheetName = row.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 31);
           XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
