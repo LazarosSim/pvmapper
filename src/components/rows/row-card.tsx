@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,7 +37,7 @@ interface RowCardProps {
 
 const RowCard: React.FC<RowCardProps> = ({ row }) => {
   const navigate = useNavigate();
-  const { countBarcodesInRow, deleteRow, updateRow } = useDB();
+  const { countBarcodesInRow, deleteRow, updateRow, currentUser } = useDB();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
   const [editName, setEditName] = React.useState(row.name);
@@ -66,6 +67,8 @@ const RowCard: React.FC<RowCardProps> = ({ row }) => {
     setIsEditDialogOpen(true);
   };
 
+  const isManager = currentUser?.role === 'manager';
+
   return (
     <>
       <Card className="mb-4 hover:shadow-md transition-shadow">
@@ -82,13 +85,15 @@ const RowCard: React.FC<RowCardProps> = ({ row }) => {
                 <Edit className="mr-2 h-4 w-4" />
                 Rename
               </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => setIsDeleteDialogOpen(true)}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
+              {isManager && (
+                <DropdownMenuItem 
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </CardHeader>

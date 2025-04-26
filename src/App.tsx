@@ -3,15 +3,18 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { DBProvider } from "@/lib/db-provider";
+import AuthGuard from "@/components/auth/auth-guard";
 import Index from "./pages/Index";
 import ParkDetail from "./pages/ParkDetail";
 import RowDetail from "./pages/RowDetail";
 import ScanPage from "./pages/ScanPage";
 import ScanParkPage from "./pages/ScanParkPage";
 import ScanRowPage from "./pages/ScanRowPage";
-import SearchPage from "./pages/SearchPage";
+import ProfilePage from "./pages/ProfilePage";
+import LoginPage from "./pages/LoginPage";
+import DashboardPage from "./pages/DashboardPage";
 import BackupPage from "./pages/BackupPage";
 import NotFound from "./pages/NotFound";
 
@@ -25,14 +28,22 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/park/:parkId" element={<ParkDetail />} />
-            <Route path="/row/:rowId" element={<RowDetail />} />
-            <Route path="/scan" element={<ScanPage />} />
-            <Route path="/scan/park/:parkId" element={<ScanParkPage />} />
-            <Route path="/scan/row/:rowId" element={<ScanRowPage />} />
-            <Route path="/search" element={<SearchPage />} />
-            <Route path="/backup" element={<BackupPage />} />
+            {/* Public route */}
+            <Route path="/login" element={<LoginPage />} />
+            
+            {/* Protected routes */}
+            <Route path="/" element={<AuthGuard><Index /></AuthGuard>} />
+            <Route path="/park/:parkId" element={<AuthGuard><ParkDetail /></AuthGuard>} />
+            <Route path="/row/:rowId" element={<AuthGuard><RowDetail /></AuthGuard>} />
+            <Route path="/scan" element={<AuthGuard><ScanPage /></AuthGuard>} />
+            <Route path="/scan/park/:parkId" element={<AuthGuard><ScanParkPage /></AuthGuard>} />
+            <Route path="/scan/row/:rowId" element={<AuthGuard><ScanRowPage /></AuthGuard>} />
+            <Route path="/profile" element={<AuthGuard><ProfilePage /></AuthGuard>} />
+            <Route path="/backup" element={<AuthGuard><BackupPage /></AuthGuard>} />
+            
+            {/* Manager-only route */}
+            <Route path="/dashboard" element={<AuthGuard requireManager={true}><DashboardPage /></AuthGuard>} />
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

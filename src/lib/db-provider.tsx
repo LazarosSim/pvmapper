@@ -6,6 +6,7 @@ export interface Barcode {
   code: string;
   timestamp: string;
   rowId: string;
+  userId?: string;
 }
 
 export interface Row {
@@ -19,19 +20,36 @@ export interface Park {
   id: string;
   name: string;
   createdAt: string;
+  expectedBarcodes: number;
+}
+
+export interface User {
+  id: string;
+  username: string;
+  password: string;
+  role: 'user' | 'manager';
+  createdAt: string;
+}
+
+export interface DailyScan {
+  date: string;
+  userId: string;
+  count: number;
 }
 
 interface DBContextType {
   parks: Park[];
   rows: Row[];
   barcodes: Barcode[];
-  addPark: (name: string) => Promise<Park | null>;
+  users: User[];
+  currentUser: User | null;
+  addPark: (name: string, expectedBarcodes: number) => Promise<Park | null>;
   addRow: (parkId: string) => Promise<Row | null>;
   addBarcode: (code: string, rowId: string) => Promise<Barcode | null>;
   deletePark: (parkId: string) => Promise<boolean>;
   deleteRow: (rowId: string) => Promise<boolean>;
   deleteBarcode: (barcodeId: string) => Promise<boolean>;
-  updatePark: (parkId: string, name: string) => Promise<boolean>;
+  updatePark: (parkId: string, name: string, expectedBarcodes?: number) => Promise<boolean>;
   updateRow: (rowId: string, name: string) => Promise<boolean>;
   updateBarcode: (barcodeId: string, code: string) => Promise<boolean>;
   getBarcodesByRowId: (rowId: string) => Barcode[];
@@ -45,6 +63,14 @@ interface DBContextType {
   countBarcodesInRow: (rowId: string) => number;
   countBarcodesInPark: (parkId: string) => number;
   resetRow: (rowId: string) => Promise<boolean>;
+  login: (username: string, password: string) => boolean;
+  logout: () => void;
+  register: (username: string, password: string, role?: 'user' | 'manager') => boolean;
+  getUserDailyScans: (userId?: string) => number;
+  getUserTotalScans: (userId?: string) => number;
+  getUserBarcodesScanned: (userId?: string) => Barcode[];
+  getAllUserStats: () => Array<{ userId: string, username: string, dailyScans: number, totalScans: number }>;
+  getParkProgress: (parkId: string) => { completed: number, total: number, percentage: number };
 }
 
 const DBContext = createContext<DBContextType | undefined>(undefined);
@@ -61,16 +87,25 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
   const [parks, setParks] = useState<Park[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [barcodes, setBarcodes] = useState<Barcode[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [dailyScans, setDailyScans] = useState<DailyScan[]>([]);
 
   useEffect(() => {
     try {
       const savedParks = localStorage.getItem("parks");
       const savedRows = localStorage.getItem("rows");
       const savedBarcodes = localStorage.getItem("barcodes");
+      const savedUsers = localStorage.getItem("users");
+      const savedCurrentUser = localStorage.getItem("currentUser");
+      const savedDailyScans = localStorage.getItem("dailyScans");
 
       if (savedParks) setParks(JSON.parse(savedParks));
       if (savedRows) setRows(JSON.parse(savedRows));
       if (savedBarcodes) setBarcodes(JSON.parse(savedBarcodes));
+      if (savedUsers) setUsers(JSON.parse(savedUsers));
+      if (savedCurrentUser) setCurrentUser(JSON.parse(savedCurrentUser));
+      if (savedDailyScans) setDailyScans(JSON.parse(savedDailyScans));
     } catch (error) {
       console.error("Failed to load data from localStorage:", error);
       toast.error("Failed to load saved data");
@@ -89,7 +124,61 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.setItem("barcodes", JSON.stringify(barcodes));
   }, [barcodes]);
 
-  const addPark = async (name: string): Promise<Park | null> => {
+  useEffect(() => {
+    localStorage.setItem("users", JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    localStorage.setItem("currentUser", JSON.stringify(currentUser));
+  }, [currentUser]);
+
+  useEffect(() => {
+    localStorage.setItem("dailyScans", JSON.stringify(dailyScans));
+  }, [dailyScans]);
+
+  const login = (username: string, password: string): boolean => {
+    const user = users.find(u => u.username === username && u.password === password);
+    if (user) {
+      setCurrentUser(user);
+      toast.success(`Welcome back, ${username}!`);
+      return true;
+    } else {
+      toast.error("Invalid username or password");
+      return false;
+    }
+  };
+
+  const logout = (): void => {
+    setCurrentUser(null);
+    toast.success("Logged out successfully");
+  };
+
+  const register = (username: string, password: string, role: 'user' | 'manager' = 'user'): boolean => {
+    if (users.some(u => u.username === username)) {
+      toast.error("Username already exists");
+      return false;
+    }
+
+    const newUser: User = {
+      id: crypto.randomUUID(),
+      username,
+      password, 
+      role,
+      createdAt: new Date().toISOString()
+    };
+    
+    setUsers(prev => [...prev, newUser]);
+    setCurrentUser(newUser);
+    toast.success("Registration successful");
+    return true;
+  };
+
+  const addPark = async (name: string, expectedBarcodes: number = 0): Promise<Park | null> => {
+    if (!currentUser || (currentUser.role !== 'manager')) {
+      toast.error("Only managers can create parks");
+      return null;
+    }
+
     if (parks.some(park => park.name.toLowerCase() === name.toLowerCase())) {
       toast.error("A park with this name already exists");
       return null;
@@ -99,6 +188,7 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
       const newPark: Park = {
         id: crypto.randomUUID(),
         name,
+        expectedBarcodes,
         createdAt: new Date().toISOString()
       };
 
@@ -110,6 +200,180 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
       toast.error("Failed to create park");
       return null;
     }
+  };
+
+  const addBarcode = async (code: string, rowId: string): Promise<Barcode | null> => {
+    if (!currentUser) {
+      toast.error("You must be logged in to add barcodes");
+      return null;
+    }
+
+    if (barcodes.some(barcode => barcode.code === code)) {
+      toast.error("This barcode already exists");
+      return null;
+    }
+
+    try {
+      const timestamp = new Date().toISOString();
+      const newBarcode: Barcode = {
+        id: crypto.randomUUID(),
+        code,
+        rowId,
+        userId: currentUser.id,
+        timestamp
+      };
+
+      setBarcodes(prev => [...prev, newBarcode]);
+      
+      const today = new Date().toISOString().split('T')[0];
+      const existingDailyScan = dailyScans.find(scan => 
+        scan.date === today && scan.userId === currentUser.id);
+      
+      if (existingDailyScan) {
+        setDailyScans(prev => prev.map(scan => 
+          scan.date === today && scan.userId === currentUser.id 
+            ? { ...scan, count: scan.count + 1 } 
+            : scan
+        ));
+      } else {
+        setDailyScans(prev => [...prev, { 
+          date: today, 
+          userId: currentUser.id, 
+          count: 1 
+        }]);
+      }
+      
+      toast.success(`Added barcode: ${code}`);
+      return newBarcode;
+    } catch (error) {
+      console.error("Failed to add barcode:", error);
+      toast.error("Failed to add barcode");
+      return null;
+    }
+  };
+
+  const updatePark = async (parkId: string, name: string, expectedBarcodes?: number): Promise<boolean> => {
+    if (!currentUser || (currentUser.role !== 'manager')) {
+      toast.error("Only managers can update parks");
+      return false;
+    }
+
+    if (parks.some(park => park.id !== parkId && park.name.toLowerCase() === name.toLowerCase())) {
+      toast.error("Another park with this name already exists");
+      return false;
+    }
+
+    try {
+      setParks(prev => 
+        prev.map(park => 
+          park.id === parkId 
+            ? { 
+                ...park, 
+                name, 
+                ...(expectedBarcodes !== undefined ? { expectedBarcodes } : {}) 
+              } 
+            : park
+        )
+      );
+      toast.success("Park updated");
+      return true;
+    } catch (error) {
+      console.error("Failed to update park:", error);
+      toast.error("Failed to update park");
+      return false;
+    }
+  };
+
+  const resetRow = async (rowId: string): Promise<boolean> => {
+    if (!currentUser) {
+      toast.error("You must be logged in to reset rows");
+      return false;
+    }
+
+    try {
+      const rowBarcodes = barcodes.filter(barcode => 
+        barcode.rowId === rowId && barcode.userId === currentUser.id
+      );
+      
+      if (rowBarcodes.length > 0) {
+        const today = new Date().toISOString().split('T')[0];
+        const todayScans = rowBarcodes.filter(barcode => 
+          barcode.timestamp.startsWith(today)
+        ).length;
+        
+        if (todayScans > 0) {
+          setDailyScans(prev => prev.map(scan => 
+            scan.date === today && scan.userId === currentUser.id
+              ? { ...scan, count: Math.max(0, scan.count - todayScans) }
+              : scan
+          ));
+        }
+      }
+      
+      setBarcodes(prev => prev.filter(barcode => barcode.rowId !== rowId));
+      toast.success("Row data has been reset");
+      return true;
+    } catch (error) {
+      console.error("Failed to reset row:", error);
+      toast.error("Failed to reset row");
+      return false;
+    }
+  };
+
+  const getUserDailyScans = (userId?: string): number => {
+    const today = new Date().toISOString().split('T')[0];
+    const userToCheck = userId || (currentUser?.id);
+    
+    if (!userToCheck) return 0;
+    
+    const todayScan = dailyScans.find(scan => 
+      scan.date === today && scan.userId === userToCheck);
+    
+    return todayScan?.count || 0;
+  };
+
+  const getUserTotalScans = (userId?: string): number => {
+    const userToCheck = userId || (currentUser?.id);
+    
+    if (!userToCheck) return 0;
+    
+    return barcodes.filter(barcode => barcode.userId === userToCheck).length;
+  };
+
+  const getUserBarcodesScanned = (userId?: string): Barcode[] => {
+    const userToCheck = userId || (currentUser?.id);
+    
+    if (!userToCheck) return [];
+    
+    return barcodes
+      .filter(barcode => barcode.userId === userToCheck)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  };
+
+  const getAllUserStats = () => {
+    if (!currentUser || currentUser.role !== 'manager') {
+      return [];
+    }
+
+    return users.map(user => ({
+      userId: user.id,
+      username: user.username,
+      dailyScans: getUserDailyScans(user.id),
+      totalScans: getUserTotalScans(user.id)
+    }));
+  };
+
+  const getParkProgress = (parkId: string) => {
+    const park = parks.find(p => p.id === parkId);
+    if (!park) return { completed: 0, total: 0, percentage: 0 };
+
+    const total = park.expectedBarcodes;
+    const parkRowIds = rows.filter(row => row.parkId === parkId).map(row => row.id);
+    const completed = barcodes.filter(barcode => parkRowIds.includes(barcode.rowId)).length;
+    
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    
+    return { completed, total, percentage };
   };
 
   const addRow = async (parkId: string): Promise<Row | null> => {
@@ -146,30 +410,6 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error("Failed to add row:", error);
       toast.error("Failed to create row");
-      return null;
-    }
-  };
-
-  const addBarcode = async (code: string, rowId: string): Promise<Barcode | null> => {
-    if (barcodes.some(barcode => barcode.code === code)) {
-      toast.error("This barcode already exists");
-      return null;
-    }
-
-    try {
-      const newBarcode: Barcode = {
-        id: crypto.randomUUID(),
-        code,
-        rowId,
-        timestamp: new Date().toISOString()
-      };
-
-      setBarcodes(prev => [...prev, newBarcode]);
-      toast.success(`Added barcode: ${code}`);
-      return newBarcode;
-    } catch (error) {
-      console.error("Failed to add barcode:", error);
-      toast.error("Failed to add barcode");
       return null;
     }
   };
@@ -219,27 +459,6 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error("Failed to delete barcode:", error);
       toast.error("Failed to delete barcode");
-      return false;
-    }
-  };
-
-  const updatePark = async (parkId: string, name: string): Promise<boolean> => {
-    if (parks.some(park => park.id !== parkId && park.name.toLowerCase() === name.toLowerCase())) {
-      toast.error("Another park with this name already exists");
-      return false;
-    }
-
-    try {
-      setParks(prev => 
-        prev.map(park => 
-          park.id === parkId ? { ...park, name } : park
-        )
-      );
-      toast.success("Park updated");
-      return true;
-    } catch (error) {
-      console.error("Failed to update park:", error);
-      toast.error("Failed to update park");
       return false;
     }
   };
@@ -316,6 +535,8 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
         parks,
         rows,
         barcodes,
+        users: users.map(user => ({ ...user, password: '******' })),
+        dailyScans,
         exportDate: new Date().toISOString()
       };
       
@@ -340,6 +561,18 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
       setRows(parsedData.rows);
       setBarcodes(parsedData.barcodes);
       
+      if (parsedData.users) {
+        const mergedUsers = parsedData.users.map((importedUser: any) => {
+          const existingUser = users.find(u => u.id === importedUser.id);
+          return existingUser ? { ...importedUser, password: existingUser.password } : importedUser;
+        });
+        setUsers(mergedUsers);
+      }
+      
+      if (parsedData.dailyScans) {
+        setDailyScans(parsedData.dailyScans);
+      }
+      
       toast.success("Data imported successfully");
       return true;
     } catch (error) {
@@ -358,22 +591,12 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     );
   };
 
-  const resetRow = async (rowId: string): Promise<boolean> => {
-    try {
-      setBarcodes(prev => prev.filter(barcode => barcode.rowId !== rowId));
-      toast.success("Row data has been reset");
-      return true;
-    } catch (error) {
-      console.error("Failed to reset row:", error);
-      toast.error("Failed to reset row");
-      return false;
-    }
-  };
-
   const value = {
     parks,
     rows,
     barcodes,
+    users,
+    currentUser,
     addPark,
     addRow,
     addBarcode,
@@ -393,7 +616,15 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     searchBarcodes,
     countBarcodesInRow,
     countBarcodesInPark,
-    resetRow
+    resetRow,
+    login,
+    logout,
+    register,
+    getUserDailyScans,
+    getUserTotalScans,
+    getUserBarcodesScanned,
+    getAllUserStats,
+    getParkProgress
   };
 
   return <DBContext.Provider value={value}>{children}</DBContext.Provider>;
