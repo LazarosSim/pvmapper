@@ -9,7 +9,133 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      barcodes: {
+        Row: {
+          code: string
+          id: string
+          row_id: string
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          code: string
+          id?: string
+          row_id: string
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          id?: string
+          row_id?: string
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "barcodes_row_id_fkey"
+            columns: ["row_id"]
+            isOneToOne: false
+            referencedRelation: "rows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_scans: {
+        Row: {
+          count: number
+          date: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          count?: number
+          date?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          count?: number
+          date?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      parks: {
+        Row: {
+          created_at: string
+          expected_barcodes: number | null
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expected_barcodes?: number | null
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expected_barcodes?: number | null
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          role: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          role?: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      rows: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          park_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          park_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          park_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rows_park_id_fkey"
+            columns: ["park_id"]
+            isOneToOne: false
+            referencedRelation: "parks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
