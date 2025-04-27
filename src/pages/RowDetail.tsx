@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useDB } from '@/lib/db-provider';
@@ -80,7 +81,7 @@ const RowDetail = () => {
   const saveEditedBarcode = async () => {
     if (editingBarcode) {
       const result = await updateBarcode(editingBarcode.id, editingBarcode.code);
-      if (result) {
+      if (result !== undefined && result !== null) {
         toast.success("Barcode updated successfully");
       }
       setEditingBarcode(null);
@@ -101,7 +102,7 @@ const RowDetail = () => {
   const saveRowName = async () => {
     if (row && rowName.trim()) {
       const result = await updateRow(row.id, rowName.trim());
-      if (result) {
+      if (result !== undefined && result !== null) {
         toast.success("Row name updated successfully");
       }
       setEditingRowName(false);
@@ -114,9 +115,10 @@ const RowDetail = () => {
     if (insertCode.trim() && insertAfterIndex !== null) {
       setIsInserting(true);
       try {
-        const result = await addBarcode(insertCode.trim(), rowId, insertAfterIndex);
+        // Fix: addBarcode should only take 2 arguments here
+        const result = await addBarcode(insertCode.trim(), rowId);
         
-        if (result) {
+        if (result !== undefined && result !== null) {
           toast.success("Barcode inserted successfully");
           setInsertCode('');
           setIsInsertDialogOpen(false);

@@ -1,3 +1,4 @@
+
 import React, { useRef, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -58,21 +59,26 @@ const ScanRowPage = () => {
 
   const registerBarcode = async () => {
     if (!barcodeInput.trim()) return;
-    const result = await addBarcode(barcodeInput.trim(), rowId);
-    setSuccess(!!result);
+    try {
+      const result = await addBarcode(barcodeInput.trim(), rowId);
+      setSuccess(result !== undefined && result !== null);
 
-    if (result) {
-      setBarcodeInput('');
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play();
+      if (result !== undefined && result !== null) {
+        setBarcodeInput('');
+        if (audioRef.current) {
+          audioRef.current.currentTime = 0;
+          audioRef.current.play();
+        }
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 200);
+        setTimeout(() => {
+          setSuccess(null);
+        }, 2000);
       }
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 200);
-      setTimeout(() => {
-        setSuccess(null);
-      }, 2000);
+    } catch (error) {
+      console.error("Error registering barcode:", error);
+      setSuccess(false);
     }
   };
 
@@ -103,7 +109,7 @@ const ScanRowPage = () => {
   const saveRowName = async () => {
     if (row && rowName.trim()) {
       const result = await updateRow(rowId, rowName);
-      if (result) {
+      if (result !== undefined && result !== null) {
         toast.success("Row name updated successfully");
         setIsEditingRowName(false);
       }

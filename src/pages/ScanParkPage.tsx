@@ -26,9 +26,13 @@ const ScanParkPage = () => {
   const rows = getRowsByParkId(parkId);
 
   const handleAddRow = async () => {
-    const newRow = await addRow(parkId);
-    if (newRow) {
-      navigate(`/scan/row/${newRow.id}`);
+    try {
+      const newRow = await addRow(parkId);
+      if (newRow !== undefined && newRow !== null) {
+        navigate(`/scan/row/${newRow.id}`);
+      }
+    } catch (error) {
+      console.error("Error adding row:", error);
     }
   };
 
