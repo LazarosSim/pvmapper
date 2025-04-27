@@ -32,7 +32,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction })
           <img 
             src="https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/xplogo.png"
             alt="XP Energy Logo" 
-            className="h-7 mr-3"
+            className="h-10 mr-3"
             onError={(e) => {
               const img = e.target as HTMLImageElement;
               img.src = '/placeholder.svg';

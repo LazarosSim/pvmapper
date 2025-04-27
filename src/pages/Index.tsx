@@ -13,16 +13,20 @@ const Index = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Make sure parks is defined before filtering
   const filteredParks = parks ? parks.filter(park => 
     park.name.toLowerCase().includes(searchQuery.toLowerCase())
   ) : [];
 
   return (
     <Layout title={
-      <span className="font-montserrat text-xl font-semibold bg-gradient-to-r from-white to-white/80 bg-clip-text">
-        XP Energy PV Mapper
-      </span>
+      <div className="flex items-center space-x-2">
+        <span className="font-montserrat text-xl font-semibold bg-gradient-to-r from-white to-white/80 bg-clip-text">
+          XP Energy
+        </span>
+        <span className="font-montserrat text-xl font-semibold bg-gradient-to-r from-white/90 to-white/70 bg-clip-text">
+          PV MAPPER
+        </span>
+      </div>
     }>
       <div className="flex flex-col">
         <div className="flex items-center space-x-2 mb-6">

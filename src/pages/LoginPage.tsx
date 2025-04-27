@@ -31,6 +31,20 @@ const LoginPage = () => {
     }
   }, [isInitialized, user]);
   
+  useEffect(() => {
+    const clearSession = async () => {
+      try {
+        await supabase.auth.signOut();
+      } catch (error) {
+        console.log('No active session to clear');
+      }
+    };
+    
+    if (location.pathname === '/login') {
+      clearSession();
+    }
+  }, [location]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -195,13 +209,13 @@ const LoginPage = () => {
 
   return (
     <div 
-      className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center relative"
+      className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center relative overflow-hidden"
       style={{ backgroundColor: 'rgb(0, 82, 155)' }}
     >
       <img 
         src="https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/loginbackground.jpg"
         alt="Background"
-        className="absolute inset-0 w-full h-full object-cover" 
+        className="absolute inset-0 w-full h-full object-cover opacity-90" 
         style={{ zIndex: -2 }}
         onError={(e) => {
           console.error("Error loading background image");
@@ -209,7 +223,10 @@ const LoginPage = () => {
           img.src = '/placeholder.svg';
         }}
       />
-      <div className="absolute inset-0 bg-gradient-to-br from-xpenergy-primary/90 to-xpenergy-secondary/70 backdrop-blur-sm" style={{ zIndex: -1 }}></div>
+      <div 
+        className="absolute inset-0 bg-gradient-to-br from-xpenergy-primary/90 to-xpenergy-secondary/70 backdrop-blur-sm" 
+        style={{ zIndex: -1 }}
+      />
       <Card className="w-full max-w-md shadow-xl backdrop-blur-sm bg-white/80 border border-white/20 z-10 animate-fade-in">
         <CardHeader className="text-center space-y-2">
           <CardTitle className="text-3xl font-bold font-montserrat bg-gradient-to-br from-xpenergy-primary to-xpenergy-secondary bg-clip-text text-transparent">
