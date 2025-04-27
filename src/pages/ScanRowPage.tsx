@@ -88,6 +88,20 @@ const ScanRowPage = () => {
     try {
       setIsProcessing(true);
       
+      const row = getRowById(rowId);
+      const park = row ? getParkById(row.parkId) : undefined;
+      
+      if (park?.validateBarcodeLength) {
+        const length = barcodeInput.trim().length;
+        if (length < 19 || length > 26) {
+          playErrorSound();
+          toast.error('Barcode must be between 19 and 26 digits');
+          setBarcodeInput('');
+          focusInput();
+          return;
+        }
+      }
+      
       const duplicates = getBarcodesByRowId(rowId).filter(b => 
         b.code.toLowerCase() === barcodeInput.trim().toLowerCase()
       );

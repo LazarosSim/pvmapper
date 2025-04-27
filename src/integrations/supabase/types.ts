@@ -72,6 +72,7 @@ export type Database = {
           id: string
           name: string
           user_id: string
+          validate_barcode_length: boolean | null
         }
         Insert: {
           created_at?: string
@@ -79,6 +80,7 @@ export type Database = {
           id?: string
           name: string
           user_id: string
+          validate_barcode_length?: boolean | null
         }
         Update: {
           created_at?: string
@@ -86,6 +88,7 @@ export type Database = {
           id?: string
           name?: string
           user_id?: string
+          validate_barcode_length?: boolean | null
         }
         Relationships: []
       }

@@ -18,6 +18,7 @@ export type Park = {
   expectedBarcodes: number;
   createdAt: string;
   userId: string;
+  validateBarcodeLength?: boolean;
 };
 
 export type Row = {
@@ -65,9 +66,9 @@ type DBContextType = {
   
   // Parks
   parks: Park[];
-  addPark: (name: string, expectedBarcodes: number) => Promise<boolean>;
+  addPark: (name: string, expectedBarcodes: number, validateBarcodeLength?: boolean) => Promise<boolean>;
   deletePark: (parkId: string) => Promise<void>;
-  updatePark: (parkId: string, name: string, expectedBarcodes: number) => Promise<void>;
+  updatePark: (parkId: string, name: string, expectedBarcodes: number, validateBarcodeLength: boolean) => Promise<void>;
   getParkById: (parkId: string) => Park | undefined;
   getParkProgress: (parkId: string) => Progress;
   
@@ -183,7 +184,8 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
           name: park.name,
           expectedBarcodes: park.expected_barcodes || 0,
           createdAt: park.created_at,
-          userId: park.user_id
+          userId: park.user_id,
+          validateBarcodeLength: park.validate_barcode_length
         }));
         
         setParks(formattedParks);
@@ -342,7 +344,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   }, [user?.id]);
 
   // Park operations
-  const addPark = async (name: string, expectedBarcodes: number): Promise<boolean> => {
+  const addPark = async (name: string, expectedBarcodes: number, validateBarcodeLength: boolean = false): Promise<boolean> => {
     if (!user) return false;
     
     try {
@@ -351,7 +353,8 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
         .insert([{ 
           name, 
           expected_barcodes: expectedBarcodes,
-          user_id: user.id
+          user_id: user.id,
+          validate_barcode_length: validateBarcodeLength
         }])
         .select();
         
@@ -367,7 +370,8 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
           name: data[0].name,
           expectedBarcodes: data[0].expected_barcodes || 0,
           createdAt: data[0].created_at,
-          userId: data[0].user_id
+          userId: data[0].user_id,
+          validateBarcodeLength: data[0].validate_barcode_length
         };
         
         setParks(prev => [newPark, ...prev]);
@@ -383,13 +387,14 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     }
   };
   
-  const updatePark = async (parkId: string, name: string, expectedBarcodes: number) => {
+  const updatePark = async (parkId: string, name: string, expectedBarcodes: number, validateBarcodeLength: boolean = false) => {
     try {
       const { error } = await supabase
         .from('parks')
         .update({ 
           name, 
-          expected_barcodes: expectedBarcodes 
+          expected_barcodes: expectedBarcodes,
+          validate_barcode_length: validateBarcodeLength
         })
         .eq('id', parkId);
         
@@ -401,7 +406,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
       
       setParks(prev => prev.map(park => 
         park.id === parkId 
-          ? { ...park, name, expectedBarcodes } 
+          ? { ...park, name, expectedBarcodes, validateBarcodeLength } 
           : park
       ));
       
