@@ -146,8 +146,8 @@ const LoginPage = () => {
     backgroundPosition: 'center'
   }}>
       
-      <Card className="w-full max-w-md shadow-xl backdrop-blur-sm bg-white/80 border border-white/20 z-10 animate-fade-in">
-        <CardHeader className="text-center space-y-2">
+      <Card className="w-full max-w-md shadow-xl backdrop-blur-sm border border-white/20 z-10 animate-fade-in bg-transparent my-0 mx-0 rounded-none py-0 px-0">
+        <CardHeader className="text-center space-y-2 bg-transparent">
           <CardTitle className="font-montserrat bg-gradient-to-br from-xpenergy-primary to-xpenergy-secondary bg-clip-text text-xpenergy-accent font-extrabold text-center text-3xl px-0">XP ENERGY PV MAPPER</CardTitle>
           <CardDescription className="text-lg text-xpenergy-primary/90">
             Sign in to continue tracking solar installations
