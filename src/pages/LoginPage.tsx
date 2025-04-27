@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LogIn, UserPlus } from 'lucide-react';
 import { useSupabase } from '@/lib/supabase-provider';
+import { toast } from 'sonner';  // Import toast from sonner
 
 const LoginPage = () => {
   const { user, signIn, signUp, resetPassword } = useSupabase();
@@ -37,7 +38,7 @@ const LoginPage = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (registerPassword !== registerConfirm) {
-      toast.error("Passwords don't match");
+      toast.error("Passwords don't match");  // Use toast from sonner
       return;
     }
     try {
