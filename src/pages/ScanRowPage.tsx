@@ -109,7 +109,7 @@ const ScanRowPage = () => {
         toast.success('Barcode added successfully');
         
         // Update latest barcodes list with most recent at the top
-        const updatedBarcodes = getBarcodesByRowId(rowId).slice(-5).reverse();
+        const updatedBarcodes = getBarcodesByRowId(rowId).slice(-10).reverse();
         setLatestBarcodes(updatedBarcodes);
       } else {
         toast.error('Failed to add barcode');
