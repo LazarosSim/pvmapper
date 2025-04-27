@@ -203,7 +203,7 @@ const LoginPage = () => {
       }}
     >
       <img 
-        src="https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/loginbackground.jpg"
+        src="https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/sign/images/loginbackground.jpg?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InN0b3JhZ2UtdXJsLXNpZ25pbmcta2V5XzBkZDZhOWI0LTZjYTAtNDk3Ni05MjYxLTc0ZDkwMWFlZjM0ZCJ9.eyJ1cmwiOiJpbWFnZXMvbG9naW5iYWNrZ3JvdW5kLmpwZyIsImlhdCI6MTc0NTc2NTEwNCwiZXhwIjoxNzc3MzAxMTA0fQ.zSYMeKohCln-imnKUFgPeSQfPWF1cMg7Mve8cIAIrHA"
         alt="Background"
         className="absolute inset-0 w-full h-full object-cover" 
         style={{ zIndex: -2 }}
