@@ -3,6 +3,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface HeaderProps {
   title: string;
@@ -13,6 +14,7 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const logoUrl = `https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/xplogo.png`;
 
   return (
     <header className="sticky top-0 w-full bg-gradient-to-r from-xpenergy-primary to-xpenergy-secondary text-white py-4 px-4 flex items-center z-10 shadow-md">
@@ -28,7 +30,16 @@ const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction })
           </Button>
         )}
         <div className="flex items-center">
-          <img src="/xplogo.png" alt="XP Energy Logo" className="h-7 mr-3" />
+          <img 
+            src={logoUrl} 
+            alt="XP Energy Logo" 
+            className="h-7 mr-3"
+            onError={(e) => {
+              const img = e.target as HTMLImageElement;
+              img.src = '/placeholder.svg';
+              console.error('Failed to load XP Energy logo');
+            }}
+          />
           {titleAction ? titleAction : <h1 className="text-xl font-semibold font-montserrat">{title}</h1>}
         </div>
       </div>

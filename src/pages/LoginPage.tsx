@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -11,34 +10,27 @@ import { useSupabase } from '@/lib/supabase-provider';
 import { toast } from 'sonner';
 
 const LoginPage = () => {
-  // State for login form
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   
-  // State for registration form
   const [registerUsername, setRegisterUsername] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerConfirm, setRegisterConfirm] = useState('');
   
-  // UI state
   const [loading, setLoading] = useState(false);
   const [creatingDemoAccounts, setCreatingDemoAccounts] = useState(false);
   const navigate = useNavigate();
   
-  // Get authentication state from context
   const { user, isInitialized } = useSupabase();
   
-  // Always declare all hooks before any conditional logic
   const [shouldRedirect, setShouldRedirect] = useState(false);
   
-  // Check if user is logged in and set redirect flag
   useEffect(() => {
     if (isInitialized && user) {
       setShouldRedirect(true);
     }
   }, [isInitialized, user]);
   
-  // Handle login form submission
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -65,7 +57,6 @@ const LoginPage = () => {
     }
   };
 
-  // Handle registration form submission
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -94,7 +85,6 @@ const LoginPage = () => {
         toast.error(error.message);
       } else {
         toast.success("Registration successful! Please log in.");
-        // Reset form and switch to login tab
         setRegisterUsername('');
         setRegisterPassword('');
         setRegisterConfirm('');
@@ -109,12 +99,10 @@ const LoginPage = () => {
     }
   };
 
-  // Create demo accounts
   const createDemoAccounts = async () => {
     try {
       setCreatingDemoAccounts(true);
       
-      // Check if demo accounts already exist to avoid recreating them
       const { data: existingProfiles, error: profileError } = await supabase
         .from('profiles')
         .select('username')
@@ -133,12 +121,10 @@ const LoginPage = () => {
       
       console.log("Setting up demo accounts...");
       
-      // Create the demo accounts in sequence to avoid race conditions
       const createDemoUser = async (username: string, password: string, role: string) => {
         try {
           const email = `${username.toLowerCase()}@example.com`;
           
-          // First check if this specific user already exists
           const { data: existingUser } = await supabase
             .from('profiles')
             .select('username')
@@ -172,7 +158,6 @@ const LoginPage = () => {
         }
       };
       
-      // Create demo accounts sequentially
       await createDemoUser("antrian", "antrian1", "user");
       await createDemoUser("lazaros", "lazaros2", "manager");
       
@@ -184,14 +169,14 @@ const LoginPage = () => {
     }
   };
 
-  // Create demo accounts on component mount
   useEffect(() => {
     if (isInitialized) {
       createDemoAccounts();
     }
   }, [isInitialized]);
 
-  // Render component based on state
+  const bgImageUrl = `https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/loginbackground.jpg`;
+
   if (!isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-xpenergy-primary bg-opacity-80 p-4">
@@ -206,14 +191,18 @@ const LoginPage = () => {
     );
   }
   
-  // Redirect if user is logged in - this must come after all hooks
   if (shouldRedirect) {
     return <Navigate to="/" replace />;
   }
 
-  // Main render
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-hero-pattern bg-cover bg-center relative">
+    <div 
+      className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center relative"
+      style={{ 
+        backgroundImage: `url(${bgImageUrl})`,
+        backgroundColor: 'rgb(0, 82, 155)',
+      }}
+    >
       <div className="absolute inset-0 bg-gradient-to-br from-xpenergy-primary/90 to-xpenergy-secondary/70 backdrop-blur-sm"></div>
       <Card className="w-full max-w-md shadow-xl backdrop-blur-sm bg-white/80 border border-white/20 z-10 animate-fade-in">
         <CardHeader className="text-center space-y-2">
