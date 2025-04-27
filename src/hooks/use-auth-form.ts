@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSupabase } from '@/lib/supabase-provider';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export const useAuthForm = () => {
