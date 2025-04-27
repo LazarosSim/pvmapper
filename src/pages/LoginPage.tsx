@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useSupabase } from '@/lib/supabase-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LogIn, UserPlus } from 'lucide-react';
+import { LogIn, UserPlus, Loader } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -17,6 +18,7 @@ const LoginPage = () => {
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerConfirm, setRegisterConfirm] = useState('');
   const [loading, setLoading] = useState(false);
+  const [creatingDemoAccounts, setCreatingDemoAccounts] = useState(false);
   const navigate = useNavigate();
   
   if (user) {
@@ -90,54 +92,67 @@ const LoginPage = () => {
 
   const createDemoAccounts = async () => {
     try {
-      const { data: existingProfiles } = await supabase
+      setCreatingDemoAccounts(true);
+      
+      // Check if demo accounts already exist to avoid recreating them
+      const { data: existingProfiles, error: profileError } = await supabase
         .from('profiles')
         .select('username')
         .limit(1);
       
-      if (existingProfiles && existingProfiles.length > 0) return;
+      if (profileError) {
+        console.error("Error checking profiles:", profileError);
+        return;
+      }
+      
+      if (existingProfiles && existingProfiles.length > 0) {
+        console.log("Demo accounts already exist, skipping creation");
+        return;
+      }
       
       console.log("Setting up demo accounts...");
       
-      const { error: error1 } = await supabase.auth.signUp({
-        email: "antrian@example.com",
-        password: "antrian1",
-        options: {
-          data: {
-            username: "antrian",
-            role: "user"
+      const createDemoUser = async (username: string, password: string, role: string) => {
+        try {
+          const email = `${username.toLowerCase()}@example.com`;
+          const { error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                username,
+                role
+              }
+            }
+          });
+          
+          if (error) {
+            console.error(`Error creating ${username} account:`, error);
+            throw error;
           }
+          
+          console.log(`${username} account created successfully`);
+        } catch (err) {
+          console.error(`Failed to create ${username} account:`, err);
         }
-      });
+      };
       
-      if (error1) {
-        console.error("Error creating antrian account:", error1);
-        return;
-      }
-      
-      const { error: error2 } = await supabase.auth.signUp({
-        email: "lazaros@example.com",
-        password: "lazaros2",
-        options: {
-          data: {
-            username: "lazaros",
-            role: "manager"
-          }
-        }
-      });
-      
-      if (error2) {
-        console.error("Error creating lazaros account:", error2);
-        return;
-      }
+      // Create demo accounts in parallel to speed up the process
+      await Promise.all([
+        createDemoUser("antrian", "antrian1", "user"),
+        createDemoUser("lazaros", "lazaros2", "manager")
+      ]);
       
       console.log("Demo accounts created successfully");
     } catch (error) {
       console.error("Error creating demo accounts:", error);
+    } finally {
+      setCreatingDemoAccounts(false);
     }
   };
 
-  React.useEffect(() => {
+  // Create demo accounts when the component mounts
+  useEffect(() => {
     createDemoAccounts();
   }, []);
 
@@ -185,10 +200,7 @@ const LoginPage = () => {
                 >
                   {loading ? (
                     <span className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
+                      <Loader className="mr-2 h-4 w-4 animate-spin" />
                       Logging in...
                     </span>
                   ) : (
@@ -243,10 +255,7 @@ const LoginPage = () => {
                 >
                   {loading ? (
                     <span className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
+                      <Loader className="mr-2 h-4 w-4 animate-spin" />
                       Registering...
                     </span>
                   ) : (
@@ -264,6 +273,12 @@ const LoginPage = () => {
           <p className="mt-2">Demo credentials:</p>
           <p>User: antrian / antrian1</p>
           <p>Manager: lazaros / lazaros2</p>
+          {creatingDemoAccounts && (
+            <p className="mt-2 flex items-center justify-center">
+              <Loader className="mr-2 h-3 w-3 animate-spin" />
+              Setting up demo accounts...
+            </p>
+          )}
         </CardFooter>
       </Card>
     </div>

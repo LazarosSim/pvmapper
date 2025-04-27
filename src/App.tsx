@@ -4,8 +4,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { DBProvider } from "@/lib/db-provider";
 import { SupabaseProvider } from "@/lib/supabase-provider";
+import { DBProvider } from "@/lib/db-provider";
 import AuthGuard from "@/components/auth/auth-guard";
 import { useState, useEffect } from "react";
 import Index from "./pages/Index";
@@ -57,11 +57,11 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <SupabaseProvider>
-          <DBProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
+        <BrowserRouter>
+          <SupabaseProvider>
+            <DBProvider>
+              <Toaster />
+              <Sonner />
               <Routes>
                 {/* Public route */}
                 <Route path="/login" element={<LoginPage />} />
@@ -80,9 +80,9 @@ const App = () => {
                 
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </BrowserRouter>
-          </DBProvider>
-        </SupabaseProvider>
+            </DBProvider>
+          </SupabaseProvider>
+        </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );

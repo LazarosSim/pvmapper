@@ -32,6 +32,9 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       setIsInitialized(true);
+    }).catch(error => {
+      console.error("Error getting session:", error);
+      setIsInitialized(true); // Still mark as initialized even on error
     });
 
     return () => subscription.unsubscribe();
