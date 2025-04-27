@@ -8,7 +8,6 @@ import { useSupabase } from '@/lib/supabase-provider';
 import { useAuthForm } from '@/hooks/use-auth-form';
 import { LoginForm } from '@/components/auth/login-form';
 import { RegisterForm } from '@/components/auth/register-form';
-
 const LoginPage = () => {
   const [creatingDemoAccounts, setCreatingDemoAccounts] = useState(false);
   const [backgroundLoaded, setBackgroundLoaded] = useState(false);
@@ -33,13 +32,11 @@ const LoginPage = () => {
     handleLogin,
     handleRegister
   } = useAuthForm();
-
   useEffect(() => {
     if (isInitialized && user) {
       setShouldRedirect(true);
     }
   }, [isInitialized, user]);
-
   useEffect(() => {
     const clearSession = async () => {
       try {
@@ -52,7 +49,6 @@ const LoginPage = () => {
       clearSession();
     }
   }, [location]);
-
   const createDemoAccounts = async () => {
     try {
       setCreatingDemoAccounts(true);
@@ -109,13 +105,13 @@ const LoginPage = () => {
       setCreatingDemoAccounts(false);
     }
   };
-
   useEffect(() => {
     if (isInitialized) {
       createDemoAccounts();
     }
   }, [isInitialized]);
 
+  // Preload the background image
   useEffect(() => {
     const preloadImage = () => {
       const img = new Image();
@@ -128,7 +124,6 @@ const LoginPage = () => {
     };
     preloadImage();
   }, []);
-
   if (!isInitialized) {
     return <div className="min-h-screen flex items-center justify-center bg-xpenergy-primary bg-opacity-80 p-4">
         <div className="text-center space-y-4">
@@ -140,23 +135,21 @@ const LoginPage = () => {
         </div>
       </div>;
   }
-
   if (shouldRedirect) {
     return <Navigate to="/" replace />;
   }
-
   const fallbackBackground = "url('https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D')";
   const backgroundImage = !backgroundError ? "url('https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/loginbackground.jpg')" : fallbackBackground;
-
   return <div className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center relative overflow-hidden bg-xpenergy-primary" style={{
     backgroundImage: backgroundImage,
     backgroundSize: 'cover',
     backgroundPosition: 'center'
   }}>
+      
       <Card className="w-full max-w-md shadow-xl backdrop-blur-sm border border-white/20 z-10 animate-fade-in bg-transparent my-0 mx-0 rounded-none py-0 px-0">
         <CardHeader className="text-center space-y-2 bg-transparent">
-          <CardTitle className="font-inter bg-gradient-to-br from-xpenergy-accent to-xpenergy-accent text-xpenergy-accent font-black tracking-energy text-center text-3xl px-0">XP ENERGY PV MAPPER</CardTitle>
-          <CardDescription className="text-lg text-xpenergy-primary/90 font-inter">
+          <CardTitle className="font-montserrat bg-gradient-to-br from-xpenergy-primary to-xpenergy-secondary bg-clip-text text-xpenergy-accent font-extrabold text-center text-3xl px-0">XP ENERGY PV MAPPER</CardTitle>
+          <CardDescription className="text-lg text-xpenergy-primary/90">
             Sign in to continue tracking solar installations
           </CardDescription>
         </CardHeader>
@@ -172,8 +165,8 @@ const LoginPage = () => {
             <RegisterForm username={registerUsername} setUsername={setRegisterUsername} password={registerPassword} setPassword={setRegisterPassword} confirmPassword={registerConfirm} setConfirmPassword={setRegisterConfirm} loading={loading} onSubmit={handleRegister} />
           </TabsContent>
         </Tabs>
+        
       </Card>
     </div>;
 };
-
 export default LoginPage;
