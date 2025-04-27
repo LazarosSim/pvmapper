@@ -57,10 +57,10 @@ const ScanRowPage = () => {
   // Load initial barcodes when component mounts or rowId changes
   useEffect(() => {
     if (rowId) {
-      // Get the last 10 barcodes from the row and sort them with the most recent first
+      // Get the most recent barcodes and sort them by timestamp
       const barcodes = getBarcodesByRowId(rowId)
-        .slice(-10)  // Get last 10 barcodes
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()); // Sort by timestamp, newest first
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()) // Sort by timestamp, newest first
+        .slice(0, 10); // Get only the 10 most recent
       setLatestBarcodes(barcodes);
     }
   }, [rowId, getBarcodesByRowId]);
@@ -111,10 +111,11 @@ const ScanRowPage = () => {
         }
         toast.success('Barcode added successfully');
         
-        // Update latest barcodes list with most recent at the top
-        const updatedBarcodes = getBarcodesByRowId(rowId)
-          .slice(-10)  // Get last 10 barcodes
-          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()); // Sort by timestamp, newest first
+        // Update latest barcodes list maintaining the sliding window
+        const updatedBarcodes = [
+          { ...result, timestamp: new Date().toISOString() }, // Add new barcode at the beginning
+          ...latestBarcodes.slice(0, 9) // Keep only the next 9 most recent barcodes
+        ];
         setLatestBarcodes(updatedBarcodes);
       } else {
         toast.error('Failed to add barcode');
