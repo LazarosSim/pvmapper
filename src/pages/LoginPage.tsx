@@ -38,11 +38,7 @@ const LoginPage = () => {
     }
   }, [isInitialized, user]);
   
-  // Handle redirect after all hooks are declared
-  if (shouldRedirect) {
-    return <Navigate to="/" replace />;
-  }
-  
+  // Handle login form submission
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -69,6 +65,7 @@ const LoginPage = () => {
     }
   };
 
+  // Handle registration form submission
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -112,6 +109,7 @@ const LoginPage = () => {
     }
   };
 
+  // Create demo accounts
   const createDemoAccounts = async () => {
     try {
       setCreatingDemoAccounts(true);
@@ -193,7 +191,7 @@ const LoginPage = () => {
     }
   }, [isInitialized]);
 
-  // Show loading state while Supabase is initializing
+  // Render component based on state
   if (!isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -207,7 +205,13 @@ const LoginPage = () => {
       </div>
     );
   }
+  
+  // Redirect if user is logged in - this must come after all hooks
+  if (shouldRedirect) {
+    return <Navigate to="/" replace />;
+  }
 
+  // Main render
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-lg">
