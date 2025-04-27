@@ -14,7 +14,6 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const logoUrl = `https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/xplogo.png`;
 
   return (
     <header className="sticky top-0 w-full bg-gradient-to-r from-xpenergy-primary to-xpenergy-secondary text-white py-4 px-4 flex items-center z-10 shadow-md">
@@ -31,7 +30,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction })
         )}
         <div className="flex items-center">
           <img 
-            src={logoUrl} 
+            src="https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/xplogo.png"
             alt="XP Energy Logo" 
             className="h-7 mr-3"
             onError={(e) => {

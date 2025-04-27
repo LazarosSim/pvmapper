@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -199,7 +200,7 @@ const LoginPage = () => {
     <div 
       className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center relative"
       style={{ 
-        backgroundImage: `url(${bgImageUrl})`,
+        backgroundImage: `url(https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/loginbackground.jpg)`,
         backgroundColor: 'rgb(0, 82, 155)',
       }}
     >
