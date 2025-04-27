@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 interface SupabaseContextType {
   user: User | null;
   session: Session | null;
+  isInitialized: boolean;
   signIn: (username: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -43,6 +44,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(() => ({
     user,
     session,
+    isInitialized,
     signIn: async (username: string, password: string) => {
       const email = `${username.toLowerCase()}@example.com`;
       const { error } = await supabase.auth.signInWithPassword({
@@ -64,7 +66,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
     }
-  }), [user, session]);
+  }), [user, session, isInitialized]);
 
   // Don't render children until we've checked for an existing session
   if (!isInitialized) {

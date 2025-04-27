@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { useSupabase } from '@/lib/supabase-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -11,20 +10,58 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 const LoginPage = () => {
-  const { user } = useSupabase();
+  // State for login form
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  
+  // State for registration form
   const [registerUsername, setRegisterUsername] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerConfirm, setRegisterConfirm] = useState('');
+  
+  // UI state
   const [loading, setLoading] = useState(false);
   const [creatingDemoAccounts, setCreatingDemoAccounts] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
   
-  if (user) {
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data.session?.user) {
+          setCurrentUser(data.session.user);
+        }
+      } catch (error) {
+        console.error("Session check error:", error);
+      }
+    };
+    
+    checkSession();
+    
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (session?.user) {
+          setCurrentUser(session.user);
+        } else {
+          setCurrentUser(null);
+        }
+      }
+    );
+    
+    return () => {
+      if (authListener && authListener.subscription) {
+        authListener.subscription.unsubscribe();
+      }
+    };
+  }, []);
+  
+  // Redirect if already logged in
+  if (currentUser) {
     return <Navigate to="/" replace />;
   }
-
+  
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -63,7 +100,7 @@ const LoginPage = () => {
     
     try {
       const email = `${registerUsername.toLowerCase()}@example.com`;
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password: registerPassword,
         options: {
@@ -79,6 +116,10 @@ const LoginPage = () => {
         toast.error(error.message);
       } else {
         toast.success("Registration successful! Please log in.");
+        // Reset form and switch to login tab
+        setRegisterUsername('');
+        setRegisterPassword('');
+        setRegisterConfirm('');
         const loginTab = document.querySelector('[data-value="login"]') as HTMLElement;
         if (loginTab) loginTab.click();
       }
@@ -98,23 +139,38 @@ const LoginPage = () => {
       const { data: existingProfiles, error: profileError } = await supabase
         .from('profiles')
         .select('username')
-        .limit(1);
+        .or('username.eq.antrian,username.eq.lazaros')
+        .limit(2);
       
       if (profileError) {
         console.error("Error checking profiles:", profileError);
         return;
       }
       
-      if (existingProfiles && existingProfiles.length > 0) {
+      if (existingProfiles && existingProfiles.length === 2) {
         console.log("Demo accounts already exist, skipping creation");
         return;
       }
       
       console.log("Setting up demo accounts...");
       
+      // Create the demo accounts in sequence to avoid race conditions
       const createDemoUser = async (username: string, password: string, role: string) => {
         try {
           const email = `${username.toLowerCase()}@example.com`;
+          
+          // First check if this specific user already exists
+          const { data: existingUser } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('username', username)
+            .single();
+            
+          if (existingUser) {
+            console.log(`${username} account already exists, skipping`);
+            return;
+          }
+            
           const { error } = await supabase.auth.signUp({
             email,
             password,
@@ -137,13 +193,11 @@ const LoginPage = () => {
         }
       };
       
-      // Create demo accounts in parallel to speed up the process
-      await Promise.all([
-        createDemoUser("antrian", "antrian1", "user"),
-        createDemoUser("lazaros", "lazaros2", "manager")
-      ]);
+      // Create demo accounts sequentially
+      await createDemoUser("antrian", "antrian1", "user");
+      await createDemoUser("lazaros", "lazaros2", "manager");
       
-      console.log("Demo accounts created successfully");
+      console.log("Demo accounts setup complete");
     } catch (error) {
       console.error("Error creating demo accounts:", error);
     } finally {
@@ -151,16 +205,16 @@ const LoginPage = () => {
     }
   };
 
-  // Create demo accounts when the component mounts
+  // Create demo accounts on component mount
   useEffect(() => {
     createDemoAccounts();
   }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Inventory Hub</CardTitle>
+          <CardTitle className="text-2xl font-bold">Inventory Hub</CardTitle>
           <CardDescription>Sign in to continue tracking inventory</CardDescription>
         </CardHeader>
         <Tabs defaultValue="login" className="w-full">
@@ -269,7 +323,7 @@ const LoginPage = () => {
             </form>
           </TabsContent>
         </Tabs>
-        <CardFooter className="flex flex-col text-center text-sm text-muted-foreground pt-0">
+        <CardFooter className="flex flex-col text-center text-sm text-muted-foreground pt-2">
           <p className="mt-2">Demo credentials:</p>
           <p>User: antrian / antrian1</p>
           <p>Manager: lazaros / lazaros2</p>

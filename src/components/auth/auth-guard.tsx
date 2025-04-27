@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useDB } from '@/lib/db-provider';
 import { useNavigate } from 'react-router-dom';
 import { useSupabase } from '@/lib/supabase-provider';
+import { Loader } from 'lucide-react';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -10,50 +11,44 @@ interface AuthGuardProps {
 }
 
 const AuthGuard: React.FC<AuthGuardProps> = ({ children, requireManager = false }) => {
-  const { currentUser } = useDB();
-  const { user } = useSupabase();
+  const { currentUser, isDBLoading } = useDB();
+  const { user, isInitialized } = useSupabase();
   const navigate = useNavigate();
-  const [isChecking, setIsChecking] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    // Only proceed with auth checking if we have both pieces of data
-    if (user === null || currentUser !== undefined) {
-      setIsChecking(false);
-      
+    // Only run the auth check if both supabase and DB providers are initialized
+    if (isInitialized && !isDBLoading) {
+      // If user is not logged in, redirect to login
       if (!user) {
         navigate('/login');
         return;
       }
 
+      // If manager role is required but user is not a manager, redirect to home
       if (requireManager && currentUser?.role !== 'manager') {
         navigate('/');
         return;
       }
-    }
-  }, [user, currentUser, requireManager, navigate]);
 
-  // While checking auth status, show a minimal loading indicator
-  if (isChecking) {
+      // Auth check is complete
+      setAuthChecked(true);
+    }
+  }, [user, currentUser, requireManager, navigate, isInitialized, isDBLoading]);
+
+  // Show loading indicator while checking auth status
+  if (!authChecked) {
     return (
-      <div className="flex items-center justify-center p-4">
-        <svg className="animate-spin h-5 w-5 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
+      <div className="flex items-center justify-center min-h-screen p-4">
+        <div className="text-center space-y-2">
+          <Loader className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-sm text-muted-foreground">Verifying access...</p>
+        </div>
       </div>
     );
   }
 
-  // If not authenticated, render nothing - redirect will happen in effect
-  if (!user) {
-    return null;
-  }
-
-  // If manager is required but user is not a manager, render nothing - redirect will happen in effect
-  if (requireManager && currentUser?.role !== 'manager') {
-    return null;
-  }
-
+  // Return children only after auth is checked and requirements are met
   return <>{children}</>;
 };
 
