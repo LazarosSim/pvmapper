@@ -30,14 +30,9 @@ const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction })
         )}
         <div className="flex items-center">
           <img 
-            src="/placeholder.svg" 
-            data-src="https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/xplogo.png"
+            src="https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/xplogo.png"
             alt="XP Energy Logo" 
             className="h-7 mr-3"
-            onLoad={(e) => {
-              const img = e.target as HTMLImageElement;
-              img.src = img.dataset.src || '/placeholder.svg';
-            }}
             onError={(e) => {
               const img = e.target as HTMLImageElement;
               img.src = '/placeholder.svg';

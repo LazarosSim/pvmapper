@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -197,18 +196,17 @@ const LoginPage = () => {
   return (
     <div 
       className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center relative"
-      style={{ 
-        backgroundImage: "url('/placeholder.svg')",
-        backgroundColor: 'rgb(0, 82, 155)',
-      }}
+      style={{ backgroundColor: 'rgb(0, 82, 155)' }}
     >
       <img 
-        src="https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/sign/images/loginbackground.jpg?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InN0b3JhZ2UtdXJsLXNpZ25pbmcta2V5XzBkZDZhOWI0LTZjYTAtNDk3Ni05MjYxLTc0ZDkwMWFlZjM0ZCJ9.eyJ1cmwiOiJpbWFnZXMvbG9naW5iYWNrZ3JvdW5kLmpwZyIsImlhdCI6MTc0NTc2NTEwNCwiZXhwIjoxNzc3MzAxMTA0fQ.zSYMeKohCln-imnKUFgPeSQfPWF1cMg7Mve8cIAIrHA"
+        src="https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/loginbackground.jpg"
         alt="Background"
         className="absolute inset-0 w-full h-full object-cover" 
         style={{ zIndex: -2 }}
-        onError={() => {
+        onError={(e) => {
           console.error("Error loading background image");
+          const img = e.target as HTMLImageElement;
+          img.src = '/placeholder.svg';
         }}
       />
       <div className="absolute inset-0 bg-gradient-to-br from-xpenergy-primary/90 to-xpenergy-secondary/70 backdrop-blur-sm" style={{ zIndex: -1 }}></div>
