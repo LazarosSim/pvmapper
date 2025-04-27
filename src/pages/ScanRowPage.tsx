@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -62,6 +63,7 @@ const ScanRowPage = () => {
 
   const row = getRowById(rowId);
   const park = row ? getParkById(row.parkId) : undefined;
+  // Get recent barcodes and reverse them so the newest appears at the top
   const recentBarcodes = getBarcodesByRowId(rowId).slice(-5).reverse();
   const totalBarcodes = countBarcodesInRow(rowId);
 
@@ -123,6 +125,7 @@ const ScanRowPage = () => {
     try {
       await resetRow(rowId);
       setIsResetDialogOpen(false);
+      focusInput();
     } finally {
       setIsResetting(false);
     }
@@ -141,6 +144,7 @@ const ScanRowPage = () => {
       if (result !== undefined && result !== null) {
         toast.success("Row name updated successfully");
         setIsEditingRowName(false);
+        focusInput();
       }
     } else {
       toast.error("Row name cannot be empty");
@@ -158,7 +162,10 @@ const ScanRowPage = () => {
       <Button variant="ghost" size="icon" onClick={saveRowName}>
         <Check className="h-4 w-4 text-green-500" />
       </Button>
-      <Button variant="ghost" size="icon" onClick={() => setIsEditingRowName(false)}>
+      <Button variant="ghost" size="icon" onClick={() => {
+        setIsEditingRowName(false);
+        focusInput();
+      }}>
         <X className="h-4 w-4 text-red-500" />
       </Button>
     </div>
@@ -264,7 +271,7 @@ const ScanRowPage = () => {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel onClick={() => focusInput()}>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={handleReset} className="bg-destructive text-destructive-foreground">
                 Reset Row
               </AlertDialogAction>
