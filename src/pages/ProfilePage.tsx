@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -7,13 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { LogOut, BarChart3, User, Award, Star, Trophy, Medal } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { Progress } from '@/components/ui/progress';
 
 const ProfilePage = () => {
   const { currentUser, logout, getUserDailyScans, getUserTotalScans, getUserBarcodesScanned } = useDB();
   const navigate = useNavigate();
 
-  // Redirect to login if not authenticated
   React.useEffect(() => {
     if (!currentUser) {
       navigate('/login');
@@ -33,28 +30,25 @@ const ProfilePage = () => {
     navigate('/login');
   };
 
-  // Achievement data
   const achievements = [
     {
       icon: Trophy,
       title: "Speed Scanner",
       description: "Scan 600 panels in under 60 minutes",
-      progress: Math.min(100, Math.round((dailyScans / 600) * 100)),
-      completed: dailyScans >= 600,
+      count: dailyScans,
+      target: 600,
     },
     {
       icon: Star,
       title: "Pattern Finder",
-      description: "Find a barcode with 4 consecutive identical digits",
-      progress: 0, // This would need actual logic to determine
-      completed: false, // Placeholder, would need real logic
+      description: "Find barcodes with 4 consecutive identical digits",
+      count: 0,
     },
     {
       icon: Medal,
       title: "Straight Spotter",
-      description: "Find a barcode with a 5-digit straight sequence",
-      progress: 0, // This would need actual logic to determine
-      completed: false, // Placeholder, would need real logic
+      description: "Find barcodes with a 5-digit straight sequence",
+      count: 0,
     },
   ];
 
@@ -129,25 +123,21 @@ const ProfilePage = () => {
             {achievements.map((achievement, index) => (
               <div key={index} className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <achievement.icon className={`h-5 w-5 ${achievement.completed ? 'text-amber-500' : 'text-muted-foreground'}`} />
+                  <achievement.icon className={`h-5 w-5 ${achievement.count >= (achievement.target || 1) ? 'text-amber-500' : 'text-muted-foreground'}`} />
                   <div className="flex-1">
                     <div className="flex justify-between">
                       <span className="font-medium">{achievement.title}</span>
-                      <span>{achievement.completed ? 'Completed!' : `${achievement.progress}%`}</span>
+                      <span>{achievement.count} found</span>
                     </div>
                     <p className="text-sm text-muted-foreground">{achievement.description}</p>
                   </div>
                 </div>
-                <Progress 
-                  value={achievement.progress} 
-                  className={`h-2 ${achievement.completed ? 'bg-amber-100' : ''}`}
-                />
               </div>
             ))}
           </CardContent>
         </Card>
 
-        {currentUser.role === 'manager' && (
+        {currentUser?.role === 'manager' && (
           <Button 
             className="w-full"
             onClick={() => navigate('/dashboard')}
