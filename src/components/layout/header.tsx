@@ -39,7 +39,10 @@ const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction })
               console.error('Failed to load XP Energy logo');
             }}
           />
-          {titleAction ? titleAction : <h1 className="text-xl font-semibold font-montserrat">{title}</h1>}
+          {titleAction ? 
+            titleAction : 
+            <h1 className="text-xl font-inter font-black tracking-energy uppercase">{title}</h1>
+          }
         </div>
       </div>
     </header>
