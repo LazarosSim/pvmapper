@@ -535,6 +535,10 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   
   const deleteRow = async (rowId: string) => {
     try {
+      // First reset the row (which will handle adjusting barcode counts)
+      await resetRow(rowId);
+      
+      // Then delete the row
       const { error } = await supabase
         .from('rows')
         .delete()
@@ -546,9 +550,8 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       
-      // Remove row and its barcodes
+      // Remove row from state
       setRows(prev => prev.filter(row => row.id !== rowId));
-      setBarcodes(prev => prev.filter(barcode => barcode.rowId !== rowId));
       
       toast.success('Row deleted successfully');
     } catch (error: any) {
@@ -563,6 +566,18 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   
   const resetRow = async (rowId: string) => {
     try {
+      // First get all barcodes for this row to track what needs to be subtracted
+      const rowBarcodes = barcodes.filter(barcode => barcode.rowId === rowId);
+      
+      // Group barcodes by user for adjustment
+      const userBarcodeCounts: {[userId: string]: number} = {};
+      rowBarcodes.forEach(barcode => {
+        if (!userBarcodeCounts[barcode.userId]) {
+          userBarcodeCounts[barcode.userId] = 0;
+        }
+        userBarcodeCounts[barcode.userId]++;
+      });
+      
       // Delete all barcodes for this row
       const { error } = await supabase
         .from('barcodes')
@@ -577,6 +592,36 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
       
       // Remove barcodes from state
       setBarcodes(prev => prev.filter(barcode => barcode.rowId !== rowId));
+      
+      // Adjust daily scans for each affected user
+      const today = new Date().toISOString().split('T')[0];
+      
+      for (const [userId, count] of Object.entries(userBarcodeCounts)) {
+        // Get current daily scan count
+        const { data: scanData } = await supabase
+          .from('daily_scans')
+          .select('id, count')
+          .eq('user_id', userId)
+          .eq('date', today)
+          .maybeSingle();
+          
+        if (scanData && scanData.count > 0) {
+          // Adjust the count, ensuring it doesn't go below 0
+          const newCount = Math.max(0, scanData.count - count);
+          
+          await supabase
+            .from('daily_scans')
+            .update({ count: newCount })
+            .eq('id', scanData.id);
+            
+          // Update local state
+          setDailyScans(prev => prev.map(scan => 
+            scan.userId === userId && scan.date === today
+              ? { ...scan, count: newCount }
+              : scan
+          ));
+        }
+      }
       
       toast.success('Row reset successfully');
     } catch (error: any) {

@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -27,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import AuthGuard from '@/components/auth/auth-guard';
 
-const NOTIF_SOUND = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAABCxAgAEABAAZGF0YaQAAACAgICAgICAgICAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgAAAAAAAAAA==";
+const NOTIF_SOUND = "data:audio/wav;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAFAAAGUACFhYWFhYWFhYWFhYWFhYWFhYWFra2tra2tra2tra2tra2tra2traOjo6Ojo6Ojo6Ojo6Ojo6Ojo6P///////////////////////////////////////////wAAADJMQVNNRTMuOTlyAc0AAAAAAAAAABSAJAJAQgAAgAAAA+aieizgAAAAAAAAAAAAAAAAAAAA//uQZAAAApEGUFUGAAArIMoKoMAABZAZnW40AAClAzOtxpgALEwy1AAAAAEVf7kGQRmBmD3QEAgEDhnePhI/JH4iByB+SPxA/IH5gQB+IPzAQA+TAMDhOIPA/IEInjB4P4fn///jHJ+T/ngfgYAgEAgEAgEAgg5nwuZIuZw5QmCvG0Ooy0JtC2CnAp1vdSlLMuOQylYZl0LERgAAAAAAlMy5z3O+n//zTjN/9/+Z//O//9y5/8ud/z//5EHL/D+KDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDEppqampqampqampqampqampqampqampqampqampqamgAAA//tQZAAAAtAeUqsMAARfA7pVYYACCUCXPqggAEAAAP8AAAAATEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkYA/wAAB/gAAACAAAD/AAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=";
 
 const ScanRowPage = () => {
   const { rowId } = useParams<{ rowId: string }>();
@@ -54,13 +53,11 @@ const ScanRowPage = () => {
     }
   };
 
-  // Load initial barcodes when component mounts or rowId changes
   useEffect(() => {
     if (rowId) {
-      // Get the most recent barcodes and sort them by timestamp
       const barcodes = getBarcodesByRowId(rowId)
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()) // Sort by timestamp, newest first
-        .slice(0, 10); // Get only the 10 most recent
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 10);
       setLatestBarcodes(barcodes);
     }
   }, [rowId, getBarcodesByRowId]);
@@ -89,7 +86,6 @@ const ScanRowPage = () => {
     try {
       setIsProcessing(true);
       
-      // Check for duplicates in the current row
       const duplicates = getBarcodesByRowId(rowId).filter(b => 
         b.code.toLowerCase() === barcodeInput.trim().toLowerCase()
       );
@@ -111,10 +107,9 @@ const ScanRowPage = () => {
         }
         toast.success('Barcode added successfully');
         
-        // Update latest barcodes list maintaining the sliding window
         const updatedBarcodes = [
-          { ...result, timestamp: new Date().toISOString() }, // Add new barcode at the beginning
-          ...latestBarcodes.slice(0, 9) // Keep only the next 9 most recent barcodes
+          { ...result, timestamp: new Date().toISOString() },
+          ...latestBarcodes.slice(0, 9)
         ];
         setLatestBarcodes(updatedBarcodes);
       } else {
@@ -145,7 +140,6 @@ const ScanRowPage = () => {
     setIsResetting(true);
     try {
       await resetRow(rowId);
-      // Update latest barcodes after reset
       setLatestBarcodes([]);
       setIsResetDialogOpen(false);
       toast.success('Row reset successfully');
@@ -256,24 +250,21 @@ const ScanRowPage = () => {
                     }
                   }}
                   placeholder="Scan or enter barcode"
-                  className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30 pr-[120px]"
+                  className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30 pr-16"
                   autoComplete="off"
                 />
                 <Button 
                   type="submit" 
                   disabled={!barcodeInput.trim() || isProcessing}
-                  className="absolute right-0 top-0 bg-inventory-primary hover:bg-inventory-primary/90"
+                  className="absolute right-0 top-0 bg-inventory-primary hover:bg-inventory-primary/90 h-full px-3 text-sm"
                 >
                   {isProcessing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing
-                    </>
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <>
-                      Add Barcode
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </>
+                    <span className="flex items-center">
+                      <span className="hidden sm:inline mr-1">Add</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </span>
                   )}
                 </Button>
               </div>

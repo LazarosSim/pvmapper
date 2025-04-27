@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -8,13 +9,19 @@ import { useSupabase } from '@/lib/supabase-provider';
 import { useAuthForm } from '@/hooks/use-auth-form';
 import { LoginForm } from '@/components/auth/login-form';
 import { RegisterForm } from '@/components/auth/register-form';
+
 const LoginPage = () => {
   const [creatingDemoAccounts, setCreatingDemoAccounts] = useState(false);
+  const [backgroundLoaded, setBackgroundLoaded] = useState(false);
+  const [backgroundError, setBackgroundError] = useState(false);
+  
   const {
     user,
     isInitialized
   } = useSupabase();
+  
   const [shouldRedirect, setShouldRedirect] = useState(false);
+  
   const {
     loginUsername,
     setLoginUsername,
@@ -30,11 +37,13 @@ const LoginPage = () => {
     handleLogin,
     handleRegister
   } = useAuthForm();
+
   useEffect(() => {
     if (isInitialized && user) {
       setShouldRedirect(true);
     }
   }, [isInitialized, user]);
+
   useEffect(() => {
     const clearSession = async () => {
       try {
@@ -43,10 +52,12 @@ const LoginPage = () => {
         console.log('No active session to clear');
       }
     };
+    
     if (location.pathname === '/login') {
       clearSession();
     }
   }, [location]);
+
   const createDemoAccounts = async () => {
     try {
       setCreatingDemoAccounts(true);
@@ -54,25 +65,31 @@ const LoginPage = () => {
         data: existingProfiles,
         error: profileError
       } = await supabase.from('profiles').select('username').or('username.eq.antrian,username.eq.lazaros').limit(2);
+      
       if (profileError) {
         console.error("Error checking profiles:", profileError);
         return;
       }
+      
       if (existingProfiles && existingProfiles.length === 2) {
         console.log("Demo accounts already exist, skipping creation");
         return;
       }
+      
       console.log("Setting up demo accounts...");
+      
       const createDemoUser = async (username: string, password: string, role: string) => {
         try {
           const email = `${username.toLowerCase()}@example.com`;
           const {
             data: existingUser
           } = await supabase.from('profiles').select('username').eq('username', username).single();
+          
           if (existingUser) {
             console.log(`${username} account already exists, skipping`);
             return;
           }
+          
           const {
             error
           } = await supabase.auth.signUp({
@@ -85,17 +102,21 @@ const LoginPage = () => {
               }
             }
           });
+          
           if (error) {
             console.error(`Error creating ${username} account:`, error);
             throw error;
           }
+          
           console.log(`${username} account created successfully`);
         } catch (err) {
           console.error(`Failed to create ${username} account:`, err);
         }
       };
+      
       await createDemoUser("antrian", "antrian1", "user");
       await createDemoUser("lazaros", "lazaros2", "manager");
+      
       console.log("Demo accounts setup complete");
     } catch (error) {
       console.error("Error creating demo accounts:", error);
@@ -103,11 +124,28 @@ const LoginPage = () => {
       setCreatingDemoAccounts(false);
     }
   };
+
   useEffect(() => {
     if (isInitialized) {
       createDemoAccounts();
     }
   }, [isInitialized]);
+
+  // Preload the background image
+  useEffect(() => {
+    const preloadImage = () => {
+      const img = new Image();
+      img.src = 'https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/loginbackground.jpg';
+      img.onload = () => setBackgroundLoaded(true);
+      img.onerror = () => {
+        console.error("Failed to load background image");
+        setBackgroundError(true);
+      };
+    };
+    
+    preloadImage();
+  }, []);
+
   if (!isInitialized) {
     return <div className="min-h-screen flex items-center justify-center bg-xpenergy-primary bg-opacity-80 p-4">
         <div className="text-center space-y-4">
@@ -119,22 +157,27 @@ const LoginPage = () => {
         </div>
       </div>;
   }
+
   if (shouldRedirect) {
     return <Navigate to="/" replace />;
   }
-  return <div style={{
-    backgroundColor: 'rgb(0, 82, 155)'
-  }} className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center relative overflow-hidden bg-xpenergy-primary">
-      <img src="https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/loginbackground.jpg" alt="Background" className="absolute inset-0 w-full h-full object-cover opacity-90" style={{
-      zIndex: -2
-    }} onError={e => {
-      console.error("Error loading background image");
-      const img = e.target as HTMLImageElement;
-      img.src = '/placeholder.svg';
-    }} />
+
+  const fallbackBackground = "url('https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D')";
+  const backgroundImage = !backgroundError
+    ? "url('https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/loginbackground.jpg')"
+    : fallbackBackground;
+
+  return <div 
+      className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center relative overflow-hidden bg-xpenergy-primary"
+      style={{
+        backgroundImage: backgroundImage,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }}
+    >
       <div className="absolute inset-0 bg-gradient-to-br from-xpenergy-primary/90 to-xpenergy-secondary/70 backdrop-blur-sm" style={{
-      zIndex: -1
-    }} />
+        zIndex: 0
+      }} />
       <Card className="w-full max-w-md shadow-xl backdrop-blur-sm bg-white/80 border border-white/20 z-10 animate-fade-in">
         <CardHeader className="text-center space-y-2">
           <CardTitle className="font-montserrat bg-gradient-to-br from-xpenergy-primary to-xpenergy-secondary bg-clip-text text-xpenergy-accent font-extrabold text-center text-3xl px-0">XP ENERGY PV MAPPER</CardTitle>
@@ -166,4 +209,5 @@ const LoginPage = () => {
       </Card>
     </div>;
 };
+
 export default LoginPage;
