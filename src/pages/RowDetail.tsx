@@ -115,8 +115,8 @@ const RowDetail = () => {
     if (insertCode.trim() && insertAfterIndex !== null) {
       setIsInserting(true);
       try {
-        // Fix: addBarcode should only take 2 arguments here
-        const result = await addBarcode(insertCode.trim(), rowId);
+        // Now our addBarcode accepts the insertAfterIndex parameter
+        const result = await addBarcode(insertCode.trim(), rowId, insertAfterIndex);
         
         if (result !== undefined && result !== null) {
           toast.success("Barcode inserted successfully");

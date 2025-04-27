@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { useSupabase } from './supabase-provider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 
 // Type Definitions
 export type User = {
@@ -32,12 +33,29 @@ export type Barcode = {
   rowId: string;
   userId: string;
   timestamp: string;
+  displayOrder?: number;
 };
 
 export type Progress = {
   completed: number;
   total: number;
   percentage: number;
+};
+
+export type DailyScanStat = {
+  date: string;
+  count: number;
+  userId: string;
+  username?: string;
+}
+
+export type UserStat = {
+  userId: string;
+  username: string;
+  totalScans: number;
+  dailyScans: number;
+  daysActive: number;
+  averageScansPerDay: number;
 };
 
 type DBContextType = {
@@ -65,7 +83,7 @@ type DBContextType = {
   
   // Barcodes
   barcodes: Barcode[];
-  addBarcode: (code: string, rowId: string) => Promise<void>;
+  addBarcode: (code: string, rowId: string, afterBarcodeIndex?: number) => Promise<void>;
   deleteBarcode: (barcodeId: string) => Promise<void>;
   updateBarcode: (barcodeId: string, code: string) => Promise<void>;
   getBarcodesByRowId: (rowId: string) => Barcode[];
@@ -81,7 +99,9 @@ type DBContextType = {
   getUserDailyScans: () => number;
   getUserTotalScans: () => number;
   getUserBarcodesScanned: () => Barcode[];
-  getAllUserStats: () => any[];
+  getAllUserStats: () => UserStat[];
+  getDailyScans: (date?: Date) => Promise<DailyScanStat[]>;
+  getScansForDateRange: (startDate: Date, endDate: Date) => Promise<{date: string, count: number}[]>;
   
   // Data management
   importData: (jsonData: string) => boolean;
@@ -100,6 +120,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [barcodes, setBarcodes] = useState<Barcode[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [dailyScans, setDailyScans] = useState<DailyScanStat[]>([]);
 
   // Fetch user profile data from the database
   const fetchUserProfile = async (userId: string) => {
@@ -211,7 +232,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase
         .from('barcodes')
         .select('*')
-        .order('timestamp', { ascending: false });
+        .order('display_order', { ascending: true });
         
       if (error) {
         console.error('Error fetching barcodes:', error);
@@ -225,13 +246,55 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
           code: barcode.code,
           rowId: barcode.row_id,
           userId: barcode.user_id,
-          timestamp: barcode.timestamp
+          timestamp: barcode.timestamp,
+          displayOrder: barcode.display_order || 0
         }));
         
         setBarcodes(formattedBarcodes);
       }
     } catch (error: any) {
       console.error('Error in fetchBarcodes:', error.message);
+    }
+  };
+
+  // Fetch daily scans data
+  const fetchDailyScans = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('daily_scans')
+        .select('*')
+        .order('date', { ascending: false });
+        
+      if (error) {
+        console.error('Error fetching daily scans:', error);
+        return;
+      }
+      
+      if (data) {
+        // Get all user profiles to map IDs to usernames
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username');
+          
+        const usernameMap = profiles ? 
+          profiles.reduce((map: {[key: string]: string}, profile) => {
+            map[profile.id] = profile.username;
+            return map;
+          }, {}) : {};
+          
+        const formattedScans: DailyScanStat[] = data.map(scan => ({
+          date: scan.date,
+          count: scan.count,
+          userId: scan.user_id,
+          username: usernameMap[scan.user_id] || 'Unknown'
+        }));
+        
+        setDailyScans(formattedScans);
+      }
+    } catch (error: any) {
+      console.error('Error in fetchDailyScans:', error.message);
     }
   };
 
@@ -256,6 +319,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
           await fetchParks();
           await fetchRows();
           await fetchBarcodes();
+          await fetchDailyScans();
         }
       } else {
         // No logged in user
@@ -264,6 +328,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
           setParks([]);
           setRows([]);
           setBarcodes([]);
+          setDailyScans([]);
           setIsDBLoading(false);
         }
       }
@@ -525,16 +590,50 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   };
   
   // Barcode operations
-  const addBarcode = async (code: string, rowId: string) => {
+  const addBarcode = async (code: string, rowId: string, afterBarcodeIndex?: number) => {
     if (!user) return;
     
     try {
+      // Get barcodes for this row to determine display order
+      const rowBarcodes = barcodes
+        .filter(barcode => barcode.rowId === rowId)
+        .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+      
+      // Determine the new display order
+      let newDisplayOrder = 0;
+      
+      if (rowBarcodes.length > 0) {
+        if (afterBarcodeIndex !== undefined && afterBarcodeIndex >= 0 && afterBarcodeIndex < rowBarcodes.length) {
+          // Insert after the specified barcode
+          const afterBarcode = rowBarcodes[afterBarcodeIndex];
+          
+          // Find all barcodes that should come after this new one
+          const laterBarcodes = rowBarcodes.filter(b => (b.displayOrder || 0) > (afterBarcode.displayOrder || 0));
+          
+          // Set the new display order to be between the selected barcode and the next one
+          if (laterBarcodes.length > 0) {
+            // Get the first barcode that comes after the selected one
+            const nextBarcode = laterBarcodes.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))[0];
+            newDisplayOrder = ((afterBarcode.displayOrder || 0) + (nextBarcode.displayOrder || 0)) / 2;
+          } else {
+            // If it's the last barcode, add a gap
+            newDisplayOrder = (afterBarcode.displayOrder || 0) + 1000;
+          }
+        } else {
+          // Add to front with a smaller display order than the first item
+          const firstBarcode = rowBarcodes.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))[0];
+          newDisplayOrder = Math.max(0, (firstBarcode.displayOrder || 0) - 1000); 
+        }
+      }
+      
+      // Add the new barcode with calculated display order
       const { data, error } = await supabase
         .from('barcodes')
         .insert([{ 
           code,
           row_id: rowId,
-          user_id: user.id
+          user_id: user.id,
+          display_order: newDisplayOrder
         }])
         .select();
         
@@ -550,13 +649,14 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
           code: data[0].code,
           rowId: data[0].row_id,
           userId: data[0].user_id,
-          timestamp: data[0].timestamp
+          timestamp: data[0].timestamp,
+          displayOrder: data[0].display_order
         };
         
         setBarcodes(prev => [newBarcode, ...prev]);
         
         // Update daily scans
-        updateDailyScans();
+        await updateDailyScans();
         
         toast.success('Barcode added successfully');
       }
@@ -615,7 +715,9 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   };
   
   const getBarcodesByRowId = (rowId: string): Barcode[] => {
-    return barcodes.filter(barcode => barcode.rowId === rowId);
+    return barcodes
+      .filter(barcode => barcode.rowId === rowId)
+      .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
   };
   
   const searchBarcodes = (query: string): Barcode[] => {
@@ -646,7 +748,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
         .select()
         .eq('user_id', user.id)
         .eq('date', today)
-        .single();
+        .maybeSingle();
         
       if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
         console.error('Error checking daily scans:', error);
@@ -659,15 +761,37 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
           .from('daily_scans')
           .update({ count: data.count + 1 })
           .eq('id', data.id);
+          
+        // Update local data
+        setDailyScans(prev => prev.map(scan => 
+          scan.userId === user.id && scan.date === today 
+            ? { ...scan, count: scan.count + 1 } 
+            : scan
+        ));
       } else {
         // Create new entry
-        await supabase
+        const { data: newScan } = await supabase
           .from('daily_scans')
           .insert([{ 
             user_id: user.id,
             count: 1,
             date: today
-          }]);
+          }])
+          .select();
+          
+        // Update local data
+        if (newScan && newScan[0]) {
+          const username = currentUser?.username || 'Unknown';
+          setDailyScans(prev => [
+            ...prev, 
+            { 
+              date: today, 
+              count: 1, 
+              userId: user.id,
+              username
+            }
+          ]);
+        }
       }
     } catch (error: any) {
       console.error('Error updating daily scans:', error.message);
@@ -675,7 +799,10 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   };
   
   const getUserDailyScans = (): number => {
-    return 0; // Placeholder for future implementation
+    if (!user) return 0;
+    const today = new Date().toISOString().split('T')[0];
+    const todayScan = dailyScans.find(scan => scan.userId === user.id && scan.date === today);
+    return todayScan?.count || 0;
   };
   
   const getUserTotalScans = (): number => {
@@ -688,8 +815,173 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     return barcodes.filter(barcode => barcode.userId === user.id);
   };
   
-  const getAllUserStats = () => {
-    return []; // Placeholder for future implementation
+  const getAllUserStats = (): UserStat[] => {
+    if (!users || users.length === 0) {
+      // Collect unique users from barcodes and daily scans
+      const userIdsFromBarcodes = [...new Set(barcodes.map(b => b.userId))];
+      const userIdsFromScans = [...new Set(dailyScans.map(ds => ds.userId))];
+      const allUserIds = [...new Set([...userIdsFromBarcodes, ...userIdsFromScans])];
+      
+      // Create a map of usernames
+      const usernameMap: {[key: string]: string} = {};
+      
+      // Add usernames from dailyScans
+      dailyScans.forEach(scan => {
+        if (scan.username && scan.userId) {
+          usernameMap[scan.userId] = scan.username;
+        }
+      });
+      
+      // If currentUser exists and isn't in the map, add it
+      if (currentUser && !usernameMap[currentUser.id]) {
+        usernameMap[currentUser.id] = currentUser.username;
+      }
+      
+      return allUserIds.map(userId => {
+        const userScans = barcodes.filter(barcode => barcode.userId === userId);
+        const userDailyScans = dailyScans.filter(scan => scan.userId === userId);
+        
+        // Calculate daily scans for today
+        const today = new Date().toISOString().split('T')[0];
+        const todayScan = userDailyScans.find(scan => scan.date === today);
+        const dailyScanCount = todayScan?.count || 0;
+        
+        // Calculate days active
+        const activeDays = new Set(userDailyScans.map(scan => scan.date)).size;
+        
+        // Calculate average scans per day
+        const averageScans = activeDays > 0 
+          ? userDailyScans.reduce((sum, scan) => sum + scan.count, 0) / activeDays 
+          : 0;
+        
+        return {
+          userId,
+          username: usernameMap[userId] || `User-${userId.slice(0, 6)}`,
+          totalScans: userScans.length,
+          dailyScans: dailyScanCount,
+          daysActive: activeDays,
+          averageScansPerDay: Math.round(averageScans * 10) / 10 // Round to 1 decimal place
+        };
+      });
+    }
+    
+    return users.map(user => {
+      const userScans = barcodes.filter(barcode => barcode.userId === user.id);
+      const userDailyScans = dailyScans.filter(scan => scan.userId === user.id);
+      
+      // Calculate daily scans for today
+      const today = new Date().toISOString().split('T')[0];
+      const todayScan = userDailyScans.find(scan => scan.date === today);
+      const dailyScanCount = todayScan?.count || 0;
+      
+      // Calculate days active
+      const activeDays = new Set(userDailyScans.map(scan => scan.date)).size;
+      
+      // Calculate average scans per day
+      const averageScans = activeDays > 0 
+        ? userDailyScans.reduce((sum, scan) => sum + scan.count, 0) / activeDays 
+        : 0;
+      
+      return {
+        userId: user.id,
+        username: user.username,
+        totalScans: userScans.length,
+        dailyScans: dailyScanCount,
+        daysActive: activeDays,
+        averageScansPerDay: Math.round(averageScans * 10) / 10 // Round to 1 decimal place
+      };
+    });
+  };
+  
+  // Get scans for a specific date
+  const getDailyScans = async (date?: Date): Promise<DailyScanStat[]> => {
+    const targetDate = date ? format(date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
+    
+    // First try to find data in our local state
+    const localDailyScans = dailyScans.filter(scan => scan.date === targetDate);
+    
+    if (localDailyScans.length > 0) {
+      return localDailyScans;
+    }
+    
+    // If not found locally, query the database
+    try {
+      const { data, error } = await supabase
+        .from('daily_scans')
+        .select()
+        .eq('date', targetDate);
+        
+      if (error) {
+        console.error(`Error fetching daily scans for ${targetDate}:`, error);
+        return [];
+      }
+      
+      if (data && data.length > 0) {
+        // Get usernames for these users
+        const userIds = data.map(scan => scan.user_id);
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', userIds);
+          
+        const usernameMap = profiles ? 
+          profiles.reduce((map: {[key: string]: string}, profile) => {
+            map[profile.id] = profile.username;
+            return map;
+          }, {}) : {};
+          
+        return data.map(scan => ({
+          date: scan.date,
+          count: scan.count,
+          userId: scan.user_id,
+          username: usernameMap[scan.user_id] || 'Unknown'
+        }));
+      }
+      
+      return [];
+    } catch (error: any) {
+      console.error(`Error in getDailyScans for ${targetDate}:`, error.message);
+      return [];
+    }
+  };
+  
+  // Get scans for a date range
+  const getScansForDateRange = async (startDate: Date, endDate: Date): Promise<{date: string, count: number}[]> => {
+    const start = format(startDate, 'yyyy-MM-dd');
+    const end = format(endDate, 'yyyy-MM-dd');
+    
+    try {
+      const { data, error } = await supabase
+        .from('daily_scans')
+        .select('date, count')
+        .gte('date', start)
+        .lte('date', end);
+        
+      if (error) {
+        console.error(`Error fetching scans for range ${start} to ${end}:`, error);
+        return [];
+      }
+      
+      if (data) {
+        // Aggregate counts by date
+        const countByDate: {[date: string]: number} = {};
+        
+        data.forEach(scan => {
+          if (!countByDate[scan.date]) {
+            countByDate[scan.date] = 0;
+          }
+          countByDate[scan.date] += scan.count;
+        });
+        
+        // Convert to array for returning
+        return Object.entries(countByDate).map(([date, count]) => ({ date, count }));
+      }
+      
+      return [];
+    } catch (error: any) {
+      console.error(`Error in getScansForDateRange for ${start} to ${end}:`, error.message);
+      return [];
+    }
   };
   
   // User management
@@ -786,6 +1078,8 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     getUserTotalScans,
     getUserBarcodesScanned,
     getAllUserStats,
+    getDailyScans,
+    getScansForDateRange,
     
     // Data management
     importData,

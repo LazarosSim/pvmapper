@@ -1,5 +1,5 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
 import { useDB } from '@/lib/db-provider';
@@ -13,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Barcode, RotateCcw, Edit, Check, X } from 'lucide-react';
+import { Barcode, RotateCcw, Edit, Check, X, Loader2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,9 +38,18 @@ const ScanRowPage = () => {
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isEditingRowName, setIsEditingRowName] = useState(false);
   const [rowName, setRowName] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    // Focus the input field when component mounts
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
 
   if (!currentUser) {
     return <Navigate to="/login" replace />;
@@ -58,8 +67,11 @@ const ScanRowPage = () => {
   const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
 
   const registerBarcode = async () => {
-    if (!barcodeInput.trim()) return;
+    if (!barcodeInput.trim() || isProcessing) return;
+    
     try {
+      setIsProcessing(true);
+      
       const result = await addBarcode(barcodeInput.trim(), rowId);
       setSuccess(result !== undefined && result !== null);
 
@@ -69,9 +81,7 @@ const ScanRowPage = () => {
           audioRef.current.currentTime = 0;
           audioRef.current.play();
         }
-        setTimeout(() => {
-          inputRef.current?.focus();
-        }, 200);
+        
         setTimeout(() => {
           setSuccess(null);
         }, 2000);
@@ -79,6 +89,15 @@ const ScanRowPage = () => {
     } catch (error) {
       console.error("Error registering barcode:", error);
       setSuccess(false);
+    } finally {
+      setIsProcessing(false);
+      
+      // Re-focus input after a short delay
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 50);
     }
   };
 
@@ -95,8 +114,13 @@ const ScanRowPage = () => {
   };
 
   const handleReset = async () => {
-    await resetRow(rowId);
-    setIsResetDialogOpen(false);
+    setIsResetting(true);
+    try {
+      await resetRow(rowId);
+      setIsResetDialogOpen(false);
+    } finally {
+      setIsResetting(false);
+    }
   };
   
   const startEditingName = () => {
@@ -161,8 +185,13 @@ const ScanRowPage = () => {
                   size="icon"
                   onClick={() => setIsResetDialogOpen(true)}
                   className="text-inventory-secondary hover:bg-inventory-secondary/10 border-inventory-secondary/30"
+                  disabled={isResetting}
                 >
-                  <RotateCcw className="h-4 w-4" />
+                  {isResetting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RotateCcw className="h-4 w-4" />
+                  )}
                 </Button>
               </div>
             </div>
@@ -181,6 +210,7 @@ const ScanRowPage = () => {
                   placeholder="Scan or enter barcode"
                   className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30"
                   autoFocus
+                  disabled={isProcessing}
                 />
                 <audio ref={audioRef} src={NOTIF_SOUND} />
               </div>
@@ -205,10 +235,17 @@ const ScanRowPage = () => {
               )}
               <Button 
                 type="submit" 
-                disabled={!barcodeInput.trim()}
+                disabled={!barcodeInput.trim() || isProcessing}
                 className="bg-inventory-primary hover:bg-inventory-primary/90"
               >
-                Add Barcode
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  'Add Barcode'
+                )}
               </Button>
             </CardFooter>
           </form>
