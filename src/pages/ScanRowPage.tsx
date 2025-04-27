@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import AuthGuard from '@/components/auth/auth-guard';
+import useSoundEffects from '@/hooks/use-sound-effects';
 
 const NOTIF_SOUND = "data:audio/wav;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAFAAAGUACFhYWFhYWFhYWFhYWFhYWFhYWFra2tra2tra2tra2tra2tra2traOjo6Ojo6Ojo6Ojo6Ojo6Ojo6P///////////////////////////////////////////wAAADJMQVNNRTMuOTlyAc0AAAAAAAAAABSAJAJAQgAAgAAAA+aieizgAAAAAAAAAAAAAAAAAAAA//uQZAAAApEGUFUGAAArIMoKoMAABZAZnW40AAClAzOtxpgALEwy1AAAAAEVf7kGQRmBmD3QEAgEDhnePhI/JH4iByB+SPxA/IH5gQB+IPzAQA+TAMDhOIPA/IEInjB4P4fn///jHJ+T/ngfgYAgEAgEAgEAgg5nwuZIuZw5QmCvG0Ooy0JtC2CnAp1vdSlLMuOQylYZl0LERgAAAAAAlMy5z3O+n//zTjN/9/+Z//O//9y5/8ud/z//5EHL/D+KDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDEppqampqampqampqampqampqampqampqampqampqamgAAA//tQZAAAAtAeUqsMAARfA7pVYYACCUCXPqggAEAAAP8AAAAATEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkYA/wAAB/gAAACAAAD/AAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=";
 
@@ -39,6 +40,7 @@ const ScanRowPage = () => {
   const [isResetting, setIsResetting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [latestBarcodes, setLatestBarcodes] = useState<any[]>([]);
+  const { playSuccessSound, playErrorSound } = useSoundEffects();
 
   const inputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -91,6 +93,7 @@ const ScanRowPage = () => {
       );
 
       if (duplicates.length > 0) {
+        playErrorSound();
         toast.error('Duplicate barcode detected');
         setBarcodeInput('');
         focusInput();
@@ -101,10 +104,7 @@ const ScanRowPage = () => {
       
       if (result !== undefined && result !== null) {
         setBarcodeInput('');
-        if (audioRef.current) {
-          audioRef.current.currentTime = 0;
-          audioRef.current.play();
-        }
+        playSuccessSound();
         toast.success('Barcode added successfully');
         
         const updatedBarcodes = [
@@ -113,10 +113,12 @@ const ScanRowPage = () => {
         ];
         setLatestBarcodes(updatedBarcodes);
       } else {
+        playErrorSound();
         toast.error('Failed to add barcode');
       }
     } catch (error) {
       console.error("Error registering barcode:", error);
+      playErrorSound();
       toast.error("Failed to add barcode");
     } finally {
       setIsProcessing(false);
