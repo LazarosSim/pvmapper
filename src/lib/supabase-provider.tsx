@@ -7,8 +7,8 @@ import { toast } from 'sonner';
 interface SupabaseContextType {
   user: User | null;
   session: Session | null;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, username: string) => Promise<void>;
+  signIn: (username: string, password: string) => Promise<void>;
+  signUp: (username: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
 }
@@ -20,7 +20,6 @@ export const SupabaseProvider = ({ children }: { children: React.ReactNode }) =>
   const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
@@ -28,7 +27,6 @@ export const SupabaseProvider = ({ children }: { children: React.ReactNode }) =>
       }
     );
 
-    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -37,12 +35,21 @@ export const SupabaseProvider = ({ children }: { children: React.ReactNode }) =>
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (username: string, password: string) => {
     try {
+      // First, get the email associated with the username
+      const { data, error: emailError } = await supabase.rpc('get_email_by_username', { p_username: username });
+      
+      if (emailError || !data) {
+        throw new Error('Username not found');
+      }
+
+      // Then, sign in using the email
       const { error } = await supabase.auth.signInWithPassword({
-        email,
+        email: data,
         password,
       });
+
       if (error) throw error;
     } catch (error: any) {
       toast.error(error.message || 'Failed to sign in');
@@ -50,7 +57,7 @@ export const SupabaseProvider = ({ children }: { children: React.ReactNode }) =>
     }
   };
 
-  const signUp = async (email: string, password: string, username: string) => {
+  const signUp = async (username: string, email: string, password: string) => {
     try {
       const { error } = await supabase.auth.signUp({
         email,
@@ -61,6 +68,7 @@ export const SupabaseProvider = ({ children }: { children: React.ReactNode }) =>
           },
         },
       });
+      
       if (error) throw error;
       toast.success('Registration successful! Please check your email to verify your account.');
     } catch (error: any) {
@@ -84,6 +92,7 @@ export const SupabaseProvider = ({ children }: { children: React.ReactNode }) =>
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
+      
       if (error) throw error;
       toast.success('Password reset instructions have been sent to your email');
     } catch (error: any) {

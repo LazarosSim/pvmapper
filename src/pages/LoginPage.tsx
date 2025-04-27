@@ -11,10 +11,10 @@ import { toast } from 'sonner';
 
 const LoginPage = () => {
   const { user, signIn, signUp, resetPassword } = useSupabase();
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [registerEmail, setRegisterEmail] = useState('');
   const [registerUsername, setRegisterUsername] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerConfirm, setRegisterConfirm] = useState('');
   const [isResetting, setIsResetting] = useState(false);
@@ -28,7 +28,7 @@ const LoginPage = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await signIn(loginEmail, loginPassword);
+      await signIn(loginUsername, loginPassword);
       navigate('/');
     } catch (error) {
       // Error is handled by the provider
@@ -42,7 +42,7 @@ const LoginPage = () => {
       return;
     }
     try {
-      await signUp(registerEmail, registerPassword, registerUsername);
+      await signUp(registerUsername, registerEmail, registerPassword);
       navigate('/');
     } catch (error) {
       // Error is handled by the provider
@@ -108,10 +108,10 @@ const LoginPage = () => {
               <CardContent className="space-y-4 pt-4">
                 <div className="space-y-2">
                   <Input
-                    type="email"
-                    placeholder="Email"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
+                    type="text"
+                    placeholder="Username"
+                    value={loginUsername}
+                    onChange={(e) => setLoginUsername(e.target.value)}
                     required
                   />
                 </div>
@@ -126,7 +126,7 @@ const LoginPage = () => {
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col gap-4">
-                <Button type="submit" className="w-full" disabled={!loginEmail || !loginPassword}>
+                <Button type="submit" className="w-full" disabled={!loginUsername || !loginPassword}>
                   <LogIn className="mr-2 h-4 w-4" />
                   Login
                 </Button>
@@ -141,19 +141,19 @@ const LoginPage = () => {
               <CardContent className="space-y-4 pt-4">
                 <div className="space-y-2">
                   <Input
-                    type="email"
-                    placeholder="Email"
-                    value={registerEmail}
-                    onChange={(e) => setRegisterEmail(e.target.value)}
+                    type="text"
+                    placeholder="Username"
+                    value={registerUsername}
+                    onChange={(e) => setRegisterUsername(e.target.value)}
                     required
                   />
                 </div>
                 <div className="space-y-2">
                   <Input
-                    type="text"
-                    placeholder="Username"
-                    value={registerUsername}
-                    onChange={(e) => setRegisterUsername(e.target.value)}
+                    type="email"
+                    placeholder="Email"
+                    value={registerEmail}
+                    onChange={(e) => setRegisterEmail(e.target.value)}
                     required
                   />
                 </div>
@@ -180,7 +180,12 @@ const LoginPage = () => {
                 <Button 
                   type="submit" 
                   className="w-full" 
-                  disabled={!registerEmail || !registerUsername || !registerPassword || registerPassword !== registerConfirm}
+                  disabled={
+                    !registerUsername || 
+                    !registerEmail || 
+                    !registerPassword || 
+                    registerPassword !== registerConfirm
+                  }
                 >
                   <UserPlus className="mr-2 h-4 w-4" />
                   Register
