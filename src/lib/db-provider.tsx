@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useSupabase } from "./supabase-provider";
 import { toast } from "sonner";
 
 export interface Barcode {
@@ -84,6 +86,7 @@ export const useDB = () => {
 };
 
 export const DBProvider = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useSupabase();
   const [parks, setParks] = useState<Park[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [barcodes, setBarcodes] = useState<Barcode[]>([]);
@@ -92,49 +95,98 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
   const [dailyScans, setDailyScans] = useState<DailyScan[]>([]);
 
   useEffect(() => {
-    try {
-      const savedParks = localStorage.getItem("parks");
-      const savedRows = localStorage.getItem("rows");
-      const savedBarcodes = localStorage.getItem("barcodes");
-      const savedUsers = localStorage.getItem("users");
-      const savedCurrentUser = localStorage.getItem("currentUser");
-      const savedDailyScans = localStorage.getItem("dailyScans");
+    async function loadUserProfile() {
+      if (!user) {
+        setCurrentUser(null);
+        return;
+      }
 
-      if (savedParks) setParks(JSON.parse(savedParks));
-      if (savedRows) setRows(JSON.parse(savedRows));
-      if (savedBarcodes) setBarcodes(JSON.parse(savedBarcodes));
-      if (savedUsers) setUsers(JSON.parse(savedUsers));
-      if (savedCurrentUser) setCurrentUser(JSON.parse(savedCurrentUser));
-      if (savedDailyScans) setDailyScans(JSON.parse(savedDailyScans));
-    } catch (error) {
-      console.error("Failed to load data from localStorage:", error);
-      toast.error("Failed to load saved data");
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error loading user profile:', error);
+        return;
+      }
+
+      if (profile) {
+        setCurrentUser({
+          id: profile.id,
+          username: profile.username,
+          role: profile.role,
+          createdAt: profile.created_at
+        });
+      }
     }
-  }, []);
+
+    loadUserProfile();
+  }, [user]);
 
   useEffect(() => {
-    localStorage.setItem("parks", JSON.stringify(parks));
-  }, [parks]);
+    if (!user) return;
 
-  useEffect(() => {
-    localStorage.setItem("rows", JSON.stringify(rows));
-  }, [rows]);
+    const parksSubscription = supabase
+      .channel('public:parks')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'parks' },
+        async (payload) => {
+          const { data: parks } = await supabase
+            .from('parks')
+            .select('*');
+          setParks(parks || []);
+        }
+      )
+      .subscribe();
 
-  useEffect(() => {
-    localStorage.setItem("barcodes", JSON.stringify(barcodes));
-  }, [barcodes]);
+    const rowsSubscription = supabase
+      .channel('public:rows')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'rows' },
+        async (payload) => {
+          const { data: rows } = await supabase
+            .from('rows')
+            .select('*');
+          setRows(rows || []);
+        }
+      )
+      .subscribe();
 
-  useEffect(() => {
-    localStorage.setItem("users", JSON.stringify(users));
-  }, [users]);
+    const barcodesSubscription = supabase
+      .channel('public:barcodes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'barcodes' },
+        async (payload) => {
+          const { data: barcodes } = await supabase
+            .from('barcodes')
+            .select('*');
+          setBarcodes(barcodes || []);
+        }
+      )
+      .subscribe();
 
-  useEffect(() => {
-    localStorage.setItem("currentUser", JSON.stringify(currentUser));
-  }, [currentUser]);
+    async function loadData() {
+      const [parksData, rowsData, barcodesData] = await Promise.all([
+        supabase.from('parks').select('*'),
+        supabase.from('rows').select('*'),
+        supabase.from('barcodes').select('*')
+      ]);
 
-  useEffect(() => {
-    localStorage.setItem("dailyScans", JSON.stringify(dailyScans));
-  }, [dailyScans]);
+      if (parksData.data) setParks(parksData.data);
+      if (rowsData.data) setRows(rowsData.data);
+      if (barcodesData.data) setBarcodes(barcodesData.data);
+    }
+
+    loadData();
+
+    return () => {
+      parksSubscription.unsubscribe();
+      rowsSubscription.unsubscribe();
+      barcodesSubscription.unsubscribe();
+    };
+  }, [user]);
 
   const login = (username: string, password: string): boolean => {
     const user = users.find(u => u.username === username && u.password === password);
