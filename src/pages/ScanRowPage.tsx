@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -43,10 +42,14 @@ const ScanRowPage = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  useEffect(() => {
+  const focusInput = () => {
     if (inputRef.current) {
       inputRef.current.focus();
     }
+  };
+
+  useEffect(() => {
+    focusInput();
   }, []);
 
   if (!currentUser) {
@@ -78,16 +81,13 @@ const ScanRowPage = () => {
       if (duplicates.length > 0) {
         toast.error('Duplicate barcode detected');
         setBarcodeInput('');
-        if (inputRef.current) {
-          inputRef.current.focus();
-        }
+        focusInput();
         return;
       }
       
       const result = await addBarcode(barcodeInput.trim(), rowId);
       
       if (result !== undefined && result !== null) {
-        // Success case
         setBarcodeInput('');
         if (audioRef.current) {
           audioRef.current.currentTime = 0;
@@ -95,7 +95,6 @@ const ScanRowPage = () => {
         }
         toast.success('Barcode added successfully');
       } else {
-        // Error case
         toast.error('Failed to add barcode');
       }
     } catch (error) {
@@ -103,9 +102,7 @@ const ScanRowPage = () => {
       toast.error("Failed to add barcode");
     } finally {
       setIsProcessing(false);
-      if (inputRef.current) {
-        inputRef.current.focus();
-      }
+      focusInput();
     }
   };
 
@@ -242,9 +239,12 @@ const ScanRowPage = () => {
               {recentBarcodes.length > 0 && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-medium">Recent Scans</h3>
-                  <div className="space-y-1">
-                    {recentBarcodes.map(barcode => (
-                      <div key={barcode.id} className="text-sm text-muted-foreground">
+                  <div className="space-y-1 animate-in fade-in slide-in-from-bottom-2">
+                    {recentBarcodes.map((barcode, index) => (
+                      <div 
+                        key={barcode.id} 
+                        className={`text-sm ${index === 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}
+                      >
                         {barcode.code}
                       </div>
                     ))}
