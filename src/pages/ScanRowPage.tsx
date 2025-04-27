@@ -57,7 +57,10 @@ const ScanRowPage = () => {
   // Load initial barcodes when component mounts or rowId changes
   useEffect(() => {
     if (rowId) {
-      const barcodes = getBarcodesByRowId(rowId).slice(-5).reverse();
+      // Get the last 10 barcodes from the row and sort them with the most recent first
+      const barcodes = getBarcodesByRowId(rowId)
+        .slice(-10)  // Get last 10 barcodes
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()); // Sort by timestamp, newest first
       setLatestBarcodes(barcodes);
     }
   }, [rowId, getBarcodesByRowId]);
@@ -109,7 +112,9 @@ const ScanRowPage = () => {
         toast.success('Barcode added successfully');
         
         // Update latest barcodes list with most recent at the top
-        const updatedBarcodes = getBarcodesByRowId(rowId).slice(-10).reverse();
+        const updatedBarcodes = getBarcodesByRowId(rowId)
+          .slice(-10)  // Get last 10 barcodes
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()); // Sort by timestamp, newest first
         setLatestBarcodes(updatedBarcodes);
       } else {
         toast.error('Failed to add barcode');
@@ -233,14 +238,22 @@ const ScanRowPage = () => {
               Scan or enter a barcode to add it to this row
             </CardDescription>
           </CardHeader>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            registerBarcode();
+          }}>
             <CardContent className="space-y-4">
               <div className="relative">
                 <Input
                   ref={inputRef}
                   value={barcodeInput}
                   onChange={(e) => setBarcodeInput(e.target.value)}
-                  onKeyDown={handleInputKeyDown}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      registerBarcode();
+                    }
+                  }}
                   placeholder="Scan or enter barcode"
                   className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30 pr-[120px]"
                   autoComplete="off"
@@ -266,7 +279,7 @@ const ScanRowPage = () => {
               <audio ref={audioRef} src={NOTIF_SOUND} />
               {latestBarcodes.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="text-sm font-medium">Recent Scans</h3>
+                  <h3 className="text-sm font-medium">Recent Scans ({latestBarcodes.length})</h3>
                   <div className="space-y-1">
                     {latestBarcodes.map((barcode, index) => (
                       <div 
