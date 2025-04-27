@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useSupabase } from '@/lib/supabase-provider';
@@ -20,7 +19,6 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   
-  // If already logged in, redirect to home page
   if (user) {
     return <Navigate to="/" replace />;
   }
@@ -41,7 +39,7 @@ const LoginPage = () => {
         toast.error("Login failed: " + error.message);
       } else {
         toast.success(`Welcome back, ${loginUsername}!`);
-        // Redirect happens automatically when user state changes
+        navigate('/');
       }
     } catch (error: any) {
       console.error("Login error:", error);
@@ -79,7 +77,6 @@ const LoginPage = () => {
         toast.error(error.message);
       } else {
         toast.success("Registration successful! Please log in.");
-        // Switch to login tab
         const loginTab = document.querySelector('[data-value="login"]') as HTMLElement;
         if (loginTab) loginTab.click();
       }
@@ -91,29 +88,19 @@ const LoginPage = () => {
     }
   };
 
-  // Create initial demo accounts if they don't exist yet
   const createDemoAccounts = async () => {
     try {
-      // Check if the users table exists and has data
-      const { data, error } = await supabase
+      const { data: existingProfiles } = await supabase
         .from('profiles')
         .select('username')
         .limit(1);
       
-      if (error) {
-        console.error("Failed to check for existing users:", error);
-        return;
-      }
-      
-      // If profiles exist, assume demo accounts are already set up
-      if (data && data.length > 0) return;
+      if (existingProfiles && existingProfiles.length > 0) return;
       
       console.log("Setting up demo accounts...");
       
-      // Create antrian user (regular user)
-      const antrianEmail = "antrian@example.com";
-      await supabase.auth.signUp({
-        email: antrianEmail,
+      const { error: error1 } = await supabase.auth.signUp({
+        email: "antrian@example.com",
         password: "antrian1",
         options: {
           data: {
@@ -123,10 +110,13 @@ const LoginPage = () => {
         }
       });
       
-      // Create lazaros user (manager)
-      const lazarosEmail = "lazaros@example.com";
-      await supabase.auth.signUp({
-        email: lazarosEmail,
+      if (error1) {
+        console.error("Error creating antrian account:", error1);
+        return;
+      }
+      
+      const { error: error2 } = await supabase.auth.signUp({
+        email: "lazaros@example.com",
         password: "lazaros2",
         options: {
           data: {
@@ -136,13 +126,17 @@ const LoginPage = () => {
         }
       });
       
+      if (error2) {
+        console.error("Error creating lazaros account:", error2);
+        return;
+      }
+      
       console.log("Demo accounts created successfully");
     } catch (error) {
       console.error("Error creating demo accounts:", error);
     }
   };
 
-  // Try to create demo accounts when the page loads
   React.useEffect(() => {
     createDemoAccounts();
   }, []);

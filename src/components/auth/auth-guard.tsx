@@ -1,7 +1,8 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useDB } from '@/lib/db-provider';
 import { useNavigate } from 'react-router-dom';
+import { useSupabase } from '@/lib/supabase-provider';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -10,35 +11,28 @@ interface AuthGuardProps {
 
 const AuthGuard: React.FC<AuthGuardProps> = ({ children, requireManager = false }) => {
   const { currentUser } = useDB();
+  const { user } = useSupabase();
   const navigate = useNavigate();
-  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    // Only redirect if we've confirmed authentication status
-    if (isChecking) {
-      setIsChecking(false);
+    if (!user) {
+      navigate('/login');
       return;
     }
-    
-    if (!currentUser) {
-      navigate('/login');
-    } else if (requireManager && currentUser.role !== 'manager') {
-      navigate('/');
-    }
-  }, [currentUser, requireManager, navigate, isChecking]);
 
-  // During initial check, render nothing to prevent flash
-  if (isChecking) {
-    return null;
-  }
+    if (requireManager && currentUser?.role !== 'manager') {
+      navigate('/');
+      return;
+    }
+  }, [user, currentUser, requireManager, navigate]);
 
   // If not authenticated, render nothing - redirect will happen in effect
-  if (!currentUser) {
+  if (!user) {
     return null;
   }
 
   // If manager is required but user is not a manager, render nothing - redirect will happen in effect
-  if (requireManager && currentUser.role !== 'manager') {
+  if (requireManager && currentUser?.role !== 'manager') {
     return null;
   }
 
