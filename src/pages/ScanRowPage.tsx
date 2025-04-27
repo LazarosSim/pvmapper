@@ -39,15 +39,28 @@ const ScanRowPage = () => {
   const [rowName, setRowName] = useState('');
   const [isResetting, setIsResetting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [latestBarcodes, setLatestBarcodes] = useState<any[]>([]);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const focusInput = () => {
     if (inputRef.current) {
-      inputRef.current.focus();
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 100);
     }
   };
+
+  // Load initial barcodes when component mounts or rowId changes
+  useEffect(() => {
+    if (rowId) {
+      const barcodes = getBarcodesByRowId(rowId).slice(-5).reverse();
+      setLatestBarcodes(barcodes);
+    }
+  }, [rowId, getBarcodesByRowId]);
 
   useEffect(() => {
     focusInput();
@@ -63,8 +76,6 @@ const ScanRowPage = () => {
 
   const row = getRowById(rowId);
   const park = row ? getParkById(row.parkId) : undefined;
-  // Get recent barcodes and reverse them so the newest appears at the top
-  const recentBarcodes = getBarcodesByRowId(rowId).slice(-5).reverse();
   const totalBarcodes = countBarcodesInRow(rowId);
 
   const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
@@ -96,6 +107,10 @@ const ScanRowPage = () => {
           audioRef.current.play();
         }
         toast.success('Barcode added successfully');
+        
+        // Update latest barcodes list with most recent at the top
+        const updatedBarcodes = getBarcodesByRowId(rowId).slice(-5).reverse();
+        setLatestBarcodes(updatedBarcodes);
       } else {
         toast.error('Failed to add barcode');
       }
@@ -124,10 +139,13 @@ const ScanRowPage = () => {
     setIsResetting(true);
     try {
       await resetRow(rowId);
+      // Update latest barcodes after reset
+      setLatestBarcodes([]);
       setIsResetDialogOpen(false);
-      focusInput();
+      toast.success('Row reset successfully');
     } finally {
       setIsResetting(false);
+      focusInput();
     }
   };
   
@@ -144,11 +162,18 @@ const ScanRowPage = () => {
       if (result !== undefined && result !== null) {
         toast.success("Row name updated successfully");
         setIsEditingRowName(false);
-        focusInput();
+      } else {
+        toast.error("Failed to update row name");
       }
     } else {
       toast.error("Row name cannot be empty");
     }
+    focusInput();
+  };
+
+  const cancelEditName = () => {
+    setIsEditingRowName(false);
+    focusInput();
   };
 
   const titleContent = isEditingRowName ? (
@@ -162,10 +187,7 @@ const ScanRowPage = () => {
       <Button variant="ghost" size="icon" onClick={saveRowName}>
         <Check className="h-4 w-4 text-green-500" />
       </Button>
-      <Button variant="ghost" size="icon" onClick={() => {
-        setIsEditingRowName(false);
-        focusInput();
-      }}>
+      <Button variant="ghost" size="icon" onClick={cancelEditName}>
         <X className="h-4 w-4 text-red-500" />
       </Button>
     </div>
@@ -221,8 +243,7 @@ const ScanRowPage = () => {
                   onKeyDown={handleInputKeyDown}
                   placeholder="Scan or enter barcode"
                   className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30 pr-[120px]"
-                  autoFocus
-                  disabled={isProcessing}
+                  autoComplete="off"
                 />
                 <Button 
                   type="submit" 
@@ -243,14 +264,14 @@ const ScanRowPage = () => {
                 </Button>
               </div>
               <audio ref={audioRef} src={NOTIF_SOUND} />
-              {recentBarcodes.length > 0 && (
+              {latestBarcodes.length > 0 && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-medium">Recent Scans</h3>
-                  <div className="space-y-1 animate-in fade-in slide-in-from-bottom-2">
-                    {recentBarcodes.map((barcode, index) => (
+                  <div className="space-y-1">
+                    {latestBarcodes.map((barcode, index) => (
                       <div 
                         key={barcode.id} 
-                        className={`text-sm ${index === 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}
+                        className={`text-sm ${index === 0 ? 'text-foreground font-medium animate-in fade-in slide-in-from-bottom-2' : 'text-muted-foreground'}`}
                       >
                         {barcode.code}
                       </div>
@@ -271,7 +292,7 @@ const ScanRowPage = () => {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => focusInput()}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel onClick={focusInput}>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={handleReset} className="bg-destructive text-destructive-foreground">
                 Reset Row
               </AlertDialogAction>
