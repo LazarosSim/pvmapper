@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LogIn, UserPlus, Loader } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useSupabase } from '@/lib/supabase-provider';
 import { toast } from 'sonner';
 
 const LoginPage = () => {
@@ -22,43 +23,13 @@ const LoginPage = () => {
   // UI state
   const [loading, setLoading] = useState(false);
   const [creatingDemoAccounts, setCreatingDemoAccounts] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
   
-  // Check if user is already logged in
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        if (data.session?.user) {
-          setCurrentUser(data.session.user);
-        }
-      } catch (error) {
-        console.error("Session check error:", error);
-      }
-    };
-    
-    checkSession();
-    
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (session?.user) {
-          setCurrentUser(session.user);
-        } else {
-          setCurrentUser(null);
-        }
-      }
-    );
-    
-    return () => {
-      if (authListener && authListener.subscription) {
-        authListener.subscription.unsubscribe();
-      }
-    };
-  }, []);
+  // Get authentication state from context
+  const { user, isInitialized } = useSupabase();
   
   // Redirect if already logged in
-  if (currentUser) {
+  if (isInitialized && user) {
     return <Navigate to="/" replace />;
   }
   
@@ -207,8 +178,25 @@ const LoginPage = () => {
 
   // Create demo accounts on component mount
   useEffect(() => {
-    createDemoAccounts();
-  }, []);
+    if (isInitialized) {
+      createDemoAccounts();
+    }
+  }, [isInitialized]);
+
+  // Show loading state while Supabase is initializing
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="text-center space-y-4">
+          <svg className="animate-spin h-10 w-10 text-primary mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <p className="text-xl font-medium">Loading authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">

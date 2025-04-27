@@ -68,17 +68,38 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch user profile when auth user changes
   useEffect(() => {
-    if (user?.id) {
-      fetchUserProfile(user.id);
-    } else {
-      // No logged in user
-      setCurrentUser(null);
-      setIsDBLoading(false);
-    }
+    let isMounted = true;
+    
+    const loadUserProfile = async () => {
+      if (user?.id) {
+        if (isMounted) {
+          await fetchUserProfile(user.id);
+        }
+      } else {
+        // No logged in user
+        if (isMounted) {
+          setCurrentUser(null);
+          setIsDBLoading(false);
+        }
+      }
+    };
+    
+    loadUserProfile();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [user?.id]);
 
+  // Create context value
+  const contextValue: DBContextType = {
+    currentUser,
+    isDBLoading,
+    refetchUser
+  };
+
   return (
-    <DBContext.Provider value={{ currentUser, isDBLoading, refetchUser }}>
+    <DBContext.Provider value={contextValue}>
       {children}
     </DBContext.Provider>
   );
