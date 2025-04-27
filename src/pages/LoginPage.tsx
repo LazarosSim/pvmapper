@@ -1,29 +1,34 @@
+
 import React, { useState, useEffect } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Navigate } from 'react-router-dom';
+import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LogIn, UserPlus, Loader } from 'lucide-react';
+import { Loader } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSupabase } from '@/lib/supabase-provider';
-import { toast } from 'sonner';
+import { useAuthForm } from '@/hooks/use-auth-form';
+import { LoginForm } from '@/components/auth/login-form';
+import { RegisterForm } from '@/components/auth/register-form';
 
 const LoginPage = () => {
-  const [loginUsername, setLoginUsername] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  
-  const [registerUsername, setRegisterUsername] = useState('');
-  const [registerPassword, setRegisterPassword] = useState('');
-  const [registerConfirm, setRegisterConfirm] = useState('');
-  
-  const [loading, setLoading] = useState(false);
   const [creatingDemoAccounts, setCreatingDemoAccounts] = useState(false);
-  const navigate = useNavigate();
-  
   const { user, isInitialized } = useSupabase();
-  
   const [shouldRedirect, setShouldRedirect] = useState(false);
+  const {
+    loginUsername,
+    setLoginUsername,
+    loginPassword,
+    setLoginPassword,
+    registerUsername,
+    setRegisterUsername,
+    registerPassword,
+    setRegisterPassword,
+    registerConfirm,
+    setRegisterConfirm,
+    loading,
+    handleLogin,
+    handleRegister
+  } = useAuthForm();
   
   useEffect(() => {
     if (isInitialized && user) {
@@ -44,74 +49,6 @@ const LoginPage = () => {
       clearSession();
     }
   }, [location]);
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    try {
-      const email = `${loginUsername.toLowerCase()}@example.com`;
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password: loginPassword,
-      });
-      
-      if (error) {
-        console.error("Login error:", error);
-        toast.error("Login failed: " + error.message);
-      } else {
-        toast.success(`Welcome back, ${loginUsername}!`);
-        navigate('/');
-      }
-    } catch (error: any) {
-      console.error("Login error:", error);
-      toast.error("Login failed: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (registerPassword !== registerConfirm) {
-      toast.error("Passwords don't match");
-      return;
-    }
-    
-    setLoading(true);
-    
-    try {
-      const email = `${registerUsername.toLowerCase()}@example.com`;
-      const { error } = await supabase.auth.signUp({
-        email,
-        password: registerPassword,
-        options: {
-          data: {
-            username: registerUsername,
-            role: 'user'
-          }
-        }
-      });
-      
-      if (error) {
-        console.error("Registration error:", error);
-        toast.error(error.message);
-      } else {
-        toast.success("Registration successful! Please log in.");
-        setRegisterUsername('');
-        setRegisterPassword('');
-        setRegisterConfirm('');
-        const loginTab = document.querySelector('[data-value="login"]') as HTMLElement;
-        if (loginTab) loginTab.click();
-      }
-    } catch (error: any) {
-      console.error("Registration error:", error);
-      toast.error("Registration failed: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const createDemoAccounts = async () => {
     try {
@@ -242,109 +179,26 @@ const LoginPage = () => {
             <TabsTrigger value="register" className="font-montserrat font-medium">Register</TabsTrigger>
           </TabsList>
           <TabsContent value="login" className="animate-fade-in">
-            <form onSubmit={handleLogin}>
-              <CardContent className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <Input
-                    type="text"
-                    placeholder="Username"
-                    value={loginUsername}
-                    onChange={(e) => setLoginUsername(e.target.value)}
-                    required
-                    disabled={loading}
-                    className="bg-white/70 border-white/30 shadow-sm focus:border-xpenergy-primary"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Input
-                    type="password"
-                    placeholder="Password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    required
-                    disabled={loading}
-                    className="bg-white/70 border-white/30 shadow-sm focus:border-xpenergy-primary"
-                  />
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button 
-                  type="submit" 
-                  className="w-full bg-gradient-to-r from-xpenergy-primary to-xpenergy-secondary hover:from-xpenergy-primary/90 hover:to-xpenergy-secondary/90 text-white shadow-md transition-all duration-300" 
-                  disabled={loading || !loginUsername || !loginPassword}
-                >
-                  {loading ? (
-                    <span className="flex items-center">
-                      <Loader className="mr-2 h-4 w-4 animate-spin" />
-                      Logging in...
-                    </span>
-                  ) : (
-                    <>
-                      <LogIn className="mr-2 h-4 w-4" />
-                      Login
-                    </>
-                  )}
-                </Button>
-              </CardFooter>
-            </form>
+            <LoginForm
+              username={loginUsername}
+              setUsername={setLoginUsername}
+              password={loginPassword}
+              setPassword={setLoginPassword}
+              loading={loading}
+              onSubmit={handleLogin}
+            />
           </TabsContent>
           <TabsContent value="register" className="animate-fade-in">
-            <form onSubmit={handleRegister}>
-              <CardContent className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <Input
-                    type="text"
-                    placeholder="Username"
-                    value={registerUsername}
-                    onChange={(e) => setRegisterUsername(e.target.value)}
-                    required
-                    disabled={loading}
-                    className="bg-white/70 border-white/30 shadow-sm focus:border-xpenergy-primary"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Input
-                    type="password"
-                    placeholder="Password"
-                    value={registerPassword}
-                    onChange={(e) => setRegisterPassword(e.target.value)}
-                    required
-                    disabled={loading}
-                    className="bg-white/70 border-white/30 shadow-sm focus:border-xpenergy-primary"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Input
-                    type="password"
-                    placeholder="Confirm Password"
-                    value={registerConfirm}
-                    onChange={(e) => setRegisterConfirm(e.target.value)}
-                    required
-                    disabled={loading}
-                    className="bg-white/70 border-white/30 shadow-sm focus:border-xpenergy-primary"
-                  />
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button 
-                  type="submit" 
-                  className="w-full bg-gradient-to-r from-xpenergy-primary to-xpenergy-secondary hover:from-xpenergy-primary/90 hover:to-xpenergy-secondary/90 text-white shadow-md transition-all duration-300" 
-                  disabled={loading || !registerUsername || !registerPassword || registerPassword !== registerConfirm}
-                >
-                  {loading ? (
-                    <span className="flex items-center">
-                      <Loader className="mr-2 h-4 w-4 animate-spin" />
-                      Registering...
-                    </span>
-                  ) : (
-                    <>
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      Register
-                    </>
-                  )}
-                </Button>
-              </CardFooter>
-            </form>
+            <RegisterForm
+              username={registerUsername}
+              setUsername={setRegisterUsername}
+              password={registerPassword}
+              setPassword={setRegisterPassword}
+              confirmPassword={registerConfirm}
+              setConfirmPassword={setRegisterConfirm}
+              loading={loading}
+              onSubmit={handleRegister}
+            />
           </TabsContent>
         </Tabs>
         <CardFooter className="flex flex-col text-center text-sm text-muted-foreground pt-2">
