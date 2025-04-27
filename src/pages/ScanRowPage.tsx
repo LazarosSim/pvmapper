@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -12,7 +13,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Barcode, RotateCcw, Edit, Check, X, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Barcode, RotateCcw, Edit, Check, X, Loader2, ArrowRight } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,11 +25,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { toast } from 'sonner';
 import AuthGuard from '@/components/auth/auth-guard';
 
-const NOTIF_SOUND =
-  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAABCxAgAEABAAZGF0YaQAAACAgICAgICAgICAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgAAAAAAAAAA==";
+const NOTIF_SOUND = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAABCxAgAEABAAZGF0YaQAAACAgICAgICAgICAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgAAAAAAAAAA==";
 
 const ScanRowPage = () => {
   const { rowId } = useParams<{ rowId: string }>();
@@ -70,29 +70,42 @@ const ScanRowPage = () => {
     try {
       setIsProcessing(true);
       
-      const result = await addBarcode(barcodeInput.trim(), rowId);
-      setSuccess(result !== undefined && result !== null);
+      // Check for duplicates in the current row
+      const duplicates = getBarcodesByRowId(rowId).filter(b => 
+        b.code.toLowerCase() === barcodeInput.trim().toLowerCase()
+      );
 
+      if (duplicates.length > 0) {
+        toast.error('Duplicate barcode detected');
+        setBarcodeInput('');
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+        return;
+      }
+      
+      const result = await addBarcode(barcodeInput.trim(), rowId);
+      
       if (result !== undefined && result !== null) {
+        // Success case
         setBarcodeInput('');
         if (audioRef.current) {
           audioRef.current.currentTime = 0;
           audioRef.current.play();
         }
-        
-        if (inputRef.current) {
-          inputRef.current.focus();
-        }
-        
-        setTimeout(() => {
-          setSuccess(null);
-        }, 2000);
+        toast.success('Barcode added successfully');
+      } else {
+        // Error case
+        toast.error('Failed to add barcode');
       }
     } catch (error) {
       console.error("Error registering barcode:", error);
-      setSuccess(false);
+      toast.error("Failed to add barcode");
     } finally {
       setIsProcessing(false);
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
     }
   };
 
@@ -196,19 +209,36 @@ const ScanRowPage = () => {
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
+              <div className="relative">
                 <Input
                   ref={inputRef}
                   value={barcodeInput}
                   onChange={(e) => setBarcodeInput(e.target.value)}
                   onKeyDown={handleInputKeyDown}
                   placeholder="Scan or enter barcode"
-                  className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30"
+                  className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30 pr-[120px]"
                   autoFocus
                   disabled={isProcessing}
                 />
-                <audio ref={audioRef} src={NOTIF_SOUND} />
+                <Button 
+                  type="submit" 
+                  disabled={!barcodeInput.trim() || isProcessing}
+                  className="absolute right-0 top-0 bg-inventory-primary hover:bg-inventory-primary/90"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing
+                    </>
+                  ) : (
+                    <>
+                      Add Barcode
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
               </div>
+              <audio ref={audioRef} src={NOTIF_SOUND} />
               {recentBarcodes.length > 0 && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-medium">Recent Scans</h3>
@@ -222,27 +252,6 @@ const ScanRowPage = () => {
                 </div>
               )}
             </CardContent>
-            <CardFooter className="justify-between">
-              {success !== null && (
-                <p className={`text-sm ${success ? "text-green-500" : "text-red-500"}`}>
-                  {success ? "Barcode added successfully" : "Failed to add barcode"}
-                </p>
-              )}
-              <Button 
-                type="submit" 
-                disabled={!barcodeInput.trim() || isProcessing}
-                className="bg-inventory-primary hover:bg-inventory-primary/90"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  'Add Barcode'
-                )}
-              </Button>
-            </CardFooter>
           </form>
         </Card>
 
