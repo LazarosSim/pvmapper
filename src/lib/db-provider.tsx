@@ -66,7 +66,7 @@ interface DBContextType {
   resetRow: (rowId: string) => Promise<boolean>;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
-  register: (username: string, password: string, role?: 'user' | 'manager') => boolean;
+  register: (username: string, password: string, role?: 'user' | 'manager') => Promise<boolean>;
   getUserDailyScans: (userId?: string) => number;
   getUserTotalScans: (userId?: string) => number;
   getUserBarcodesScanned: (userId?: string) => Barcode[];
@@ -757,7 +757,7 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
         parks,
         rows,
         barcodes,
-        users: users.map(user => ({ ...user, password: '******' })),
+        users: users.map(user => ({ ...user })),
         dailyScans,
         exportDate: new Date().toISOString()
       };
@@ -786,7 +786,7 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
       if (parsedData.users) {
         const mergedUsers = parsedData.users.map((importedUser: any) => {
           const existingUser = users.find(u => u.id === importedUser.id);
-          return existingUser ? { ...importedUser, password: existingUser.password } : importedUser;
+          return existingUser ? { ...importedUser } : importedUser;
         });
         setUsers(mergedUsers);
       }
