@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -28,7 +27,7 @@ const ScanParkPage = () => {
   const handleAddRow = async () => {
     try {
       const newRow = await addRow(parkId);
-      if (newRow !== undefined && newRow !== null) {
+      if (newRow) {
         navigate(`/scan/row/${newRow.id}`);
       }
     } catch (error) {

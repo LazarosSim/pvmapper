@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useSupabase } from './supabase-provider';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,7 +56,7 @@ type DBContextType = {
   // Rows
   rows: Row[];
   getRowsByParkId: (parkId: string) => Row[];
-  addRow: (parkId: string) => Promise<void>;
+  addRow: (parkId: string) => Promise<Row | null>;
   deleteRow: (rowId: string) => Promise<void>;
   updateRow: (rowId: string, name: string) => Promise<void>;
   getRowById: (rowId: string) => Row | undefined;
@@ -399,8 +398,8 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     return rows.filter(row => row.parkId === parkId);
   };
   
-  const addRow = async (parkId: string) => {
-    if (!user) return;
+  const addRow = async (parkId: string): Promise<Row | null> => {
+    if (!user) return null;
     
     // Get rows count for this park to create a sequential name
     const parkRows = rows.filter(row => row.parkId === parkId);
@@ -419,7 +418,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         console.error('Error adding row:', error);
         toast.error(`Failed to create row: ${error.message}`);
-        return;
+        return null;
       }
       
       if (data && data[0]) {
@@ -432,10 +431,14 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
         
         setRows(prev => [newRow, ...prev]);
         toast.success('Row added successfully');
+        return newRow;
       }
+      
+      return null;
     } catch (error: any) {
       console.error('Error in addRow:', error.message);
       toast.error(`Failed to create row: ${error.message}`);
+      return null;
     }
   };
   
