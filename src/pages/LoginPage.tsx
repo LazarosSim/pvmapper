@@ -28,8 +28,18 @@ const LoginPage = () => {
   // Get authentication state from context
   const { user, isInitialized } = useSupabase();
   
-  // Redirect if already logged in
-  if (isInitialized && user) {
+  // Always declare all hooks before any conditional logic
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+  
+  // Check if user is logged in and set redirect flag
+  useEffect(() => {
+    if (isInitialized && user) {
+      setShouldRedirect(true);
+    }
+  }, [isInitialized, user]);
+  
+  // Handle redirect after all hooks are declared
+  if (shouldRedirect) {
     return <Navigate to="/" replace />;
   }
   
