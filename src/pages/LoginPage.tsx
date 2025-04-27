@@ -1,94 +1,51 @@
 
 import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { useDB } from '@/lib/db-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LogIn, UserPlus } from 'lucide-react';
-import { useSupabase } from '@/lib/supabase-provider';
-import { toast } from 'sonner';  // Import toast from sonner
+import { useInitialSetup } from '@/hooks/use-initial-setup';
 
 const LoginPage = () => {
-  const { user, signIn, signUp, resetPassword } = useSupabase();
-  const [loginEmail, setLoginEmail] = useState('');
+  const { currentUser, login, register } = useDB();
+  const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [registerEmail, setRegisterEmail] = useState('');
   const [registerUsername, setRegisterUsername] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerConfirm, setRegisterConfirm] = useState('');
-  const [isResetting, setIsResetting] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
   const navigate = useNavigate();
   
-  if (user) {
+  // Setup initial manager account if needed
+  const { isSetup } = useInitialSetup();
+  
+  // If already logged in, redirect to home page
+  if (currentUser) {
     return <Navigate to="/" replace />;
   }
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      await signIn(loginEmail, loginPassword);
+    if (login(loginUsername, loginPassword)) {
       navigate('/');
-    } catch (error) {
-      // Error is handled by the provider
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
     if (registerPassword !== registerConfirm) {
-      toast.error("Passwords don't match");  // Use toast from sonner
+      alert("Passwords don't match");
       return;
     }
-    try {
-      await signUp(registerEmail, registerPassword, registerUsername);
+    if (register(registerUsername, registerPassword)) {
       navigate('/');
-    } catch (error) {
-      // Error is handled by the provider
     }
   };
 
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await resetPassword(resetEmail);
-      setIsResetting(false);
-    } catch (error) {
-      // Error is handled by the provider
-    }
-  };
-
-  if (isResetting) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Reset Password</CardTitle>
-            <CardDescription>Enter your email to reset your password</CardDescription>
-          </CardHeader>
-          <form onSubmit={handleResetPassword}>
-            <CardContent className="space-y-4 pt-4">
-              <Input
-                type="email"
-                placeholder="Email"
-                value={resetEmail}
-                onChange={(e) => setResetEmail(e.target.value)}
-                required
-              />
-            </CardContent>
-            <CardFooter className="flex flex-col gap-4">
-              <Button type="submit" className="w-full">
-                Send Reset Instructions
-              </Button>
-              <Button variant="ghost" onClick={() => setIsResetting(false)}>
-                Back to Login
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
-      </div>
-    );
+  if (!isSetup) {
+    return <div>Setting up application...</div>;
   }
 
   return (
@@ -108,10 +65,10 @@ const LoginPage = () => {
               <CardContent className="space-y-4 pt-4">
                 <div className="space-y-2">
                   <Input
-                    type="email"
-                    placeholder="Email"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
+                    type="text"
+                    placeholder="Username"
+                    value={loginUsername}
+                    onChange={(e) => setLoginUsername(e.target.value)}
                     required
                   />
                 </div>
@@ -125,13 +82,10 @@ const LoginPage = () => {
                   />
                 </div>
               </CardContent>
-              <CardFooter className="flex flex-col gap-4">
-                <Button type="submit" className="w-full" disabled={!loginEmail || !loginPassword}>
+              <CardFooter>
+                <Button type="submit" className="w-full" disabled={!loginUsername || !loginPassword}>
                   <LogIn className="mr-2 h-4 w-4" />
                   Login
-                </Button>
-                <Button variant="ghost" className="w-full" onClick={() => setIsResetting(true)}>
-                  Forgot Password?
                 </Button>
               </CardFooter>
             </form>
@@ -139,15 +93,6 @@ const LoginPage = () => {
           <TabsContent value="register">
             <form onSubmit={handleRegister}>
               <CardContent className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <Input
-                    type="email"
-                    placeholder="Email"
-                    value={registerEmail}
-                    onChange={(e) => setRegisterEmail(e.target.value)}
-                    required
-                  />
-                </div>
                 <div className="space-y-2">
                   <Input
                     type="text"
@@ -180,7 +125,7 @@ const LoginPage = () => {
                 <Button 
                   type="submit" 
                   className="w-full" 
-                  disabled={!registerEmail || !registerUsername || !registerPassword || registerPassword !== registerConfirm}
+                  disabled={!registerUsername || !registerPassword || registerPassword !== registerConfirm}
                 >
                   <UserPlus className="mr-2 h-4 w-4" />
                   Register
@@ -189,6 +134,10 @@ const LoginPage = () => {
             </form>
           </TabsContent>
         </Tabs>
+        <CardFooter className="flex flex-col text-center text-sm text-muted-foreground pt-0">
+          <p className="mt-2">Demo credentials:</p>
+          <p>Manager: manager / manager123</p>
+        </CardFooter>
       </Card>
     </div>
   );
