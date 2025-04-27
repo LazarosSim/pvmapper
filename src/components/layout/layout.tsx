@@ -19,13 +19,13 @@ const Layout: React.FC<LayoutProps> = ({ children, title, showBack, titleAction 
       : String(title);
 
   return (
-    <div className="min-h-screen bg-inventory-background flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col font-montserrat">
       <Header 
         title={titleString} 
         showBack={showBack} 
         titleAction={titleAction} 
       />
-      <main className="flex-1 p-4 pb-20 overflow-y-auto">
+      <main className="flex-1 p-4 pb-20 overflow-y-auto bg-gradient-to-b from-white to-gray-50">
         {children}
       </main>
       <BottomNav />

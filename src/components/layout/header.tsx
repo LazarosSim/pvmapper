@@ -2,7 +2,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Database } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
@@ -15,21 +15,21 @@ const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction })
   const location = useLocation();
 
   return (
-    <header className="sticky top-0 w-full bg-inventory-primary text-white py-4 px-4 flex items-center z-10 shadow-md">
+    <header className="sticky top-0 w-full bg-gradient-to-r from-xpenergy-primary to-xpenergy-secondary text-white py-4 px-4 flex items-center z-10 shadow-md">
       <div className="flex-1 flex items-center">
         {showBack && (
           <Button 
             variant="ghost" 
             size="icon" 
             onClick={() => navigate(-1)}
-            className="mr-2 text-white hover:bg-inventory-primary hover:text-white/80"
+            className="mr-2 text-white hover:bg-xpenergy-primary/20 hover:text-white/90"
           >
             <ArrowLeft className="h-6 w-6" />
           </Button>
         )}
         <div className="flex items-center">
-          <Database className="h-6 w-6 mr-2" />
-          {titleAction ? titleAction : <h1 className="text-xl font-semibold">{title}</h1>}
+          <img src="/xplogo.png" alt="XP Energy Logo" className="h-7 mr-3" />
+          {titleAction ? titleAction : <h1 className="text-xl font-semibold font-montserrat">{title}</h1>}
         </div>
       </div>
     </header>

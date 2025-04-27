@@ -194,13 +194,13 @@ const LoginPage = () => {
   // Render component based on state
   if (!isInitialized) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="min-h-screen flex items-center justify-center bg-xpenergy-primary bg-opacity-80 p-4">
         <div className="text-center space-y-4">
-          <svg className="animate-spin h-10 w-10 text-primary mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin h-10 w-10 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <p className="text-xl font-medium">Loading authentication...</p>
+          <p className="text-xl font-medium text-white">Loading authentication...</p>
         </div>
       </div>
     );
@@ -213,18 +213,23 @@ const LoginPage = () => {
 
   // Main render
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Inventory Hub</CardTitle>
-          <CardDescription>Sign in to continue tracking inventory</CardDescription>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-hero-pattern bg-cover bg-center relative">
+      <div className="absolute inset-0 bg-gradient-to-br from-xpenergy-primary/90 to-xpenergy-secondary/70 backdrop-blur-sm"></div>
+      <Card className="w-full max-w-md shadow-xl backdrop-blur-sm bg-white/80 border border-white/20 z-10 animate-fade-in">
+        <CardHeader className="text-center space-y-2">
+          <CardTitle className="text-3xl font-bold font-montserrat bg-gradient-to-br from-xpenergy-primary to-xpenergy-secondary bg-clip-text text-transparent">
+            XP Energy PV Mapper
+          </CardTitle>
+          <CardDescription className="text-lg text-xpenergy-primary/90">
+            Sign in to continue tracking solar installations
+          </CardDescription>
         </CardHeader>
         <Tabs defaultValue="login" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login">Login</TabsTrigger>
-            <TabsTrigger value="register">Register</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="login" className="font-montserrat font-medium">Login</TabsTrigger>
+            <TabsTrigger value="register" className="font-montserrat font-medium">Register</TabsTrigger>
           </TabsList>
-          <TabsContent value="login">
+          <TabsContent value="login" className="animate-fade-in">
             <form onSubmit={handleLogin}>
               <CardContent className="space-y-4 pt-4">
                 <div className="space-y-2">
@@ -235,6 +240,7 @@ const LoginPage = () => {
                     onChange={(e) => setLoginUsername(e.target.value)}
                     required
                     disabled={loading}
+                    className="bg-white/70 border-white/30 shadow-sm focus:border-xpenergy-primary"
                   />
                 </div>
                 <div className="space-y-2">
@@ -245,13 +251,14 @@ const LoginPage = () => {
                     onChange={(e) => setLoginPassword(e.target.value)}
                     required
                     disabled={loading}
+                    className="bg-white/70 border-white/30 shadow-sm focus:border-xpenergy-primary"
                   />
                 </div>
               </CardContent>
               <CardFooter>
                 <Button 
                   type="submit" 
-                  className="w-full" 
+                  className="w-full bg-gradient-to-r from-xpenergy-primary to-xpenergy-secondary hover:from-xpenergy-primary/90 hover:to-xpenergy-secondary/90 text-white shadow-md transition-all duration-300" 
                   disabled={loading || !loginUsername || !loginPassword}
                 >
                   {loading ? (
@@ -269,7 +276,7 @@ const LoginPage = () => {
               </CardFooter>
             </form>
           </TabsContent>
-          <TabsContent value="register">
+          <TabsContent value="register" className="animate-fade-in">
             <form onSubmit={handleRegister}>
               <CardContent className="space-y-4 pt-4">
                 <div className="space-y-2">
@@ -280,6 +287,7 @@ const LoginPage = () => {
                     onChange={(e) => setRegisterUsername(e.target.value)}
                     required
                     disabled={loading}
+                    className="bg-white/70 border-white/30 shadow-sm focus:border-xpenergy-primary"
                   />
                 </div>
                 <div className="space-y-2">
@@ -290,6 +298,7 @@ const LoginPage = () => {
                     onChange={(e) => setRegisterPassword(e.target.value)}
                     required
                     disabled={loading}
+                    className="bg-white/70 border-white/30 shadow-sm focus:border-xpenergy-primary"
                   />
                 </div>
                 <div className="space-y-2">
@@ -300,13 +309,14 @@ const LoginPage = () => {
                     onChange={(e) => setRegisterConfirm(e.target.value)}
                     required
                     disabled={loading}
+                    className="bg-white/70 border-white/30 shadow-sm focus:border-xpenergy-primary"
                   />
                 </div>
               </CardContent>
               <CardFooter>
                 <Button 
                   type="submit" 
-                  className="w-full" 
+                  className="w-full bg-gradient-to-r from-xpenergy-primary to-xpenergy-secondary hover:from-xpenergy-primary/90 hover:to-xpenergy-secondary/90 text-white shadow-md transition-all duration-300" 
                   disabled={loading || !registerUsername || !registerPassword || registerPassword !== registerConfirm}
                 >
                   {loading ? (
