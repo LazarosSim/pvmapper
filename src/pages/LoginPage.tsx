@@ -176,8 +176,6 @@ const LoginPage = () => {
     }
   }, [isInitialized]);
 
-  const bgImageUrl = `https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/loginbackground.jpg`;
-
   if (!isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-xpenergy-primary bg-opacity-80 p-4">
@@ -200,11 +198,20 @@ const LoginPage = () => {
     <div 
       className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center relative"
       style={{ 
-        backgroundImage: `url(https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/loginbackground.jpg)`,
+        backgroundImage: "url('/placeholder.svg')",
         backgroundColor: 'rgb(0, 82, 155)',
       }}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-xpenergy-primary/90 to-xpenergy-secondary/70 backdrop-blur-sm"></div>
+      <img 
+        src="https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/loginbackground.jpg"
+        alt="Background"
+        className="absolute inset-0 w-full h-full object-cover" 
+        style={{ zIndex: -2 }}
+        onError={() => {
+          console.error("Error loading background image");
+        }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-br from-xpenergy-primary/90 to-xpenergy-secondary/70 backdrop-blur-sm" style={{ zIndex: -1 }}></div>
       <Card className="w-full max-w-md shadow-xl backdrop-blur-sm bg-white/80 border border-white/20 z-10 animate-fade-in">
         <CardHeader className="text-center space-y-2">
           <CardTitle className="text-3xl font-bold font-montserrat bg-gradient-to-br from-xpenergy-primary to-xpenergy-secondary bg-clip-text text-transparent">
