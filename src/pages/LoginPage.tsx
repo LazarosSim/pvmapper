@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useSupabase } from '@/lib/supabase-provider';
@@ -10,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 const LoginPage = () => {
-  const { user, signIn } = useSupabase();
+  const { user } = useSupabase();
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [registerUsername, setRegisterUsername] = useState('');
@@ -29,8 +30,19 @@ const LoginPage = () => {
     setLoading(true);
     
     try {
-      await signIn(loginUsername, loginPassword);
-      // Redirect happens automatically when user state changes
+      const email = `${loginUsername.toLowerCase()}@example.com`;
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password: loginPassword,
+      });
+      
+      if (error) {
+        console.error("Login error:", error);
+        toast.error("Login failed: " + error.message);
+      } else {
+        toast.success(`Welcome back, ${loginUsername}!`);
+        // Redirect happens automatically when user state changes
+      }
     } catch (error: any) {
       console.error("Login error:", error);
       toast.error("Login failed: " + error.message);
@@ -63,20 +75,77 @@ const LoginPage = () => {
       });
       
       if (error) {
+        console.error("Registration error:", error);
         toast.error(error.message);
       } else {
         toast.success("Registration successful! Please log in.");
         // Switch to login tab
-        document.querySelector('[data-state="inactive"][data-value="login"]')?.dispatchEvent(
-          new MouseEvent('click', { bubbles: true })
-        );
+        const loginTab = document.querySelector('[data-value="login"]') as HTMLElement;
+        if (loginTab) loginTab.click();
       }
     } catch (error: any) {
+      console.error("Registration error:", error);
       toast.error("Registration failed: " + error.message);
     } finally {
       setLoading(false);
     }
   };
+
+  // Create initial demo accounts if they don't exist yet
+  const createDemoAccounts = async () => {
+    try {
+      // Check if the users table exists and has data
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('username')
+        .limit(1);
+      
+      if (error) {
+        console.error("Failed to check for existing users:", error);
+        return;
+      }
+      
+      // If profiles exist, assume demo accounts are already set up
+      if (data && data.length > 0) return;
+      
+      console.log("Setting up demo accounts...");
+      
+      // Create antrian user (regular user)
+      const antrianEmail = "antrian@example.com";
+      await supabase.auth.signUp({
+        email: antrianEmail,
+        password: "antrian1",
+        options: {
+          data: {
+            username: "antrian",
+            role: "user"
+          }
+        }
+      });
+      
+      // Create lazaros user (manager)
+      const lazarosEmail = "lazaros@example.com";
+      await supabase.auth.signUp({
+        email: lazarosEmail,
+        password: "lazaros2",
+        options: {
+          data: {
+            username: "lazaros",
+            role: "manager"
+          }
+        }
+      });
+      
+      console.log("Demo accounts created successfully");
+    } catch (error) {
+      console.error("Error creating demo accounts:", error);
+    }
+  };
+
+  // Try to create demo accounts when the page loads
+  React.useEffect(() => {
+    createDemoAccounts();
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">

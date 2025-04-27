@@ -92,6 +92,7 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [dailyScans, setDailyScans] = useState<DailyScan[]>([]);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   useEffect(() => {
     async function loadUserProfile() {
@@ -100,24 +101,28 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
 
-      if (error) {
-        console.error('Error loading user profile:', error);
-        return;
-      }
+        if (error) {
+          console.error('Error loading user profile:', error);
+          return;
+        }
 
-      if (profile) {
-        setCurrentUser({
-          id: profile.id,
-          username: profile.username,
-          role: profile.role as 'user' | 'manager',
-          createdAt: profile.created_at
-        });
+        if (profile) {
+          setCurrentUser({
+            id: profile.id,
+            username: profile.username,
+            role: profile.role as 'user' | 'manager',
+            createdAt: profile.created_at
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load profile:', err);
       }
     }
 
@@ -125,25 +130,36 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
   }, [user]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setIsDataLoaded(false);
+      return;
+    }
 
     const parksSubscription = supabase
       .channel('public:parks')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'parks' },
-        async (payload) => {
-          const { data: parksData } = await supabase
-            .from('parks')
-            .select('*');
-          
-          if (parksData) {
-            const mappedParks = parksData.map(park => ({
-              id: park.id,
-              name: park.name,
-              expectedBarcodes: park.expected_barcodes || 0,
-              createdAt: park.created_at
-            }));
-            setParks(mappedParks);
+        async () => {
+          try {
+            const { data, error } = await supabase
+              .from('parks')
+              .select('*');
+            
+            if (error) {
+              throw error;
+            }
+            
+            if (data) {
+              const mappedParks = data.map(park => ({
+                id: park.id,
+                name: park.name,
+                expectedBarcodes: park.expected_barcodes || 0,
+                createdAt: park.created_at
+              }));
+              setParks(mappedParks);
+            }
+          } catch (err) {
+            console.error('Error fetching parks:', err);
           }
         }
       )
@@ -153,19 +169,27 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
       .channel('public:rows')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'rows' },
-        async (payload) => {
-          const { data: rowsData } = await supabase
-            .from('rows')
-            .select('*');
-          
-          if (rowsData) {
-            const mappedRows = rowsData.map(row => ({
-              id: row.id,
-              name: row.name,
-              parkId: row.park_id,
-              createdAt: row.created_at
-            }));
-            setRows(mappedRows);
+        async () => {
+          try {
+            const { data, error } = await supabase
+              .from('rows')
+              .select('*');
+            
+            if (error) {
+              throw error;
+            }
+            
+            if (data) {
+              const mappedRows = data.map(row => ({
+                id: row.id,
+                name: row.name,
+                parkId: row.park_id,
+                createdAt: row.created_at
+              }));
+              setRows(mappedRows);
+            }
+          } catch (err) {
+            console.error('Error fetching rows:', err);
           }
         }
       )
@@ -175,61 +199,101 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
       .channel('public:barcodes')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'barcodes' },
-        async (payload) => {
-          const { data: barcodesData } = await supabase
-            .from('barcodes')
-            .select('*');
-          
-          if (barcodesData) {
-            const mappedBarcodes = barcodesData.map(barcode => ({
-              id: barcode.id,
-              code: barcode.code,
-              timestamp: barcode.timestamp,
-              rowId: barcode.row_id,
-              userId: barcode.user_id
-            }));
-            setBarcodes(mappedBarcodes);
+        async () => {
+          try {
+            const { data, error } = await supabase
+              .from('barcodes')
+              .select('*');
+            
+            if (error) {
+              throw error;
+            }
+            
+            if (data) {
+              const mappedBarcodes = data.map(barcode => ({
+                id: barcode.id,
+                code: barcode.code,
+                timestamp: barcode.timestamp,
+                rowId: barcode.row_id,
+                userId: barcode.user_id
+              }));
+              setBarcodes(mappedBarcodes);
+            }
+          } catch (err) {
+            console.error('Error fetching barcodes:', err);
           }
         }
       )
       .subscribe();
 
     async function loadData() {
-      const [parksData, rowsData, barcodesData] = await Promise.all([
-        supabase.from('parks').select('*'),
-        supabase.from('rows').select('*'),
-        supabase.from('barcodes').select('*')
-      ]);
+      try {
+        const [parksResult, rowsResult, barcodesResult, profilesResult, dailyScansResult] = await Promise.all([
+          supabase.from('parks').select('*'),
+          supabase.from('rows').select('*'),
+          supabase.from('barcodes').select('*'),
+          supabase.from('profiles').select('*'),
+          supabase.from('daily_scans').select('*')
+        ]);
 
-      if (parksData.data) {
-        const mappedParks = parksData.data.map(park => ({
-          id: park.id,
-          name: park.name,
-          expectedBarcodes: park.expected_barcodes || 0,
-          createdAt: park.created_at
-        }));
-        setParks(mappedParks);
-      }
+        if (parksResult.error) throw parksResult.error;
+        if (parksResult.data) {
+          const mappedParks = parksResult.data.map(park => ({
+            id: park.id,
+            name: park.name,
+            expectedBarcodes: park.expected_barcodes || 0,
+            createdAt: park.created_at
+          }));
+          setParks(mappedParks);
+        }
 
-      if (rowsData.data) {
-        const mappedRows = rowsData.data.map(row => ({
-          id: row.id,
-          name: row.name,
-          parkId: row.park_id,
-          createdAt: row.created_at
-        }));
-        setRows(mappedRows);
-      }
+        if (rowsResult.error) throw rowsResult.error;
+        if (rowsResult.data) {
+          const mappedRows = rowsResult.data.map(row => ({
+            id: row.id,
+            name: row.name,
+            parkId: row.park_id,
+            createdAt: row.created_at
+          }));
+          setRows(mappedRows);
+        }
 
-      if (barcodesData.data) {
-        const mappedBarcodes = barcodesData.data.map(barcode => ({
-          id: barcode.id,
-          code: barcode.code,
-          timestamp: barcode.timestamp,
-          rowId: barcode.row_id,
-          userId: barcode.user_id
-        }));
-        setBarcodes(mappedBarcodes);
+        if (barcodesResult.error) throw barcodesResult.error;
+        if (barcodesResult.data) {
+          const mappedBarcodes = barcodesResult.data.map(barcode => ({
+            id: barcode.id,
+            code: barcode.code,
+            timestamp: barcode.timestamp,
+            rowId: barcode.row_id,
+            userId: barcode.user_id
+          }));
+          setBarcodes(mappedBarcodes);
+        }
+
+        if (profilesResult.error) throw profilesResult.error;
+        if (profilesResult.data) {
+          const mappedUsers = profilesResult.data.map(profile => ({
+            id: profile.id,
+            username: profile.username,
+            role: profile.role as 'user' | 'manager',
+            createdAt: profile.created_at
+          }));
+          setUsers(mappedUsers);
+        }
+
+        if (dailyScansResult.error) throw dailyScansResult.error;
+        if (dailyScansResult.data) {
+          const mappedDailyScans = dailyScansResult.data.map(scan => ({
+            date: scan.date,
+            userId: scan.user_id,
+            count: scan.count
+          }));
+          setDailyScans(mappedDailyScans);
+        }
+
+        setIsDataLoaded(true);
+      } catch (err) {
+        console.error('Error loading data:', err);
       }
     }
 
@@ -246,7 +310,7 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const email = `${username.toLowerCase()}@example.com`;
       
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -848,6 +912,10 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     getAllUserStats,
     getParkProgress
   };
+
+  if (!user && !isDataLoaded) {
+    return null;
+  }
 
   return <DBContext.Provider value={value}>{children}</DBContext.Provider>;
 };

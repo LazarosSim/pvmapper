@@ -16,6 +16,7 @@ const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined
 export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -30,6 +31,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session }}) => {
       setSession(session);
       setUser(session?.user ?? null);
+      setIsInitialized(true);
     });
 
     return () => subscription.unsubscribe();
@@ -46,6 +48,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       });
       
       if (error) {
+        console.error("SignIn error:", error);
         toast.error(error.message);
         throw error;
       }
@@ -53,11 +56,17 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     signOut: async () => {
       const { error } = await supabase.auth.signOut();
       if (error) {
+        console.error("SignOut error:", error);
         toast.error(error.message);
         throw error;
       }
     }
   }), [user, session]);
+
+  // Don't render children until we've checked for an existing session
+  if (!isInitialized) {
+    return null;
+  }
 
   return (
     <SupabaseContext.Provider value={value}>
