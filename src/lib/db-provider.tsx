@@ -33,7 +33,7 @@ export type Barcode = {
   rowId: string;
   userId: string;
   timestamp: string;
-  displayOrder?: number;
+  displayOrder: number;
 };
 
 export type Progress = {
@@ -83,7 +83,7 @@ type DBContextType = {
   
   // Barcodes
   barcodes: Barcode[];
-  addBarcode: (code: string, rowId: string, afterBarcodeIndex?: number) => Promise<void>;
+  addBarcode: (code: string, rowId: string, afterBarcodeIndex?: number) => Promise<Barcode | null>;
   deleteBarcode: (barcodeId: string) => Promise<void>;
   updateBarcode: (barcodeId: string, code: string) => Promise<void>;
   getBarcodesByRowId: (rowId: string) => Barcode[];
@@ -597,7 +597,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
       // Get barcodes for this row to determine display order
       const rowBarcodes = barcodes
         .filter(barcode => barcode.rowId === rowId)
-        .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+        .sort((a, b) => a.displayOrder - b.displayOrder);
       
       // Determine the new display order
       let newDisplayOrder = 0;
@@ -606,27 +606,20 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
         if (afterBarcodeIndex !== undefined && afterBarcodeIndex >= 0 && afterBarcodeIndex < rowBarcodes.length) {
           // Insert after the specified barcode
           const afterBarcode = rowBarcodes[afterBarcodeIndex];
+          const laterBarcodes = rowBarcodes.filter(b => b.displayOrder > afterBarcode.displayOrder);
           
-          // Find all barcodes that should come after this new one
-          const laterBarcodes = rowBarcodes.filter(b => (b.displayOrder || 0) > (afterBarcode.displayOrder || 0));
-          
-          // Set the new display order to be between the selected barcode and the next one
           if (laterBarcodes.length > 0) {
-            // Get the first barcode that comes after the selected one
-            const nextBarcode = laterBarcodes.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))[0];
-            newDisplayOrder = ((afterBarcode.displayOrder || 0) + (nextBarcode.displayOrder || 0)) / 2;
+            const nextBarcode = laterBarcodes[0];
+            newDisplayOrder = (afterBarcode.displayOrder + nextBarcode.displayOrder) / 2;
           } else {
-            // If it's the last barcode, add a gap
-            newDisplayOrder = (afterBarcode.displayOrder || 0) + 1000;
+            newDisplayOrder = afterBarcode.displayOrder + 1000;
           }
         } else {
-          // Add to front with a smaller display order than the first item
-          const firstBarcode = rowBarcodes.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))[0];
-          newDisplayOrder = Math.max(0, (firstBarcode.displayOrder || 0) - 1000); 
+          // Add to beginning with smaller display order
+          newDisplayOrder = rowBarcodes[0].displayOrder - 1000;
         }
       }
       
-      // Add the new barcode with calculated display order
       const { data, error } = await supabase
         .from('barcodes')
         .insert([{ 
@@ -640,7 +633,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         console.error('Error adding barcode:', error);
         toast.error(`Failed to add barcode: ${error.message}`);
-        return;
+        return null;
       }
       
       if (data && data[0]) {
@@ -650,15 +643,12 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
           rowId: data[0].row_id,
           userId: data[0].user_id,
           timestamp: data[0].timestamp,
-          displayOrder: data[0].display_order
+          displayOrder: data[0].display_order || 0
         };
         
         setBarcodes(prev => [newBarcode, ...prev]);
-        
-        // Update daily scans
         await updateDailyScans();
-        
-        toast.success('Barcode added successfully');
+        return newBarcode;
       }
     } catch (error: any) {
       console.error('Error in addBarcode:', error.message);
@@ -717,7 +707,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   const getBarcodesByRowId = (rowId: string): Barcode[] => {
     return barcodes
       .filter(barcode => barcode.rowId === rowId)
-      .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+      .sort((a, b) => a.displayOrder - b.displayOrder);
   };
   
   const searchBarcodes = (query: string): Barcode[] => {

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -67,7 +66,7 @@ const DashboardPage = () => {
   // Load calendar data when month changes
   useEffect(() => {
     const loadCalendarData = async () => {
-      if (!selectedDate || !currentUser?.role === 'manager') return;
+      if (!selectedDate || currentUser?.role !== 'manager') return;
       
       setIsLoadingCalendar(true);
       
@@ -101,7 +100,7 @@ const DashboardPage = () => {
   // Load daily scan data when a date is selected
   useEffect(() => {
     const loadDailyStats = async () => {
-      if (!selectedDate || !currentUser?.role === 'manager') return;
+      if (!selectedDate || currentUser?.role !== 'manager') return;
       
       setIsLoadingStats(true);
       

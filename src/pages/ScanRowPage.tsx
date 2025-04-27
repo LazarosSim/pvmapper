@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -45,7 +44,6 @@ const ScanRowPage = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
-    // Focus the input field when component mounts
     if (inputRef.current) {
       inputRef.current.focus();
     }
@@ -82,6 +80,10 @@ const ScanRowPage = () => {
           audioRef.current.play();
         }
         
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+        
         setTimeout(() => {
           setSuccess(null);
         }, 2000);
@@ -91,13 +93,6 @@ const ScanRowPage = () => {
       setSuccess(false);
     } finally {
       setIsProcessing(false);
-      
-      // Re-focus input after a short delay
-      setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.focus();
-        }
-      }, 50);
     }
   };
 

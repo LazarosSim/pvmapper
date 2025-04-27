@@ -12,6 +12,7 @@ export type Database = {
       barcodes: {
         Row: {
           code: string
+          display_order: number | null
           id: string
           row_id: string
           timestamp: string
@@ -19,6 +20,7 @@ export type Database = {
         }
         Insert: {
           code: string
+          display_order?: number | null
           id?: string
           row_id: string
           timestamp?: string
@@ -26,6 +28,7 @@ export type Database = {
         }
         Update: {
           code?: string
+          display_order?: number | null
           id?: string
           row_id?: string
           timestamp?: string
