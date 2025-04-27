@@ -28,7 +28,6 @@ export interface Park {
 export interface User {
   id: string;
   username: string;
-  password: string;
   role: 'user' | 'manager';
   createdAt: string;
 }
@@ -65,7 +64,7 @@ interface DBContextType {
   countBarcodesInRow: (rowId: string) => number;
   countBarcodesInPark: (parkId: string) => number;
   resetRow: (rowId: string) => Promise<boolean>;
-  login: (username: string, password: string) => boolean;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   register: (username: string, password: string, role?: 'user' | 'manager') => boolean;
   getUserDailyScans: (userId?: string) => number;
@@ -282,7 +281,6 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
   
   const register = async (username: string, password: string, role: 'user' | 'manager' = 'user'): Promise<boolean> => {
     try {
-      // Create a pseudo-email from username
       const email = `${username.toLowerCase()}@example.com`;
       
       const { data, error } = await supabase.auth.signUp({
@@ -381,10 +379,8 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
         return null;
       }
 
-      // Update daily scan count
       const today = new Date().toISOString().split('T')[0];
       
-      // Check if we already have a scan count for today
       const { data: existingScan } = await supabase
         .from('daily_scans')
         .select()
@@ -393,13 +389,11 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
         .single();
 
       if (existingScan) {
-        // Update existing scan count
         await supabase
           .from('daily_scans')
           .update({ count: existingScan.count + 1 })
           .eq('id', existingScan.id);
       } else {
-        // Insert new scan count
         await supabase
           .from('daily_scans')
           .insert({

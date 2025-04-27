@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useSupabase } from '@/lib/supabase-provider';
 import { Button } from '@/components/ui/button';
@@ -34,6 +33,7 @@ const LoginPage = () => {
       // Redirect happens automatically when user state changes
     } catch (error: any) {
       console.error("Login error:", error);
+      toast.error("Login failed: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -67,8 +67,9 @@ const LoginPage = () => {
       } else {
         toast.success("Registration successful! Please log in.");
         // Switch to login tab
-        const loginTab = document.querySelector('[data-state="inactive"][data-value="login"]') as HTMLElement;
-        if (loginTab) loginTab.click();
+        document.querySelector('[data-state="inactive"][data-value="login"]')?.dispatchEvent(
+          new MouseEvent('click', { bubbles: true })
+        );
       }
     } catch (error: any) {
       toast.error("Registration failed: " + error.message);
