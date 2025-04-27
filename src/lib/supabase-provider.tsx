@@ -40,13 +40,20 @@ export const SupabaseProvider = ({ children }: { children: React.ReactNode }) =>
       // First, get the email associated with the username
       const { data, error: emailError } = await supabase.rpc('get_email_by_username', { p_username: username });
       
-      if (emailError || !data) {
+      if (emailError || !data || data.length === 0) {
         throw new Error('Username not found');
+      }
+
+      // Extract the email from the result
+      const email = data[0].email;
+      
+      if (!email) {
+        throw new Error('Email not found for this username');
       }
 
       // Then, sign in using the email
       const { error } = await supabase.auth.signInWithPassword({
-        email: data,
+        email: email,
         password,
       });
 
