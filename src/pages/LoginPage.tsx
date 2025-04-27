@@ -165,15 +165,7 @@ const LoginPage = () => {
             <RegisterForm username={registerUsername} setUsername={setRegisterUsername} password={registerPassword} setPassword={setRegisterPassword} confirmPassword={registerConfirm} setConfirmPassword={setRegisterConfirm} loading={loading} onSubmit={handleRegister} />
           </TabsContent>
         </Tabs>
-        <CardFooter className="flex flex-col text-center text-sm text-muted-foreground pt-2">
-          <p className="mt-2">Demo credentials:</p>
-          <p>User: antrian / antrian1</p>
-          <p>Manager: lazaros / lazaros2</p>
-          {creatingDemoAccounts && <p className="mt-2 flex items-center justify-center">
-              <Loader className="mr-2 h-3 w-3 animate-spin" />
-              Setting up demo accounts...
-            </p>}
-        </CardFooter>
+        
       </Card>
     </div>;
 };
