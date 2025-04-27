@@ -36,7 +36,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, requireManager = false 
     }
   }, [user, currentUser, requireManager, navigate, isInitialized, isDBLoading]);
 
-  // Always render the loading state first to ensure consistent hook execution
+  // Always render the same component structure
   if (!authChecked) {
     return (
       <div className="flex items-center justify-center min-h-screen p-4">

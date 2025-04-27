@@ -13,9 +13,10 @@ const Index = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredParks = parks.filter(park => 
+  // Make sure parks is defined before filtering
+  const filteredParks = parks ? parks.filter(park => 
     park.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ) : [];
 
   return (
     <Layout title={

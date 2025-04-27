@@ -57,23 +57,36 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     session,
     isInitialized,
     signIn: async (username: string, password: string) => {
-      const email = `${username.toLowerCase()}@example.com`;
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      
-      if (error) {
+      try {
+        // Add a default email domain for demo purposes
+        const email = `${username.toLowerCase()}@example.com`;
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        
+        if (error) {
+          console.error("SignIn error:", error);
+          toast.error(error.message);
+          throw error;
+        }
+      } catch (error: any) {
         console.error("SignIn error:", error);
-        toast.error(error.message);
+        toast.error(error.message || 'Failed to sign in');
         throw error;
       }
     },
     signOut: async () => {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          console.error("SignOut error:", error);
+          toast.error(error.message);
+          throw error;
+        }
+      } catch (error: any) {
         console.error("SignOut error:", error);
-        toast.error(error.message);
+        toast.error(error.message || 'Failed to sign out');
         throw error;
       }
     }
