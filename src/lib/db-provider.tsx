@@ -116,7 +116,7 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
         setCurrentUser({
           id: profile.id,
           username: profile.username,
-          role: profile.role,
+          role: profile.role as 'user' | 'manager',
           createdAt: profile.created_at
         });
       }
@@ -133,10 +133,19 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'parks' },
         async (payload) => {
-          const { data: parks } = await supabase
+          const { data: parksData } = await supabase
             .from('parks')
             .select('*');
-          setParks(parks || []);
+          
+          if (parksData) {
+            const mappedParks = parksData.map(park => ({
+              id: park.id,
+              name: park.name,
+              expectedBarcodes: park.expected_barcodes || 0,
+              createdAt: park.created_at
+            }));
+            setParks(mappedParks);
+          }
         }
       )
       .subscribe();
@@ -146,10 +155,19 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'rows' },
         async (payload) => {
-          const { data: rows } = await supabase
+          const { data: rowsData } = await supabase
             .from('rows')
             .select('*');
-          setRows(rows || []);
+          
+          if (rowsData) {
+            const mappedRows = rowsData.map(row => ({
+              id: row.id,
+              name: row.name,
+              parkId: row.park_id,
+              createdAt: row.created_at
+            }));
+            setRows(mappedRows);
+          }
         }
       )
       .subscribe();
@@ -159,10 +177,20 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'barcodes' },
         async (payload) => {
-          const { data: barcodes } = await supabase
+          const { data: barcodesData } = await supabase
             .from('barcodes')
             .select('*');
-          setBarcodes(barcodes || []);
+          
+          if (barcodesData) {
+            const mappedBarcodes = barcodesData.map(barcode => ({
+              id: barcode.id,
+              code: barcode.code,
+              timestamp: barcode.timestamp,
+              rowId: barcode.row_id,
+              userId: barcode.user_id
+            }));
+            setBarcodes(mappedBarcodes);
+          }
         }
       )
       .subscribe();
@@ -174,9 +202,36 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
         supabase.from('barcodes').select('*')
       ]);
 
-      if (parksData.data) setParks(parksData.data);
-      if (rowsData.data) setRows(rowsData.data);
-      if (barcodesData.data) setBarcodes(barcodesData.data);
+      if (parksData.data) {
+        const mappedParks = parksData.data.map(park => ({
+          id: park.id,
+          name: park.name,
+          expectedBarcodes: park.expected_barcodes || 0,
+          createdAt: park.created_at
+        }));
+        setParks(mappedParks);
+      }
+
+      if (rowsData.data) {
+        const mappedRows = rowsData.data.map(row => ({
+          id: row.id,
+          name: row.name,
+          parkId: row.park_id,
+          createdAt: row.created_at
+        }));
+        setRows(mappedRows);
+      }
+
+      if (barcodesData.data) {
+        const mappedBarcodes = barcodesData.data.map(barcode => ({
+          id: barcode.id,
+          code: barcode.code,
+          timestamp: barcode.timestamp,
+          rowId: barcode.row_id,
+          userId: barcode.user_id
+        }));
+        setBarcodes(mappedBarcodes);
+      }
     }
 
     loadData();
@@ -188,41 +243,70 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [user]);
 
-  const login = (username: string, password: string): boolean => {
-    const user = users.find(u => u.username === username && u.password === password);
-    if (user) {
-      setCurrentUser(user);
+  const login = async (username: string, password: string): Promise<boolean> => {
+    try {
+      const email = `${username.toLowerCase()}@example.com`;
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        toast.error(error.message);
+        return false;
+      }
+
       toast.success(`Welcome back, ${username}!`);
       return true;
-    } else {
-      toast.error("Invalid username or password");
+    } catch (error: any) {
+      toast.error("Login failed: " + error.message);
       return false;
     }
   };
 
-  const logout = (): void => {
-    setCurrentUser(null);
-    toast.success("Logged out successfully");
+  const logout = async (): Promise<void> => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      
+      toast.success("Logged out successfully");
+    } catch (error: any) {
+      toast.error("Logout failed: " + error.message);
+    }
   };
-
-  const register = (username: string, password: string, role: 'user' | 'manager' = 'user'): boolean => {
-    if (users.some(u => u.username === username)) {
-      toast.error("Username already exists");
+  
+  const register = async (username: string, password: string, role: 'user' | 'manager' = 'user'): Promise<boolean> => {
+    try {
+      // Create a pseudo-email from username
+      const email = `${username.toLowerCase()}@example.com`;
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username,
+            role
+          }
+        }
+      });
+      
+      if (error) {
+        toast.error(error.message);
+        return false;
+      }
+      
+      toast.success("Registration successful");
+      return true;
+    } catch (error: any) {
+      toast.error("Registration failed: " + error.message);
       return false;
     }
-
-    const newUser: User = {
-      id: crypto.randomUUID(),
-      username,
-      password, 
-      role,
-      createdAt: new Date().toISOString()
-    };
-    
-    setUsers(prev => [...prev, newUser]);
-    setCurrentUser(newUser);
-    toast.success("Registration successful");
-    return true;
   };
 
   const addPark = async (name: string, expectedBarcodes: number = 0): Promise<Park | null> => {
@@ -237,16 +321,31 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      const newPark: Park = {
-        id: crypto.randomUUID(),
-        name,
-        expectedBarcodes,
-        createdAt: new Date().toISOString()
+      const { data: newPark, error } = await supabase
+        .from('parks')
+        .insert({
+          name,
+          expected_barcodes: expectedBarcodes,
+          user_id: user?.id
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Failed to add park:", error);
+        toast.error("Failed to create park");
+        return null;
+      }
+
+      const mappedPark: Park = {
+        id: newPark.id,
+        name: newPark.name,
+        expectedBarcodes: newPark.expected_barcodes || 0,
+        createdAt: newPark.created_at
       };
 
-      setParks(prev => [...prev, newPark]);
       toast.success(`Created park: ${name}`);
-      return newPark;
+      return mappedPark;
     } catch (error) {
       console.error("Failed to add park:", error);
       toast.error("Failed to create park");
@@ -266,56 +365,60 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      const newBarcode: Barcode = {
-        id: crypto.randomUUID(),
-        code,
-        rowId,
-        userId: currentUser.id,
-        timestamp: new Date().toISOString()
+      const { data: newBarcode, error } = await supabase
+        .from('barcodes')
+        .insert({
+          code,
+          row_id: rowId,
+          user_id: user?.id
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Failed to add barcode:", error);
+        toast.error("Failed to add barcode");
+        return null;
+      }
+
+      // Update daily scan count
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Check if we already have a scan count for today
+      const { data: existingScan } = await supabase
+        .from('daily_scans')
+        .select()
+        .eq('user_id', user?.id)
+        .eq('date', today)
+        .single();
+
+      if (existingScan) {
+        // Update existing scan count
+        await supabase
+          .from('daily_scans')
+          .update({ count: existingScan.count + 1 })
+          .eq('id', existingScan.id);
+      } else {
+        // Insert new scan count
+        await supabase
+          .from('daily_scans')
+          .insert({
+            user_id: user?.id,
+            count: 1,
+            date: today
+          });
+      }
+
+      const mappedBarcode: Barcode = {
+        id: newBarcode.id,
+        code: newBarcode.code,
+        timestamp: newBarcode.timestamp,
+        rowId: newBarcode.row_id,
+        userId: newBarcode.user_id
       };
 
-      const rowBarcodes = barcodes.filter(barcode => barcode.rowId === rowId);
-      
-      setBarcodes(prev => {
-        if (position !== undefined && position >= 0 && position < rowBarcodes.length) {
-          const updatedBarcodes = [...prev];
-          const rowBarcodeIndices = updatedBarcodes
-            .map((barcode, index) => barcode.rowId === rowId ? index : -1)
-            .filter(index => index !== -1);
-          
-          if (position >= 0 && position < rowBarcodeIndices.length) {
-            const insertIndex = rowBarcodeIndices[position] + 1;
-            updatedBarcodes.splice(insertIndex, 0, newBarcode);
-            return updatedBarcodes;
-          }
-          
-          return [...prev, newBarcode];
-        }
-        
-        return [...prev, newBarcode];
-      });
-
-      const today = new Date().toISOString().split('T')[0];
-      const existingDailyScan = dailyScans.find(scan => 
-        scan.date === today && scan.userId === currentUser.id
-      );
-      
-      if (existingDailyScan) {
-        setDailyScans(prev => prev.map(scan => 
-          scan.date === today && scan.userId === currentUser.id 
-            ? { ...scan, count: scan.count + 1 } 
-            : scan
-        ));
-      } else {
-        setDailyScans(prev => [...prev, { 
-          date: today, 
-          userId: currentUser.id, 
-          count: 1 
-        }]);
-      }
-      
       toast.success(`Added barcode: ${code}`);
-      return newBarcode;
+      return mappedBarcode;
     } catch (error) {
       console.error("Failed to add barcode:", error);
       toast.error("Failed to add barcode");
@@ -335,17 +438,22 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      setParks(prev => 
-        prev.map(park => 
-          park.id === parkId 
-            ? { 
-                ...park, 
-                name, 
-                ...(expectedBarcodes !== undefined ? { expectedBarcodes } : {}) 
-              } 
-            : park
-        )
-      );
+      const updateData: any = { name };
+      if (expectedBarcodes !== undefined) {
+        updateData.expected_barcodes = expectedBarcodes;
+      }
+
+      const { error } = await supabase
+        .from('parks')
+        .update(updateData)
+        .eq('id', parkId);
+
+      if (error) {
+        console.error("Failed to update park:", error);
+        toast.error("Failed to update park");
+        return false;
+      }
+
       toast.success("Park updated");
       return true;
     } catch (error) {
@@ -362,26 +470,17 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      const rowBarcodes = barcodes.filter(barcode => 
-        barcode.rowId === rowId && barcode.userId === currentUser.id
-      );
-      
-      if (rowBarcodes.length > 0) {
-        const today = new Date().toISOString().split('T')[0];
-        const todayScans = rowBarcodes.filter(barcode => 
-          barcode.timestamp.startsWith(today)
-        ).length;
-        
-        if (todayScans > 0) {
-          setDailyScans(prev => prev.map(scan => 
-            scan.date === today && scan.userId === currentUser.id
-              ? { ...scan, count: Math.max(0, scan.count - todayScans) }
-              : scan
-          ));
-        }
+      const { error } = await supabase
+        .from('barcodes')
+        .delete()
+        .eq('row_id', rowId);
+
+      if (error) {
+        console.error("Failed to reset row:", error);
+        toast.error("Failed to reset row");
+        return false;
       }
-      
-      setBarcodes(prev => prev.filter(barcode => barcode.rowId !== rowId));
+
       toast.success("Row data has been reset");
       return true;
     } catch (error) {
@@ -468,16 +567,30 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
       const rowNumber = highestNumber + 1;
       const rowName = `Row ${rowNumber}`;
 
-      const newRow: Row = {
-        id: crypto.randomUUID(),
-        name: rowName,
-        parkId,
-        createdAt: new Date().toISOString()
+      const { data: newRow, error } = await supabase
+        .from('rows')
+        .insert({
+          name: rowName,
+          park_id: parkId
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Failed to add row:", error);
+        toast.error("Failed to create row");
+        return null;
+      }
+
+      const mappedRow: Row = {
+        id: newRow.id,
+        name: newRow.name,
+        parkId: newRow.park_id,
+        createdAt: newRow.created_at
       };
 
-      setRows(prev => [...prev, newRow]);
       toast.success(`Created row: ${rowName}`);
-      return newRow;
+      return mappedRow;
     } catch (error) {
       console.error("Failed to add row:", error);
       toast.error("Failed to create row");
@@ -492,16 +605,16 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      const parkRows = rows.filter(row => row.parkId === parkId);
-      
-      const rowIds = parkRows.map(row => row.id);
-      const parkBarcodes = barcodes.filter(barcode => rowIds.includes(barcode.rowId));
-      
-      setBarcodes(prev => prev.filter(barcode => !parkBarcodes.some(pb => pb.id === barcode.id)));
-      
-      setRows(prev => prev.filter(row => row.parkId !== parkId));
-      
-      setParks(prev => prev.filter(park => park.id !== parkId));
+      const { error } = await supabase
+        .from('parks')
+        .delete()
+        .eq('id', parkId);
+
+      if (error) {
+        console.error("Failed to delete park:", error);
+        toast.error("Failed to delete park");
+        return false;
+      }
       
       toast.success("Park deleted");
       return true;
@@ -519,9 +632,16 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      setBarcodes(prev => prev.filter(barcode => barcode.rowId !== rowId));
-      
-      setRows(prev => prev.filter(row => row.id !== rowId));
+      const { error } = await supabase
+        .from('rows')
+        .delete()
+        .eq('id', rowId);
+
+      if (error) {
+        console.error("Failed to delete row:", error);
+        toast.error("Failed to delete row");
+        return false;
+      }
       
       toast.success("Row deleted");
       return true;
@@ -534,7 +654,17 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
 
   const deleteBarcode = async (barcodeId: string): Promise<boolean> => {
     try {
-      setBarcodes(prev => prev.filter(barcode => barcode.id !== barcodeId));
+      const { error } = await supabase
+        .from('barcodes')
+        .delete()
+        .eq('id', barcodeId);
+
+      if (error) {
+        console.error("Failed to delete barcode:", error);
+        toast.error("Failed to delete barcode");
+        return false;
+      }
+
       toast.success("Barcode deleted");
       return true;
     } catch (error) {
@@ -551,11 +681,17 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      setRows(prev => 
-        prev.map(row => 
-          row.id === rowId ? { ...row, name } : row
-        )
-      );
+      const { error } = await supabase
+        .from('rows')
+        .update({ name })
+        .eq('id', rowId);
+
+      if (error) {
+        console.error("Failed to update row:", error);
+        toast.error("Failed to update row");
+        return false;
+      }
+
       toast.success("Row updated");
       return true;
     } catch (error) {
@@ -572,11 +708,17 @@ export const DBProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      setBarcodes(prev => 
-        prev.map(barcode => 
-          barcode.id === barcodeId ? { ...barcode, code } : barcode
-        )
-      );
+      const { error } = await supabase
+        .from('barcodes')
+        .update({ code })
+        .eq('id', barcodeId);
+
+      if (error) {
+        console.error("Failed to update barcode:", error);
+        toast.error("Failed to update barcode");
+        return false;
+      }
+
       toast.success("Barcode updated");
       return true;
     } catch (error) {
