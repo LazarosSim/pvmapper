@@ -486,25 +486,9 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   const addRow = async (parkId: string, navigate: boolean = true): Promise<Row | null> => {
     if (!user) return null;
     
-    // Get all rows for this park
+    // Get rows count for this park to create a sequential name
     const parkRows = rows.filter(row => row.parkId === parkId);
-    
-    // Find the highest row number in the park
-    let highestRowNumber = 0;
-    
-    parkRows.forEach(row => {
-      // Extract the base number from row names (e.g., "Row 5_a" becomes 5)
-      const match = row.name.match(/^Row\s+(\d+)/i);
-      if (match) {
-        const rowNumber = parseInt(match[1], 10);
-        if (rowNumber > highestRowNumber) {
-          highestRowNumber = rowNumber;
-        }
-      }
-    });
-    
-    // Create a new row with the next sequential number
-    const rowNumber = highestRowNumber + 1;
+    const rowNumber = parkRows.length + 1;
     const rowName = `Row ${rowNumber}`;
     
     try {
@@ -970,4 +954,306 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   const getUserDailyScans = (): number => {
     if (!user) return 0;
     const today = new Date().toISOString().split('T')[0];
-    const todayScan = dailyScans.find(scan
+    const todayScan = dailyScans.find(scan => scan.userId === user.id && scan.date === today);
+    return todayScan?.count || 0;
+  };
+  
+  const getUserTotalScans = (): number => {
+    if (!user) return 0;
+    return barcodes.filter(barcode => barcode.userId === user.id).length;
+  };
+  
+  const getUserBarcodesScanned = (): Barcode[] => {
+    if (!user) return [];
+    return barcodes.filter(barcode => barcode.userId === user.id);
+  };
+  
+  const getAllUserStats = (): UserStat[] => {
+    if (!users || users.length === 0) {
+      // Collect unique users from barcodes and daily scans
+      const userIdsFromBarcodes = [...new Set(barcodes.map(b => b.userId))];
+      const userIdsFromScans = [...new Set(dailyScans.map(ds => ds.userId))];
+      const allUserIds = [...new Set([...userIdsFromBarcodes, ...userIdsFromScans])];
+      
+      // Create a map of usernames
+      const usernameMap: {[key: string]: string} = {};
+      
+      // Add usernames from dailyScans
+      dailyScans.forEach(scan => {
+        if (scan.username && scan.userId) {
+          usernameMap[scan.userId] = scan.username;
+        }
+      });
+      
+      // If currentUser exists and isn't in the map, add it
+      if (currentUser && !usernameMap[currentUser.id]) {
+        usernameMap[currentUser.id] = currentUser.username;
+      }
+      
+      return allUserIds.map(userId => {
+        const userScans = barcodes.filter(barcode => barcode.userId === userId);
+        const userDailyScans = dailyScans.filter(scan => scan.userId === userId);
+        
+        // Calculate daily scans for today
+        const today = new Date().toISOString().split('T')[0];
+        const todayScan = userDailyScans.find(scan => scan.date === today);
+        const dailyScanCount = todayScan?.count || 0;
+        
+        // Calculate days active
+        const activeDays = new Set(userDailyScans.map(scan => scan.date)).size;
+        
+        // Calculate average scans per day
+        const averageScans = activeDays > 0 
+          ? userDailyScans.reduce((sum, scan) => sum + scan.count, 0) / activeDays 
+          : 0;
+        
+        return {
+          userId,
+          username: usernameMap[userId] || `User-${userId.slice(0, 6)}`,
+          totalScans: userScans.length,
+          dailyScans: dailyScanCount,
+          daysActive: activeDays,
+          averageScansPerDay: Math.round(averageScans * 10) / 10 // Round to 1 decimal place
+        };
+      });
+    }
+    
+    return users.map(user => {
+      const userScans = barcodes.filter(barcode => barcode.userId === user.id);
+      const userDailyScans = dailyScans.filter(scan => scan.userId === user.id);
+      
+      // Calculate daily scans for today
+      const today = new Date().toISOString().split('T')[0];
+      const todayScan = userDailyScans.find(scan => scan.date === today);
+      const dailyScanCount = todayScan?.count || 0;
+      
+      // Calculate days active
+      const activeDays = new Set(userDailyScans.map(scan => scan.date)).size;
+      
+      // Calculate average scans per day
+      const averageScans = activeDays > 0 
+        ? userDailyScans.reduce((sum, scan) => sum + scan.count, 0) / activeDays 
+        : 0;
+      
+      return {
+        userId: user.id,
+        username: user.username,
+        totalScans: userScans.length,
+        dailyScans: dailyScanCount,
+        daysActive: activeDays,
+        averageScansPerDay: Math.round(averageScans * 10) / 10 // Round to 1 decimal place
+      };
+    });
+  };
+  
+  // Get scans for a specific date
+  const getDailyScans = async (date?: Date): Promise<DailyScanStat[]> => {
+    const targetDate = date ? format(date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
+    
+    // First try to find data in our local state
+    const localDailyScans = dailyScans.filter(scan => scan.date === targetDate);
+    
+    if (localDailyScans.length > 0) {
+      return localDailyScans;
+    }
+    
+    // If not found locally, query the database
+    try {
+      const { data, error } = await supabase
+        .from('daily_scans')
+        .select()
+        .eq('date', targetDate);
+        
+      if (error) {
+        console.error(`Error fetching daily scans for ${targetDate}:`, error);
+        return [];
+      }
+      
+      if (data && data.length > 0) {
+        // Get usernames for these users
+        const userIds = data.map(scan => scan.user_id);
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', userIds);
+          
+        const usernameMap = profiles ? 
+          profiles.reduce((map: {[key: string]: string}, profile) => {
+            map[profile.id] = profile.username;
+            return map;
+          }, {}) : {};
+          
+        return data.map(scan => ({
+          date: scan.date,
+          count: scan.count,
+          userId: scan.user_id,
+          username: usernameMap[scan.user_id] || 'Unknown'
+        }));
+      }
+      
+      return [];
+    } catch (error: any) {
+      console.error(`Error in getDailyScans for ${targetDate}:`, error.message);
+      return [];
+    }
+  };
+  
+  // Get scans for a date range
+  const getScansForDateRange = async (startDate: Date, endDate: Date): Promise<{date: string, count: number}[]> => {
+    const start = format(startDate, 'yyyy-MM-dd');
+    const end = format(endDate, 'yyyy-MM-dd');
+    
+    try {
+      const { data, error } = await supabase
+        .from('daily_scans')
+        .select('date, count')
+        .gte('date', start)
+        .lte('date', end);
+        
+      if (error) {
+        console.error(`Error fetching scans for range ${start} to ${end}:`, error);
+        return [];
+      }
+      
+      if (data) {
+        // Aggregate counts by date
+        const countByDate: {[date: string]: number} = {};
+        
+        data.forEach(scan => {
+          if (!countByDate[scan.date]) {
+            countByDate[scan.date] = 0;
+          }
+          countByDate[scan.date] += scan.count;
+        });
+        
+        // Convert to array for returning
+        return Object.entries(countByDate).map(([date, count]) => ({ date, count }));
+      }
+      
+      return [];
+    } catch (error: any) {
+      console.error(`Error in getScansForDateRange for ${start} to ${end}:`, error.message);
+      return [];
+    }
+  };
+  
+  // User management
+  const register = async (username: string, password: string, role: string) => {
+    // Implementation would be added here
+  };
+  
+  const logout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Error logging out:', error);
+        toast.error(`Failed to logout: ${error.message}`);
+        return;
+      }
+      
+      toast.success('Logged out successfully');
+    } catch (error: any) {
+      console.error('Error in logout:', error.message);
+      toast.error(`Failed to logout: ${error.message}`);
+    }
+  };
+  
+  // Data management
+  const importData = (jsonData: string): boolean => {
+    try {
+      const data = JSON.parse(jsonData);
+      
+      if (data.parks) setParks(data.parks);
+      if (data.rows) setRows(data.rows);
+      if (data.barcodes) setBarcodes(data.barcodes);
+      
+      toast.success('Data imported successfully');
+      return true;
+    } catch (error: any) {
+      console.error('Error importing data:', error.message);
+      toast.error(`Failed to import data: ${error.message}`);
+      return false;
+    }
+  };
+  
+  const exportData = (): string => {
+    const data = {
+      parks,
+      rows,
+      barcodes,
+      exportDate: new Date().toISOString()
+    };
+    
+    return JSON.stringify(data, null, 2);
+  };
+
+  // Create context value
+  const contextValue: DBContextType = {
+    currentUser,
+    isDBLoading,
+    refetchUser,
+    
+    // Parks
+    parks,
+    addPark,
+    deletePark,
+    updatePark,
+    getParkById,
+    getParkProgress,
+    
+    // Rows
+    rows,
+    getRowsByParkId,
+    addRow,
+    deleteRow,
+    updateRow,
+    getRowById,
+    resetRow,
+    countBarcodesInRow,
+    addSubRow,
+    
+    // Barcodes
+    barcodes,
+    addBarcode,
+    deleteBarcode,
+    updateBarcode,
+    getBarcodesByRowId,
+    searchBarcodes,
+    countBarcodesInPark,
+    
+    // User management
+    users,
+    register,
+    logout,
+    
+    // User stats
+    getUserDailyScans,
+    getUserTotalScans,
+    getUserBarcodesScanned,
+    getAllUserStats,
+    getDailyScans,
+    getScansForDateRange,
+    
+    // Data management
+    importData,
+    exportData,
+    
+    // Helper function
+    isManager
+  };
+
+  return (
+    <DBContext.Provider value={contextValue}>
+      {children}
+    </DBContext.Provider>
+  );
+}
+
+export const useDB = () => {
+  const context = useContext(DBContext);
+  if (!context) {
+    throw new Error('useDB must be used within a DBProvider');
+  }
+  return context;
+};
