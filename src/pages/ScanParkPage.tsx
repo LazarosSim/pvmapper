@@ -2,7 +2,7 @@
 import React from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
-import { useDB } from '@/lib/db-provider';
+import { useDB, type Row } from '@/lib/db-provider';
 import { Button } from '@/components/ui/button';
 import {
   Card,

@@ -721,7 +721,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
           .maybeSingle();
           
         if (scanData) {
-          // Subtract the count - this can result in negative values
+          // Subtract the count - this can now result in negative values
           const newCount = scanData.count - count;
           
           await supabase
