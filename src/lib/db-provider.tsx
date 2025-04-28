@@ -557,8 +557,11 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     const hasSubRows = relatedRows.some(row => row.name.includes('_'));
     
     if (!hasSubRows && originalRow.name === `Row ${rowNumber}`) {
-      // Rename original row to Row X_a
+      // Rename original row to Row X_a first
       await updateRow(originalRow.id, `Row ${rowNumber}_a`);
+      
+      // Add the newly renamed row to our relatedRows array
+      relatedRows.push({...originalRow, name: `Row ${rowNumber}_a`});
     }
     
     // Determine the next suffix letter to use
