@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Edit, Trash2, MoreVertical, FolderOpen } from 'lucide-react';
+import { Edit, Trash2, MoreVertical, FolderOpen, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDB, Row } from '@/lib/db-provider';
 import { formatDistanceToNow } from 'date-fns';
@@ -37,7 +37,7 @@ interface RowCardProps {
 
 const RowCard: React.FC<RowCardProps> = ({ row }) => {
   const navigate = useNavigate();
-  const { countBarcodesInRow, deleteRow, updateRow } = useDB();
+  const { countBarcodesInRow, deleteRow, updateRow, addSubRow, isManager } = useDB();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
   const [editName, setEditName] = React.useState(row.name);
@@ -67,31 +67,51 @@ const RowCard: React.FC<RowCardProps> = ({ row }) => {
     setIsEditDialogOpen(true);
   };
 
+  const handleAddSubRow = async () => {
+    await addSubRow(row.id);
+  };
+
   return (
     <>
       <Card className="mb-4 hover:shadow-md transition-shadow">
         <CardHeader className="pb-2 flex flex-row items-center justify-between">
           <CardTitle className="text-lg font-semibold">{row.name}</CardTitle>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <MoreVertical className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={openEditDialog}>
-                <Edit className="mr-2 h-4 w-4" />
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => setIsDeleteDialogOpen(true)}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleAddSubRow}
+              className="hidden md:flex"
+              title="Add Subrow"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Subrow
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleAddSubRow} className="md:hidden">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Subrow
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={openEditDialog}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="text-sm text-muted-foreground mb-2">Created {createdAt}</div>

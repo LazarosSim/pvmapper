@@ -75,12 +75,13 @@ type DBContextType = {
   // Rows
   rows: Row[];
   getRowsByParkId: (parkId: string) => Row[];
-  addRow: (parkId: string) => Promise<Row | null>;
+  addRow: (parkId: string, navigate?: boolean) => Promise<Row | null>;
   deleteRow: (rowId: string) => Promise<void>;
   updateRow: (rowId: string, name: string) => Promise<void>;
   getRowById: (rowId: string) => Row | undefined;
   resetRow: (rowId: string) => Promise<void>;
   countBarcodesInRow: (rowId: string) => number;
+  addSubRow: (rowId: string) => Promise<Row | null>;
   
   // Barcodes
   barcodes: Barcode[];
@@ -107,6 +108,9 @@ type DBContextType = {
   // Data management
   importData: (jsonData: string) => boolean;
   exportData: () => string;
+
+  // Helper function
+  isManager: () => boolean;
 };
 
 const DBContext = createContext<DBContextType | undefined>(undefined);
@@ -343,9 +347,20 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user?.id]);
 
+  // Helper function to check if current user is a manager
+  const isManager = () => {
+    return currentUser?.role === 'manager' || currentUser?.role === 'admin';
+  };
+
   // Park operations
   const addPark = async (name: string, expectedBarcodes: number, validateBarcodeLength: boolean = false): Promise<boolean> => {
     if (!user) return false;
+    
+    // Check if the user is a manager, if not, deny permission
+    if (!isManager()) {
+      toast.error('Only managers can create parks');
+      return false;
+    }
     
     try {
       const { data, error } = await supabase
@@ -468,7 +483,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     return rows.filter(row => row.parkId === parkId);
   };
   
-  const addRow = async (parkId: string): Promise<Row | null> => {
+  const addRow = async (parkId: string, navigate: boolean = true): Promise<Row | null> => {
     if (!user) return null;
     
     // Get rows count for this park to create a sequential name
@@ -508,6 +523,96 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     } catch (error: any) {
       console.error('Error in addRow:', error.message);
       toast.error(`Failed to create row: ${error.message}`);
+      return null;
+    }
+  };
+
+  const addSubRow = async (parentRowId: string): Promise<Row | null> => {
+    if (!user) return null;
+    
+    // Get the original row
+    const originalRow = rows.find(row => row.id === parentRowId);
+    if (!originalRow) {
+      toast.error('Parent row not found');
+      return null;
+    }
+    
+    // Extract the base row name (get the row number)
+    const baseNameMatch = originalRow.name.match(/^Row\s+(\d+)(?:_[a-z])?$/i);
+    if (!baseNameMatch) {
+      toast.error('Unable to determine parent row base name');
+      return null;
+    }
+    
+    const rowNumber = baseNameMatch[1];
+    const parkId = originalRow.parkId;
+    
+    // Find all related rows with the same base number
+    const relatedRows = rows.filter(row => {
+      const match = row.name.match(/^Row\s+(\d+)(?:_([a-z]))?$/i);
+      return match && match[1] === rowNumber && row.parkId === parkId;
+    });
+    
+    // Check if we need to rename the original row (first time adding a subrow)
+    const hasSubRows = relatedRows.some(row => row.name.includes('_'));
+    
+    if (!hasSubRows && originalRow.name === `Row ${rowNumber}`) {
+      // Rename original row to Row X_a
+      await updateRow(originalRow.id, `Row ${rowNumber}_a`);
+    }
+    
+    // Determine the next suffix letter to use
+    let nextSuffix = 'a';
+    const suffixes = relatedRows
+      .map(row => {
+        const match = row.name.match(/^Row\s+\d+_([a-z])$/i);
+        return match ? match[1].toLowerCase() : '';
+      })
+      .filter(Boolean);
+    
+    if (suffixes.length > 0) {
+      // Get the last letter and increment it
+      const lastLetter = String.fromCharCode(
+        Math.max(...suffixes.map(s => s.charCodeAt(0)))
+      );
+      nextSuffix = String.fromCharCode(lastLetter.charCodeAt(0) + 1);
+    }
+    
+    // Create new row with the next suffix
+    const newRowName = `Row ${rowNumber}_${nextSuffix}`;
+    
+    try {
+      const { data, error } = await supabase
+        .from('rows')
+        .insert([{ 
+          name: newRowName,
+          park_id: parkId
+        }])
+        .select();
+        
+      if (error) {
+        console.error('Error adding subrow:', error);
+        toast.error(`Failed to create subrow: ${error.message}`);
+        return null;
+      }
+      
+      if (data && data[0]) {
+        const newRow: Row = {
+          id: data[0].id,
+          name: data[0].name,
+          parkId: data[0].park_id,
+          createdAt: data[0].created_at
+        };
+        
+        setRows(prev => [newRow, ...prev]);
+        toast.success('Subrow added successfully');
+        return newRow;
+      }
+      
+      return null;
+    } catch (error: any) {
+      console.error('Error in addSubRow:', error.message);
+      toast.error(`Failed to create subrow: ${error.message}`);
       return null;
     }
   };
@@ -574,13 +679,18 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
       // First get all barcodes for this row to track what needs to be subtracted
       const rowBarcodes = barcodes.filter(barcode => barcode.rowId === rowId);
       
-      // Group barcodes by user for adjustment
-      const userBarcodeCounts: {[userId: string]: number} = {};
+      // Group barcodes by user and date for adjustment
+      const userBarcodeCounts: {[key: string]: number} = {};
+      
+      // Format: userId_date -> count
       rowBarcodes.forEach(barcode => {
-        if (!userBarcodeCounts[barcode.userId]) {
-          userBarcodeCounts[barcode.userId] = 0;
+        const scanDate = new Date(barcode.timestamp).toISOString().split('T')[0];
+        const key = `${barcode.userId}_${scanDate}`;
+        
+        if (!userBarcodeCounts[key]) {
+          userBarcodeCounts[key] = 0;
         }
-        userBarcodeCounts[barcode.userId]++;
+        userBarcodeCounts[key]++;
       });
       
       // Delete all barcodes for this row
@@ -598,21 +708,21 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
       // Remove barcodes from state
       setBarcodes(prev => prev.filter(barcode => barcode.rowId !== rowId));
       
-      // Adjust daily scans for each affected user
-      const today = new Date().toISOString().split('T')[0];
-      
-      for (const [userId, count] of Object.entries(userBarcodeCounts)) {
+      // Adjust daily scans for each affected user and date
+      for (const [key, count] of Object.entries(userBarcodeCounts)) {
+        const [userId, date] = key.split('_');
+        
         // Get current daily scan count
         const { data: scanData } = await supabase
           .from('daily_scans')
           .select('id, count')
           .eq('user_id', userId)
-          .eq('date', today)
+          .eq('date', date)
           .maybeSingle();
           
-        if (scanData && scanData.count > 0) {
-          // Adjust the count, ensuring it doesn't go below 0
-          const newCount = Math.max(0, scanData.count - count);
+        if (scanData) {
+          // Subtract the count - this can result in negative values
+          const newCount = scanData.count - count;
           
           await supabase
             .from('daily_scans')
@@ -621,7 +731,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
             
           // Update local state
           setDailyScans(prev => prev.map(scan => 
-            scan.userId === userId && scan.date === today
+            scan.userId === userId && scan.date === date
               ? { ...scan, count: newCount }
               : scan
           ));
@@ -1098,6 +1208,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     getRowById,
     resetRow,
     countBarcodesInRow,
+    addSubRow,
     
     // Barcodes
     barcodes,
@@ -1123,7 +1234,10 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     
     // Data management
     importData,
-    exportData
+    exportData,
+    
+    // Helper function
+    isManager
   };
 
   return (

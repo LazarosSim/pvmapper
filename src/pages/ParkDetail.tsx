@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useDB } from '@/lib/db-provider';
@@ -25,8 +24,40 @@ const ParkDetail = () => {
   );
 
   const handleAddRow = async () => {
-    await addRow(parkId);
+    await addRow(parkId, false);
   };
+
+  const groupRows = () => {
+    const grouped: { [key: string]: Row[] } = {};
+    
+    filteredRows.forEach(row => {
+      const match = row.name.match(/^Row\s+(\d+)/i);
+      if (match) {
+        const baseNum = match[1];
+        if (!grouped[baseNum]) {
+          grouped[baseNum] = [];
+        }
+        grouped[baseNum].push(row);
+      } else {
+        if (!grouped['other']) {
+          grouped['other'] = [];
+        }
+        grouped['other'].push(row);
+      }
+    });
+    
+    Object.keys(grouped).forEach(key => {
+      grouped[key].sort((a, b) => {
+        const suffixA = a.name.match(/_([a-z])$/i)?.[1] || '';
+        const suffixB = b.name.match(/_([a-z])$/i)?.[1] || '';
+        return suffixA.localeCompare(suffixB);
+      });
+    });
+    
+    return grouped;
+  };
+  
+  const rowGroups = groupRows();
 
   return (
     <Layout title={park?.name || 'Park Detail'} showBack>
@@ -40,9 +71,22 @@ const ParkDetail = () => {
           />
         </div>
 
-        {filteredRows.length > 0 ? (
-          filteredRows.map(row => (
-            <RowCard key={row.id} row={row} />
+        {Object.keys(rowGroups).length > 0 ? (
+          Object.keys(rowGroups).sort((a, b) => {
+            if (!isNaN(Number(a)) && !isNaN(Number(b))) {
+              return Number(a) - Number(b);
+            }
+            return a.localeCompare(b);
+          }).map(groupKey => (
+            <div key={groupKey} className="mb-6">
+              <div className="flex flex-wrap gap-4">
+                {rowGroups[groupKey].map(row => (
+                  <div key={row.id} className="w-full md:w-auto flex-grow">
+                    <RowCard row={row} />
+                  </div>
+                ))}
+              </div>
+            </div>
           ))
         ) : (
           <div className="text-center py-8">
