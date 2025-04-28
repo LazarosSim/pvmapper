@@ -722,7 +722,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
           
         if (scanData) {
           // Subtract the count - this can result in negative values
-          const newCount = scanData.count - count;
+          const newCount = Math.max(scanData.count - count, -999999);
           
           await supabase
             .from('daily_scans')

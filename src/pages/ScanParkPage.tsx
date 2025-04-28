@@ -15,7 +15,7 @@ import { FolderOpen, Plus } from 'lucide-react';
 
 const ScanParkPage = () => {
   const { parkId } = useParams<{ parkId: string }>();
-  const { parks, getRowsByParkId, getParkById, addRow, countBarcodesInRow } = useDB();
+  const { parks, getRowsByParkId, getParkById, addRow, addSubRow, countBarcodesInRow } = useDB();
   const navigate = useNavigate();
 
   if (!parkId || !parks.some(p => p.id === parkId)) {
@@ -31,6 +31,14 @@ const ScanParkPage = () => {
       await addRow(parkId, false);
     } catch (error) {
       console.error("Error adding row:", error);
+    }
+  };
+  
+  const handleAddSubRow = async (parentRowId: string) => {
+    try {
+      await addSubRow(parentRowId);
+    } catch (error) {
+      console.error("Error adding subrow:", error);
     }
   };
   
@@ -96,14 +104,23 @@ const ScanParkPage = () => {
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <Button 
-                          variant="outline" 
-                          className="w-full"
-                          onClick={() => navigate(`/scan/row/${row.id}`)}
-                        >
-                          <FolderOpen className="mr-2 h-4 w-4" />
-                          Select Row
-                        </Button>
+                        <div className="flex items-center justify-between gap-2">
+                          <Button 
+                            variant="outline" 
+                            className="flex-1"
+                            onClick={() => navigate(`/scan/row/${row.id}`)}
+                          >
+                            <FolderOpen className="mr-2 h-4 w-4" />
+                            Select Row
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => handleAddSubRow(row.id)}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add Subrow
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}

@@ -1,175 +1,81 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Link } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
-import { Edit, Trash2, MoreVertical, FolderOpen, Plus } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useDB, Row } from '@/lib/db-provider';
-import { formatDistanceToNow } from 'date-fns';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from '@/components/ui/input';
+import { useDB } from '@/lib/db-provider';
+import { Edit, Trash2, BarChart3, RefreshCcw, Plus } from 'lucide-react';
+import { Row } from '@/lib/db-provider';
 
-interface RowCardProps {
+type RowCardProps = {
   row: Row;
-}
+  onAddSubRow?: (rowId: string) => void;
+};
 
-const RowCard: React.FC<RowCardProps> = ({ row }) => {
-  const navigate = useNavigate();
-  const { countBarcodesInRow, deleteRow, updateRow, addSubRow, isManager } = useDB();
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
-  const [editName, setEditName] = React.useState(row.name);
-  
-  const barcodeCount = countBarcodesInRow(row.id);
-  const createdAt = formatDistanceToNow(new Date(row.createdAt), { addSuffix: true });
-  
-  const handleEdit = () => {
-    updateRow(row.id, editName);
-    setIsEditDialogOpen(false);
-  };
-  
-  const handleDelete = () => {
-    deleteRow(row.id);
-    setIsDeleteDialogOpen(false);
-  };
-  
-  const handleRename = () => {
-    if (editName.trim() && editName !== row.name) {
-      updateRow(row.id, editName);
+const RowCard = ({ row, onAddSubRow }: RowCardProps) => {
+  const { updateRow, deleteRow, resetRow, countBarcodesInRow } = useDB();
+
+  const handleReset = async () => {
+    if (window.confirm(`Are you sure you want to reset ${row.name}? This will remove all barcodes in this row.`)) {
+      await resetRow(row.id);
     }
-    setIsEditDialogOpen(false);
   };
 
-  const openEditDialog = () => {
-    setEditName(row.name);
-    setIsEditDialogOpen(true);
+  const handleDelete = async () => {
+    if (window.confirm(`Are you sure you want to delete ${row.name}?`)) {
+      await deleteRow(row.id);
+    }
   };
 
-  const handleAddSubRow = async () => {
-    await addSubRow(row.id);
+  const handleAddSubRow = () => {
+    if (onAddSubRow) {
+      onAddSubRow(row.id);
+    }
   };
+
+  const barcodeCount = countBarcodesInRow(row.id);
 
   return (
-    <>
-      <Card className="mb-4 hover:shadow-md transition-shadow">
-        <CardHeader className="pb-2 flex flex-row items-center justify-between">
-          <CardTitle className="text-lg font-semibold">{row.name}</CardTitle>
-          <div className="flex items-center space-x-2">
+    <Card className="w-full h-full">
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-base font-medium">{row.name}</CardTitle>
+          <span className="text-sm text-muted-foreground">{barcodeCount} barcodes</span>
+        </div>
+        <CardDescription>
+          Created {new Date(row.createdAt).toLocaleDateString()}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="pb-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" className="flex-1" asChild>
+            <Link to={`/row/${row.id}`}>
+              <BarChart3 className="mr-1 h-4 w-4" />
+              Details
+            </Link>
+          </Button>
+          {onAddSubRow && (
             <Button 
               variant="outline" 
-              size="sm"
+              size="sm" 
               onClick={handleAddSubRow}
-              className="hidden md:flex"
-              title="Add Subrow"
+              className="flex-1"
             >
-              <Plus className="h-4 w-4 mr-1" />
+              <Plus className="mr-1 h-4 w-4" />
               Add Subrow
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <MoreVertical className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleAddSubRow} className="md:hidden">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Subrow
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={openEditDialog}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Rename
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setIsDeleteDialogOpen(true)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="text-sm text-muted-foreground mb-2">Created {createdAt}</div>
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-sm font-medium">{barcodeCount} Barcodes</span>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => navigate(`/row/${row.id}`)}>
-              <FolderOpen className="mr-2 h-4 w-4" />
-              Open
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-      
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete "{row.name}" and all of its barcodes.
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rename Row</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <Input
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              placeholder="Row name"
-              className="w-full"
-              autoFocus
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleRename} disabled={!editName.trim() || editName === row.name}>
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+          )}
+        </div>
+      </CardContent>
+      <CardFooter className="pt-0 flex justify-between">
+        <Button variant="ghost" size="sm" onClick={handleReset}>
+          <RefreshCcw className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={handleDelete}>
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      </CardFooter>
+    </Card>
   );
 };
 
