@@ -26,27 +26,8 @@ const Layout: React.FC<LayoutProps> = ({ children, title, showBack, titleAction 
         showBack={showBack} 
         titleAction={titleAction} 
       />
-      <main 
-        className="flex-1 p-4 pb-20 overflow-y-auto bg-gradient-to-b from-white to-gray-50 relative"
-        style={{
-          position: 'relative',
-        }}
-      >
-        {/* Background canvas with 50% opacity */}
-        <div 
-          className="absolute inset-0 z-0 pointer-events-none"
-          style={{
-            backgroundImage: 'url("https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/XPcanvas.png")',
-            backgroundSize: '500px',
-            backgroundRepeat: 'repeat',
-            opacity: 0.5,
-          }}
-        />
-        
-        {/* Content on top of background */}
-        <div className="relative z-10">
-          {children}
-        </div>
+      <main className="flex-1 p-4 pb-20 overflow-y-auto bg-gradient-to-b from-white to-gray-50">
+        {children}
       </main>
       <XPLogo />
       <BottomNav />
