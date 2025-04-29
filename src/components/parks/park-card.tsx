@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -120,8 +121,17 @@ const ParkCard: React.FC<ParkCardProps> = ({
   const isManager = currentUser?.role === 'manager';
 
   return <>
-    <Card className="mb-4 hover:shadow-md transition-shadow glass-card">
-      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+    <Card className="mb-4 hover:shadow-md transition-shadow glass-card relative overflow-hidden">
+      {/* Semi-transparent background image layer */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center opacity-10 z-0" 
+        style={{ 
+          backgroundImage: `url(https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/XPcanvas.png)` 
+        }} 
+      />
+      
+      {/* Content layer (above the background) */}
+      <CardHeader className="pb-2 flex flex-row items-center justify-between relative z-10">
         <CardTitle className="text-inventory-text text-xl font-semibold text-left">{park.name}</CardTitle>
         <div className="flex gap-2">
           <Button variant="outline" size="icon" onClick={handleExportExcel} disabled={isExporting} className="text-inventory-secondary hover:text-inventory-secondary/80">
@@ -146,7 +156,7 @@ const ParkCard: React.FC<ParkCardProps> = ({
             </DropdownMenu>}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="relative z-10">
         <div className="text-sm text-muted-foreground mb-2">Created {createdAt}</div>
         
         {park.expectedBarcodes > 0 && <div className="mb-4 space-y-2">

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -108,67 +107,103 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
       return match && match[1] === rowNumber && row.parkId === parkId;
     });
     
-    // Check if we need to rename the original row (first time adding a subrow)
-    const hasSubRows = relatedRows.some(row => row.name.includes('_'));
+    // Check if we need to rename the original row (if it doesn't have a suffix yet)
+    const needsRenaming = originalRow.name === `Row ${rowNumber}`;
     
-    if (!hasSubRows && originalRow.name === `Row ${rowNumber}`) {
-      // Rename original row to Row X_a
+    // First, if the original row needs renaming, do that before adding a new one
+    if (needsRenaming) {
+      // Always rename to _a first
       await updateRow(originalRow.id, `Row ${rowNumber}_a`);
-    }
-    
-    // Determine the next suffix letter to use
-    let nextSuffix = 'a';
-    const suffixes = relatedRows
-      .map(row => {
-        const match = row.name.match(/^Row\s+\d+_([a-z])$/i);
-        return match ? match[1].toLowerCase() : '';
-      })
-      .filter(Boolean);
-    
-    if (suffixes.length > 0) {
+      
+      // After renaming, the new row will be _b
+      const newRowName = `Row ${rowNumber}_b`;
+      
+      try {
+        const { data, error } = await supabase
+          .from('rows')
+          .insert([{ 
+            name: newRowName,
+            park_id: parkId
+          }])
+          .select();
+          
+        if (error) {
+          console.error('Error adding subrow:', error);
+          toast.error(`Failed to create subrow: ${error.message}`);
+          return null;
+        }
+        
+        if (data && data[0]) {
+          const newRow: Row = {
+            id: data[0].id,
+            name: data[0].name,
+            parkId: data[0].park_id,
+            createdAt: data[0].created_at
+          };
+          
+          setRows(prev => [newRow, ...prev]);
+          toast.success('Subrow added successfully');
+          return newRow;
+        }
+        
+        return null;
+      } catch (error: any) {
+        console.error('Error in addSubRow:', error.message);
+        toast.error(`Failed to create subrow: ${error.message}`);
+        return null;
+      }
+    } else {
+      // The original row already has a suffix, so just determine the next letter
+      const suffixes = relatedRows
+        .map(row => {
+          const match = row.name.match(/^Row\s+\d+_([a-z])$/i);
+          return match ? match[1].toLowerCase() : '';
+        })
+        .filter(Boolean);
+      
       // Get the last letter and increment it
       const lastLetter = String.fromCharCode(
         Math.max(...suffixes.map(s => s.charCodeAt(0)))
       );
-      nextSuffix = String.fromCharCode(lastLetter.charCodeAt(0) + 1);
-    }
-    
-    // Create new row with the next suffix
-    const newRowName = `Row ${rowNumber}_${nextSuffix}`;
-    
-    try {
-      const { data, error } = await supabase
-        .from('rows')
-        .insert([{ 
-          name: newRowName,
-          park_id: parkId
-        }])
-        .select();
+      const nextSuffix = String.fromCharCode(lastLetter.charCodeAt(0) + 1);
+      
+      // Create new row with the next suffix
+      const newRowName = `Row ${rowNumber}_${nextSuffix}`;
+      
+      try {
+        const { data, error } = await supabase
+          .from('rows')
+          .insert([{ 
+            name: newRowName,
+            park_id: parkId
+          }])
+          .select();
+          
+        if (error) {
+          console.error('Error adding subrow:', error);
+          toast.error(`Failed to create subrow: ${error.message}`);
+          return null;
+        }
         
-      if (error) {
-        console.error('Error adding subrow:', error);
+        if (data && data[0]) {
+          const newRow: Row = {
+            id: data[0].id,
+            name: data[0].name,
+            parkId: data[0].park_id,
+            createdAt: data[0].created_at
+          };
+          
+          setRows(prev => [newRow, ...prev]);
+          toast.success('Subrow added successfully');
+          return newRow;
+        }
+        
+        return null;
+      } catch (error: any) {
+        console.error('Error in addSubRow:', error.message);
         toast.error(`Failed to create subrow: ${error.message}`);
         return null;
       }
-      
-      if (data && data[0]) {
-        const newRow: Row = {
-          id: data[0].id,
-          name: data[0].name,
-          parkId: data[0].park_id,
-          createdAt: data[0].created_at
-        };
-        
-        setRows(prev => [newRow, ...prev]);
-        toast.success('Subrow added successfully');
-        return newRow;
-      }
-      
-      return null;
-    } catch (error: any) {
-      console.error('Error in addSubRow:', error.message);
-      toast.error(`Failed to create subrow: ${error.message}`);
-      return null;
     }
   };
   
