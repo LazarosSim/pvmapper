@@ -33,9 +33,10 @@ import { Input } from '@/components/ui/input';
 
 interface RowCardProps {
   row: Row;
+  onOpen?: () => void; // Made optional to maintain backward compatibility
 }
 
-const RowCard: React.FC<RowCardProps> = ({ row }) => {
+const RowCard: React.FC<RowCardProps> = ({ row, onOpen }) => {
   const navigate = useNavigate();
   const { countBarcodesInRow, deleteRow, updateRow, addSubRow, isManager } = useDB();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
@@ -69,6 +70,14 @@ const RowCard: React.FC<RowCardProps> = ({ row }) => {
 
   const handleAddSubRow = async () => {
     await addSubRow(row.id);
+  };
+
+  const handleOpenRow = () => {
+    // Call the onOpen callback if provided
+    if (onOpen) {
+      onOpen();
+    }
+    navigate(`/row/${row.id}`);
   };
 
   return (
@@ -119,7 +128,7 @@ const RowCard: React.FC<RowCardProps> = ({ row }) => {
             <div>
               <span className="text-sm font-medium">{barcodeCount} Barcodes</span>
             </div>
-            <Button variant="outline" size="sm" onClick={() => navigate(`/row/${row.id}`)}>
+            <Button variant="outline" size="sm" onClick={handleOpenRow}>
               <FolderOpen className="mr-2 h-4 w-4" />
               Open
             </Button>
