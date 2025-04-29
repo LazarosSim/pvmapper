@@ -15,6 +15,26 @@ const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction })
   const navigate = useNavigate();
   const location = useLocation();
   
+  const handleBackClick = () => {
+    // Special handling for scan flow
+    if (location.pathname.startsWith('/scan/park/')) {
+      navigate('/scan');
+      return;
+    }
+    
+    if (location.pathname.startsWith('/scan/row/')) {
+      // Extract parkId from localStorage
+      const rememberedParkId = localStorage.getItem('selectedParkId');
+      if (rememberedParkId) {
+        navigate(`/scan/park/${rememberedParkId}`);
+        return;
+      }
+    }
+    
+    // Default behavior
+    navigate(-1);
+  };
+  
   return (
     <header className="sticky top-0 w-full bg-gradient-to-r from-xpenergy-primary to-xpenergy-secondary text-white py-4 px-4 flex items-center z-10 shadow-md">
       <div className="flex-1 flex items-center">
@@ -22,7 +42,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction })
           <Button 
             variant="ghost" 
             size="icon" 
-            onClick={() => navigate(-1)}
+            onClick={handleBackClick}
             className="mr-2 text-white hover:bg-xpenergy-primary/20 hover:text-white/90"
           >
             <ArrowLeft className="h-6 w-6" />
