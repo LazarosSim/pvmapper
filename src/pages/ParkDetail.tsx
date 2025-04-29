@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useDB } from '@/lib/db-provider';
@@ -6,6 +7,7 @@ import RowCard from '@/components/rows/row-card';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import type { Row } from '@/lib/db-provider';
 
 const ParkDetail = () => {
   const { parkId } = useParams<{ parkId: string }>();
