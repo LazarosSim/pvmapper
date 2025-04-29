@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useDB } from '@/lib/db-provider';
 import Layout from '@/components/layout/layout';
@@ -13,7 +14,19 @@ const ParkDetail = () => {
   const { parks, getRowsByParkId, getParkById, addRow } = useDB();
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Save selected park to localStorage
+  useEffect(() => {
+    if (parkId) {
+      localStorage.setItem('selectedParkId', parkId);
+    }
+  }, [parkId]);
+
   if (!parkId || !parks.some(p => p.id === parkId)) {
+    // Try to get remembered park from localStorage
+    const rememberedParkId = localStorage.getItem('selectedParkId');
+    if (rememberedParkId && parks.some(p => p.id === rememberedParkId)) {
+      return <Navigate to={`/park/${rememberedParkId}`} replace />;
+    }
     return <Navigate to="/" replace />;
   }
 

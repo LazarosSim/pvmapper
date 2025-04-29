@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
 import { useDB } from '@/lib/db-provider';
@@ -10,17 +11,30 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { FolderOpen, Plus, Search } from 'lucide-react';
+import { FolderOpen, Plus, Search, ArrowDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import type { Row } from '@/lib/types/db-types';
+import { toast } from 'sonner';
 
 const ScanParkPage = () => {
   const { parkId } = useParams<{ parkId: string }>();
-  const { parks, getRowsByParkId, getParkById, addRow, countBarcodesInRow } = useDB();
+  const { parks, getRowsByParkId, getParkById, addRow, countBarcodesInRow, addSubRow } = useDB();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Save selected park to localStorage
+  useEffect(() => {
+    if (parkId) {
+      localStorage.setItem('selectedParkId', parkId);
+    }
+  }, [parkId]);
+
   if (!parkId || !parks.some(p => p.id === parkId)) {
+    // Try to get remembered park from localStorage
+    const rememberedParkId = localStorage.getItem('selectedParkId');
+    if (rememberedParkId && parks.some(p => p.id === rememberedParkId)) {
+      return <Navigate to={`/scan/park/${rememberedParkId}`} replace />;
+    }
     return <Navigate to="/scan" replace />;
   }
 
@@ -37,6 +51,18 @@ const ScanParkPage = () => {
       await addRow(parkId, false);
     } catch (error) {
       console.error("Error adding row:", error);
+    }
+  };
+
+  const handleAddSubRow = async (parentRowId: string) => {
+    try {
+      const newRow = await addSubRow(parentRowId);
+      if (newRow) {
+        toast.success(`Added subrow ${newRow.name}`);
+      }
+    } catch (error) {
+      console.error("Error adding subrow:", error);
+      toast.error("Failed to add subrow");
     }
   };
   
@@ -114,7 +140,7 @@ const ScanParkPage = () => {
                             Select this row to scan barcodes
                           </CardDescription>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="space-y-2">
                           <Button 
                             variant="outline" 
                             className="w-full"
@@ -122,6 +148,14 @@ const ScanParkPage = () => {
                           >
                             <FolderOpen className="mr-2 h-4 w-4" />
                             Select Row
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="w-full"
+                            onClick={() => handleAddSubRow(row.id)}
+                          >
+                            <ArrowDown className="mr-2 h-4 w-4" />
+                            Add Subrow
                           </Button>
                         </CardContent>
                       </Card>

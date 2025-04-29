@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
 import { useDB } from '@/lib/db-provider';
@@ -16,6 +16,14 @@ import { FolderOpen } from 'lucide-react';
 const ScanPage = () => {
   const { parks } = useDB();
   const navigate = useNavigate();
+
+  // Check for remembered park when component mounts
+  useEffect(() => {
+    const rememberedParkId = localStorage.getItem('selectedParkId');
+    if (rememberedParkId && parks.some(p => p.id === rememberedParkId)) {
+      navigate(`/scan/park/${rememberedParkId}`, { replace: true });
+    }
+  }, [parks, navigate]);
 
   if (parks.length === 0) {
     return <Navigate to="/" replace />;
