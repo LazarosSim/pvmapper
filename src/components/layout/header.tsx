@@ -17,6 +17,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction })
   const handleBackClick = () => {
     // Special handling for navigation between scan flows
     if (location.pathname.startsWith('/scan/park/')) {
+      // Always navigate to main scan page when back is clicked from a park page
       navigate('/scan');
       return;
     }
