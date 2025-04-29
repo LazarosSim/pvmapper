@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -13,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { FolderOpen, Plus, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import type { Row } from '@/lib/db-provider';
+import type { Row } from '@/lib/types/db-types';
 
 const ScanParkPage = () => {
   const { parkId } = useParams<{ parkId: string }>();
