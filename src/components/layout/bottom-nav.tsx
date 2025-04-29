@@ -40,7 +40,7 @@ const BottomNav = () => {
       <div className="flex items-center justify-around">
         {links.map(link => <Link key={link.href} to={link.href} className={cn("flex flex-col items-center px-2 py-1 rounded-md", link.active ? "text-inventory-primary" : "text-muted-foreground hover:text-inventory-primary transition")}>
             {link.icon}
-            <span className="mt-1 text-xs">{link.label}</span>
+            <span className="mt-1 text-xs text-xpenergy-text">{link.label}</span>
           </Link>)}
       </div>
     </nav>;
