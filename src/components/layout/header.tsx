@@ -3,7 +3,6 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 
 interface HeaderProps {
   title: string;
@@ -16,7 +15,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction })
   const location = useLocation();
   
   const handleBackClick = () => {
-    // Special handling for scan flow
+    // Special handling for navigation between scan flows
     if (location.pathname.startsWith('/scan/park/')) {
       navigate('/scan');
       return;
@@ -27,6 +26,21 @@ const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction })
       const rememberedParkId = localStorage.getItem('selectedParkId');
       if (rememberedParkId) {
         navigate(`/scan/park/${rememberedParkId}`);
+        return;
+      }
+    }
+    
+    // Special handling for navigation between main flows
+    if (location.pathname.startsWith('/park/')) {
+      navigate('/');
+      return;
+    }
+    
+    if (location.pathname.startsWith('/row/')) {
+      // Extract parkId from localStorage
+      const rememberedParkId = localStorage.getItem('selectedParkId');
+      if (rememberedParkId) {
+        navigate(`/park/${rememberedParkId}`);
         return;
       }
     }

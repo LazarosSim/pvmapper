@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -22,10 +21,12 @@ const ScanParkPage = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Save selected park to localStorage
+  // Save selected park to localStorage and clear row selection
   useEffect(() => {
     if (parkId) {
       localStorage.setItem('selectedParkId', parkId);
+      // We're at park level, so clear any row selection
+      localStorage.removeItem('selectedRowId');
     }
   }, [parkId]);
 
@@ -64,6 +65,13 @@ const ScanParkPage = () => {
       console.error("Error adding subrow:", error);
       toast.error("Failed to add subrow");
     }
+  };
+  
+  const handleSelectRow = (rowId: string) => {
+    // Save both park and row ID for consistent navigation
+    localStorage.setItem('selectedParkId', parkId);
+    localStorage.setItem('selectedRowId', rowId);
+    navigate(`/scan/row/${rowId}`);
   };
   
   // Group rows by their base number for display
@@ -144,7 +152,7 @@ const ScanParkPage = () => {
                           <Button 
                             variant="outline" 
                             className="w-full"
-                            onClick={() => navigate(`/scan/row/${row.id}`)}
+                            onClick={() => handleSelectRow(row.id)}
                           >
                             <FolderOpen className="mr-2 h-4 w-4" />
                             Select Row

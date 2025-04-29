@@ -14,10 +14,13 @@ const ParkDetail = () => {
   const { parks, getRowsByParkId, getParkById, addRow } = useDB();
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Save selected park to localStorage
+  // Save selected park to localStorage and clear row selection
+  // This ensures consistency between HomePage and ScanPage navigation
   useEffect(() => {
     if (parkId) {
       localStorage.setItem('selectedParkId', parkId);
+      // We're at park level, so clear any row selection
+      localStorage.removeItem('selectedRowId');
     }
   }, [parkId]);
 
@@ -96,7 +99,14 @@ const ParkDetail = () => {
               <div className="flex flex-wrap gap-4">
                 {rowGroups[groupKey].map(row => (
                   <div key={row.id} className="w-full md:w-auto flex-grow">
-                    <RowCard row={row} />
+                    <RowCard 
+                      row={row} 
+                      onOpen={() => {
+                        // When opening a row, store both the park ID and row ID
+                        localStorage.setItem('selectedParkId', parkId);
+                        localStorage.setItem('selectedRowId', row.id);
+                      }}
+                    />
                   </div>
                 ))}
               </div>

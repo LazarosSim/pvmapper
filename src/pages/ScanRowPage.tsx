@@ -8,7 +8,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -45,15 +44,16 @@ const ScanRowPage = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  const focusInput = () => {
-    if (inputRef.current) {
-      setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.focus();
-        }
-      }, 100);
+  // Save selected row and park to localStorage for consistent navigation
+  useEffect(() => {
+    if (rowId && rows.some(r => r.id === rowId)) {
+      localStorage.setItem('selectedRowId', rowId);
+      const row = getRowById(rowId);
+      if (row) {
+        localStorage.setItem('selectedParkId', row.parkId);
+      }
     }
-  };
+  }, [rowId, rows, getRowById]);
 
   useEffect(() => {
     if (rowId) {
@@ -73,6 +73,18 @@ const ScanRowPage = () => {
   }
 
   if (!rowId || !rows.some(r => r.id === rowId)) {
+    // Try to get remembered row from localStorage
+    const rememberedRowId = localStorage.getItem('selectedRowId');
+    if (rememberedRowId && rows.some(r => r.id === rememberedRowId)) {
+      return <Navigate to={`/scan/row/${rememberedRowId}`} replace />;
+    }
+    
+    // If no remembered row, try to get remembered park
+    const rememberedParkId = localStorage.getItem('selectedParkId');
+    if (rememberedParkId) {
+      return <Navigate to={`/scan/park/${rememberedParkId}`} replace />;
+    }
+    
     return <Navigate to="/scan" replace />;
   }
 

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -118,13 +117,19 @@ const ParkCard: React.FC<ParkCardProps> = ({
     }
   };
 
+  const handleOpenPark = () => {
+    // Store selected park ID in localStorage for navigation syncing
+    localStorage.setItem('selectedParkId', park.id);
+    navigate(`/park/${park.id}`);
+  };
+
   const isManager = currentUser?.role === 'manager';
 
   return <>
     <Card className="mb-4 hover:shadow-md transition-shadow glass-card relative overflow-hidden">
-      {/* Semi-transparent background image layer */}
+      {/* Semi-transparent background image layer - increased opacity to 50% */}
       <div 
-        className="absolute inset-0 bg-cover bg-center opacity-10 z-0" 
+        className="absolute inset-0 bg-cover bg-center opacity-50 z-0" 
         style={{ 
           backgroundImage: `url(https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/XPcanvas.png)` 
         }} 
@@ -181,7 +186,7 @@ const ParkCard: React.FC<ParkCardProps> = ({
             <span className="mx-2 text-muted-foreground">•</span>
             <span className="text-sm font-medium">{barcodeCount} Barcodes</span>
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate(`/park/${park.id}`)} className="bg-inventory-secondary/10 text-inventory-secondary hover:bg-inventory-secondary/20 border-inventory-secondary/30">
+          <Button variant="outline" size="sm" onClick={handleOpenPark} className="bg-inventory-secondary/10 text-inventory-secondary hover:bg-inventory-secondary/20 border-inventory-secondary/30">
             <FolderOpen className="mr-2 h-4 w-4" />
             Open
           </Button>

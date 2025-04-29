@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -20,8 +19,17 @@ const ScanPage = () => {
   // Check for remembered park when component mounts
   useEffect(() => {
     const rememberedParkId = localStorage.getItem('selectedParkId');
+    // If we have a selected park in localStorage and it exists in our parks list
     if (rememberedParkId && parks.some(p => p.id === rememberedParkId)) {
-      navigate(`/scan/park/${rememberedParkId}`, { replace: true });
+      // Also check if there's a selected row
+      const rememberedRowId = localStorage.getItem('selectedRowId');
+      if (rememberedRowId) {
+        // Navigate to the row scanning page if we have a selected row
+        navigate(`/scan/row/${rememberedRowId}`, { replace: true });
+      } else {
+        // Otherwise just navigate to the park scanning page
+        navigate(`/scan/park/${rememberedParkId}`, { replace: true });
+      }
     }
   }, [parks, navigate]);
 
@@ -44,7 +52,10 @@ const ScanPage = () => {
               <Button 
                 variant="outline" 
                 className="w-full"
-                onClick={() => navigate(`/scan/park/${park.id}`)}
+                onClick={() => {
+                  localStorage.setItem('selectedParkId', park.id);
+                  navigate(`/scan/park/${park.id}`);
+                }}
               >
                 <FolderOpen className="mr-2 h-4 w-4" />
                 Select Park

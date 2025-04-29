@@ -2,6 +2,7 @@
 import React from 'react';
 import Header from './header';
 import BottomNav from './bottom-nav';
+import XPLogo from './xp-logo';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -28,6 +29,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title, showBack, titleAction 
       <main className="flex-1 p-4 pb-20 overflow-y-auto bg-gradient-to-b from-white to-gray-50">
         {children}
       </main>
+      <XPLogo />
       <BottomNav />
     </div>
   );
