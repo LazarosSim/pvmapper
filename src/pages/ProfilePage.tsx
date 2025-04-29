@@ -30,7 +30,7 @@ const ProfilePage = () => {
     navigate('/login');
   };
 
-  const achievements = [
+  //const achievements = [
     {
       icon: Trophy,
       title: "Speed Scanner",
@@ -38,13 +38,13 @@ const ProfilePage = () => {
       count: dailyScans,
       target: 600,
     },
-    {
+   // {
       icon: Star,
       title: "Pattern Finder",
       description: "Find barcodes with 4 consecutive identical digits",
       count: 0,
     },
-    {
+  //  {
       icon: Medal,
       title: "Straight Spotter",
       description: "Find barcodes with a 5-digit straight sequence",
