@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 
@@ -12,49 +12,9 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction }) => {
   const navigate = useNavigate();
-  const location = useLocation();
   
   const handleBackClick = () => {
-    // Special handling for navigation between scan flows
-    if (location.pathname === '/scan' || location.pathname === '/scan/') {
-      navigate('/');
-      return;
-    }
-    
-    if (location.pathname.startsWith('/scan/park/')) {
-      // When in a scan park page, navigate back to scan selection
-      navigate('/scan');
-      return;
-    }
-    
-    if (location.pathname.startsWith('/scan/row/')) {
-      // Extract parkId from localStorage
-      const rememberedParkId = localStorage.getItem('selectedParkId');
-      if (rememberedParkId) {
-        navigate(`/scan/park/${rememberedParkId}`);
-        return;
-      }
-      // Fallback if no parkId in localStorage
-      navigate('/scan');
-      return;
-    }
-    
-    // Special handling for navigation between main flows
-    if (location.pathname.startsWith('/park/')) {
-      navigate('/');
-      return;
-    }
-    
-    if (location.pathname.startsWith('/row/')) {
-      // Extract parkId from localStorage
-      const rememberedParkId = localStorage.getItem('selectedParkId');
-      if (rememberedParkId) {
-        navigate(`/park/${rememberedParkId}`);
-        return;
-      }
-    }
-    
-    // Default behavior
+    // Simplified navigation - just go back one step
     navigate(-1);
   };
   

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
 import { useDB } from '@/lib/db-provider';
@@ -21,21 +22,7 @@ const ScanParkPage = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Save selected park to localStorage and clear row selection
-  useEffect(() => {
-    if (parkId) {
-      localStorage.setItem('selectedParkId', parkId);
-      // We're at park level, so clear any row selection
-      localStorage.removeItem('selectedRowId');
-    }
-  }, [parkId]);
-
   if (!parkId || !parks.some(p => p.id === parkId)) {
-    // Try to get remembered park from localStorage
-    const rememberedParkId = localStorage.getItem('selectedParkId');
-    if (rememberedParkId && parks.some(p => p.id === rememberedParkId)) {
-      return <Navigate to={`/scan/park/${rememberedParkId}`} replace />;
-    }
     return <Navigate to="/scan" replace />;
   }
 
@@ -68,9 +55,6 @@ const ScanParkPage = () => {
   };
   
   const handleSelectRow = (rowId: string) => {
-    // Save both park and row ID for consistent navigation
-    localStorage.setItem('selectedParkId', parkId);
-    localStorage.setItem('selectedRowId', rowId);
     navigate(`/scan/row/${rowId}`);
   };
   
