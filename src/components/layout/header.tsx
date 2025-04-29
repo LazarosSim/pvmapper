@@ -16,7 +16,13 @@ const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction })
   
   const handleBackClick = () => {
     // Special handling for navigation between scan flows
+    if (location.pathname === '/scan' || location.pathname === '/scan/') {
+      navigate('/');
+      return;
+    }
+    
     if (location.pathname.startsWith('/scan/park/')) {
+      // When in a scan park page, navigate back to scan selection
       navigate('/scan');
       return;
     }
@@ -28,6 +34,9 @@ const Header: React.FC<HeaderProps> = ({ title, showBack = false, titleAction })
         navigate(`/scan/park/${rememberedParkId}`);
         return;
       }
+      // Fallback if no parkId in localStorage
+      navigate('/scan');
+      return;
     }
     
     // Special handling for navigation between main flows

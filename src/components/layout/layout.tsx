@@ -26,7 +26,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title, showBack, titleAction 
         showBack={showBack} 
         titleAction={titleAction} 
       />
-      <main className="flex-1 p-4 pb-20 overflow-y-auto bg-gradient-to-b from-white to-gray-50">
+      <main className="flex-1 p-4 pb-20 overflow-y-auto bg-gradient-to-b from-[#E8F4FF] to-[#D3EAFF]">
         {children}
       </main>
       <XPLogo />
