@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useDB } from '@/lib/db-provider';
@@ -7,11 +6,10 @@ import RowCard from '@/components/rows/row-card';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import type { Row } from '@/lib/db-provider';
 
 const ParkDetail = () => {
   const { parkId } = useParams<{ parkId: string }>();
-  const { parks, getRowsByParkId, getParkById, addRow, addSubRow } = useDB();
+  const { parks, getRowsByParkId, getParkById, addRow } = useDB();
   const [searchQuery, setSearchQuery] = useState('');
 
   if (!parkId || !parks.some(p => p.id === parkId)) {
@@ -27,10 +25,6 @@ const ParkDetail = () => {
 
   const handleAddRow = async () => {
     await addRow(parkId, false);
-  };
-  
-  const handleAddSubRow = async (parentRowId: string) => {
-    await addSubRow(parentRowId);
   };
 
   const groupRows = () => {
@@ -88,7 +82,7 @@ const ParkDetail = () => {
               <div className="flex flex-wrap gap-4">
                 {rowGroups[groupKey].map(row => (
                   <div key={row.id} className="w-full md:w-auto flex-grow">
-                    <RowCard row={row} onAddSubRow={handleAddSubRow} />
+                    <RowCard row={row} />
                   </div>
                 ))}
               </div>

@@ -557,11 +557,8 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     const hasSubRows = relatedRows.some(row => row.name.includes('_'));
     
     if (!hasSubRows && originalRow.name === `Row ${rowNumber}`) {
-      // Rename original row to Row X_a first
+      // Rename original row to Row X_a
       await updateRow(originalRow.id, `Row ${rowNumber}_a`);
-      
-      // Add the newly renamed row to our relatedRows array
-      relatedRows.push({...originalRow, name: `Row ${rowNumber}_a`});
     }
     
     // Determine the next suffix letter to use
@@ -725,7 +722,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
           
         if (scanData) {
           // Subtract the count - this can result in negative values
-          const newCount = Math.max(scanData.count - count, -999999);
+          const newCount = scanData.count - count;
           
           await supabase
             .from('daily_scans')
