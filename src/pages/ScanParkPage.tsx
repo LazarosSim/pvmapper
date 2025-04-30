@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -29,7 +28,6 @@ const ScanParkPage = () => {
   const { parks, getRowsByParkId, getParkById, addRow, countBarcodesInRow, addSubRow, isManager } = useDB();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const [isAddRowDialogOpen, setIsAddRowDialogOpen] = useState(false);
   const [isAddSubRowDialogOpen, setIsAddSubRowDialogOpen] = useState(false);
   const [selectedParentRowId, setSelectedParentRowId] = useState<string | null>(null);
   const [expectedBarcodes, setExpectedBarcodes] = useState<string>('');
@@ -47,16 +45,8 @@ const ScanParkPage = () => {
 
   const handleAddRow = async () => {
     try {
-      setIsAddRowDialogOpen(false);
-      
-      // Parse expected barcodes or set to undefined if empty
-      const expectedBarcodesValue = expectedBarcodes.trim() 
-        ? parseInt(expectedBarcodes, 10) 
-        : undefined;
-      
-      // Add row without automatic navigation
-      await addRow(parkId, expectedBarcodesValue, false);
-      setExpectedBarcodes('');
+      // In ScanParkPage, add row without asking for expected barcodes
+      await addRow(parkId, undefined, false);
     } catch (error) {
       console.error("Error adding row:", error);
     }
@@ -204,7 +194,7 @@ const ScanParkPage = () => {
         
         <div className="pt-4">
           <Button 
-            onClick={() => setIsAddRowDialogOpen(true)}
+            onClick={handleAddRow}
             className="w-full"
           >
             <Plus className="mr-2 h-4 w-4" />
@@ -212,41 +202,6 @@ const ScanParkPage = () => {
           </Button>
         </div>
       </div>
-
-      {/* Dialog for adding a new row */}
-      <Dialog open={isAddRowDialogOpen} onOpenChange={setIsAddRowDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Row</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="expected-barcodes">Expected Barcodes</Label>
-              <Input
-                id="expected-barcodes"
-                type="number"
-                min="0"
-                value={expectedBarcodes}
-                onChange={(e) => setExpectedBarcodes(e.target.value)}
-                placeholder="Leave empty for unlimited"
-                className="w-full"
-                autoFocus
-              />
-              <p className="text-xs text-muted-foreground">
-                Set the maximum number of barcodes for this row. Leave empty for unlimited.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddRowDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddRow}>
-              Add Row
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Dialog for adding a subrow */}
       <Dialog open={isAddSubRowDialogOpen} onOpenChange={setIsAddSubRowDialogOpen}>

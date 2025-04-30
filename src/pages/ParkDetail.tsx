@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useDB } from '@/lib/db-provider';
@@ -8,11 +7,21 @@ import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import type { Row } from '@/lib/types/db-types';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from '@/components/ui/label';
 
 const ParkDetail = () => {
   const { parkId } = useParams<{ parkId: string }>();
   const { parks, getRowsByParkId, getParkById, addRow } = useDB();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isAddRowDialogOpen, setIsAddRowDialogOpen] = useState(false);
+  const [expectedBarcodes, setExpectedBarcodes] = useState<string>('');
 
   // Save selected park to localStorage and clear row selection
   // This ensures consistency between HomePage and ScanPage navigation
@@ -40,9 +49,25 @@ const ParkDetail = () => {
     row.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const handleOpenAddDialog = () => {
+    setExpectedBarcodes('');
+    setIsAddRowDialogOpen(true);
+  };
+
   const handleAddRow = async () => {
-    // Fix: passing undefined instead of false for the expectedBarcodes parameter
-    await addRow(parkId, undefined);
+    try {
+      setIsAddRowDialogOpen(false);
+      
+      // Parse expected barcodes or set to undefined if empty
+      const expectedBarcodesValue = expectedBarcodes.trim() 
+        ? parseInt(expectedBarcodes, 10) 
+        : undefined;
+      
+      await addRow(parkId, expectedBarcodesValue);
+      setExpectedBarcodes('');
+    } catch (error) {
+      console.error("Error adding row:", error);
+    }
   };
 
   const groupRows = () => {
@@ -122,11 +147,46 @@ const ParkDetail = () => {
         )}
         
         <Button 
-          onClick={handleAddRow}
+          onClick={handleOpenAddDialog}
           className="fixed bottom-20 right-4 rounded-full w-14 h-14 shadow-lg bg-inventory-primary hover:bg-inventory-primary/90"
         >
           <Plus className="h-6 w-6" />
         </Button>
+
+        {/* Dialog for adding a new row with expected barcodes */}
+        <Dialog open={isAddRowDialogOpen} onOpenChange={setIsAddRowDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Row</DialogTitle>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="expected-barcodes">Expected Barcodes</Label>
+                <Input
+                  id="expected-barcodes"
+                  type="number"
+                  min="0"
+                  value={expectedBarcodes}
+                  onChange={(e) => setExpectedBarcodes(e.target.value)}
+                  placeholder="Leave empty for unlimited"
+                  className="w-full"
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground">
+                  Set the maximum number of barcodes for this row. Leave empty for unlimited.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAddRowDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddRow}>
+                Add Row
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
