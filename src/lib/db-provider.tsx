@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useSupabase } from './supabase-provider';
 import { toast } from 'sonner';
@@ -109,13 +108,15 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     // Rows
     rows,
     getRowsByParkId,
-    addRow,
+    addRow: (parkId, expectedBarcodes, navigate) => 
+      addRow(parkId, expectedBarcodes, navigate),
     deleteRow,
     updateRow,
     getRowById,
     resetRow,
     countBarcodesInRow,
-    addSubRow,
+    addSubRow: (rowId, expectedBarcodes) => 
+      addSubRow(rowId, expectedBarcodes),
     
     // Barcodes
     barcodes,

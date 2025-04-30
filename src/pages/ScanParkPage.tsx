@@ -15,12 +15,24 @@ import { FolderOpen, Plus, Search, ArrowDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import type { Row } from '@/lib/types/db-types';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from '@/components/ui/label';
 
 const ScanParkPage = () => {
   const { parkId } = useParams<{ parkId: string }>();
-  const { parks, getRowsByParkId, getParkById, addRow, countBarcodesInRow, addSubRow } = useDB();
+  const { parks, getRowsByParkId, getParkById, addRow, countBarcodesInRow, addSubRow, isManager } = useDB();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isAddRowDialogOpen, setIsAddRowDialogOpen] = useState(false);
+  const [isAddSubRowDialogOpen, setIsAddSubRowDialogOpen] = useState(false);
+  const [selectedParentRowId, setSelectedParentRowId] = useState<string | null>(null);
+  const [expectedBarcodes, setExpectedBarcodes] = useState<string>('');
 
   if (!parkId || !parks.some(p => p.id === parkId)) {
     return <Navigate to="/scan" replace />;
@@ -35,19 +47,39 @@ const ScanParkPage = () => {
 
   const handleAddRow = async () => {
     try {
+      setIsAddRowDialogOpen(false);
+      
+      // Parse expected barcodes or set to undefined if empty
+      const expectedBarcodesValue = expectedBarcodes.trim() 
+        ? parseInt(expectedBarcodes, 10) 
+        : undefined;
+      
       // Add row without automatic navigation
-      await addRow(parkId, false);
+      await addRow(parkId, expectedBarcodesValue, false);
+      setExpectedBarcodes('');
     } catch (error) {
       console.error("Error adding row:", error);
     }
   };
 
-  const handleAddSubRow = async (parentRowId: string) => {
+  const handleAddSubRow = async () => {
     try {
-      const newRow = await addSubRow(parentRowId);
-      if (newRow) {
-        toast.success(`Added subrow ${newRow.name}`);
+      setIsAddSubRowDialogOpen(false);
+      
+      if (selectedParentRowId) {
+        // Parse expected barcodes or set to undefined if empty
+        const expectedBarcodesValue = expectedBarcodes.trim() 
+          ? parseInt(expectedBarcodes, 10) 
+          : undefined;
+        
+        const newRow = await addSubRow(selectedParentRowId, expectedBarcodesValue);
+        if (newRow) {
+          toast.success(`Added subrow ${newRow.name}`);
+        }
       }
+      
+      setExpectedBarcodes('');
+      setSelectedParentRowId(null);
     } catch (error) {
       console.error("Error adding subrow:", error);
       toast.error("Failed to add subrow");
@@ -56,6 +88,12 @@ const ScanParkPage = () => {
   
   const handleSelectRow = (rowId: string) => {
     navigate(`/scan/row/${rowId}`);
+  };
+  
+  const openAddSubRowDialog = (parentRowId: string) => {
+    setSelectedParentRowId(parentRowId);
+    setExpectedBarcodes('');
+    setIsAddSubRowDialogOpen(true);
   };
   
   // Group rows by their base number for display
@@ -125,7 +163,7 @@ const ScanParkPage = () => {
                           <div className="flex justify-between items-center">
                             <CardTitle className="text-lg font-semibold">{row.name}</CardTitle>
                             <span className="text-sm text-muted-foreground">
-                              {countBarcodesInRow(row.id)} barcodes
+                              {countBarcodesInRow(row.id)} {row.expectedBarcodes ? `/ ${row.expectedBarcodes}` : ''} barcodes
                             </span>
                           </div>
                           <CardDescription>
@@ -144,7 +182,7 @@ const ScanParkPage = () => {
                           <Button
                             variant="ghost"
                             className="w-full"
-                            onClick={() => handleAddSubRow(row.id)}
+                            onClick={() => openAddSubRowDialog(row.id)}
                           >
                             <ArrowDown className="mr-2 h-4 w-4" />
                             Add Subrow
@@ -166,7 +204,7 @@ const ScanParkPage = () => {
         
         <div className="pt-4">
           <Button 
-            onClick={handleAddRow}
+            onClick={() => setIsAddRowDialogOpen(true)}
             className="w-full"
           >
             <Plus className="mr-2 h-4 w-4" />
@@ -174,6 +212,76 @@ const ScanParkPage = () => {
           </Button>
         </div>
       </div>
+
+      {/* Dialog for adding a new row */}
+      <Dialog open={isAddRowDialogOpen} onOpenChange={setIsAddRowDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Row</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="expected-barcodes">Expected Barcodes</Label>
+              <Input
+                id="expected-barcodes"
+                type="number"
+                min="0"
+                value={expectedBarcodes}
+                onChange={(e) => setExpectedBarcodes(e.target.value)}
+                placeholder="Leave empty for unlimited"
+                className="w-full"
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                Set the maximum number of barcodes for this row. Leave empty for unlimited.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddRowDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddRow}>
+              Add Row
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for adding a subrow */}
+      <Dialog open={isAddSubRowDialogOpen} onOpenChange={setIsAddSubRowDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Subrow</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="subrow-expected-barcodes">Expected Barcodes</Label>
+              <Input
+                id="subrow-expected-barcodes"
+                type="number"
+                min="0"
+                value={expectedBarcodes}
+                onChange={(e) => setExpectedBarcodes(e.target.value)}
+                placeholder="Leave empty for unlimited"
+                className="w-full"
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                Set the maximum number of barcodes for this subrow. Leave empty for unlimited.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddSubRowDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddSubRow}>
+              Add Subrow
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };

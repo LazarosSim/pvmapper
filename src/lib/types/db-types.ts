@@ -1,4 +1,3 @@
-
 // Type definitions for the database provider
 
 // User type
@@ -25,6 +24,7 @@ export type Row = {
   name: string;
   parkId: string;
   createdAt: string;
+  expectedBarcodes?: number | null;
 };
 
 // Barcode type
@@ -79,13 +79,13 @@ export type DBContextType = {
   // Rows
   rows: Row[];
   getRowsByParkId: (parkId: string) => Row[];
-  addRow: (parkId: string, navigate?: boolean) => Promise<Row | null>;
+  addRow: (parkId: string, expectedBarcodes?: number, navigate?: boolean) => Promise<Row | null>;
   deleteRow: (rowId: string) => Promise<void>;
-  updateRow: (rowId: string, name: string) => Promise<void>;
+  updateRow: (rowId: string, name: string, expectedBarcodes?: number) => Promise<void>;
   getRowById: (rowId: string) => Row | undefined;
   resetRow: (rowId: string) => Promise<void>;
   countBarcodesInRow: (rowId: string) => number;
-  addSubRow: (rowId: string) => Promise<Row | null>;
+  addSubRow: (rowId: string, expectedBarcodes?: number) => Promise<Row | null>;
   
   // Barcodes
   barcodes: Barcode[];

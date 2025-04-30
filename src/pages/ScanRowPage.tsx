@@ -111,6 +111,18 @@ const ScanRowPage = () => {
       const row = getRowById(rowId);
       const park = row ? getParkById(row.parkId) : undefined;
       
+      // Check if the row has reached its expected barcode limit
+      if (row?.expectedBarcodes !== undefined && row.expectedBarcodes !== null) {
+        const currentCount = countBarcodesInRow(rowId);
+        if (currentCount >= row.expectedBarcodes) {
+          playErrorSound();
+          toast.error(`Maximum barcode limit reached (${row.expectedBarcodes}). Cannot add more barcodes to this row.`);
+          setBarcodeInput('');
+          focusInput();
+          return;
+        }
+      }
+      
       if (park?.validateBarcodeLength) {
         const length = barcodeInput.trim().length;
         if (length < 19 || length > 26) {
@@ -248,7 +260,7 @@ const ScanRowPage = () => {
               </CardTitle>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium bg-secondary px-3 py-1 rounded-full">
-                  {totalBarcodes} barcodes
+                  {totalBarcodes} {row?.expectedBarcodes ? `/ ${row.expectedBarcodes}` : ''} barcodes
                 </span>
                 <Button 
                   variant="outline" 
@@ -267,6 +279,7 @@ const ScanRowPage = () => {
             </div>
             <CardDescription>
               Scan or enter a barcode to add it to this row
+              {row?.expectedBarcodes ? ` (max: ${row.expectedBarcodes})` : ''}
             </CardDescription>
           </CardHeader>
           <form onSubmit={(e) => {

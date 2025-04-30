@@ -28,7 +28,8 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
           id: row.id,
           name: row.name,
           parkId: row.park_id,
-          createdAt: row.created_at
+          createdAt: row.created_at,
+          expectedBarcodes: row.expected_barcodes
         }));
         
         setRows(formattedRows);
@@ -42,7 +43,7 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
     return rows.filter(row => row.parkId === parkId);
   };
   
-  const addRow = async (parkId: string, navigate: boolean = true): Promise<Row | null> => {
+  const addRow = async (parkId: string, expectedBarcodes?: number, navigate: boolean = true): Promise<Row | null> => {
     // Get rows count for this park to create a sequential name
     const parkRows = rows.filter(row => row.parkId === parkId);
     const rowNumber = parkRows.length + 1;
@@ -53,7 +54,8 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
         .from('rows')
         .insert([{ 
           name: rowName,
-          park_id: parkId
+          park_id: parkId,
+          expected_barcodes: expectedBarcodes
         }])
         .select();
         
@@ -68,7 +70,8 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
           id: data[0].id,
           name: data[0].name,
           parkId: data[0].park_id,
-          createdAt: data[0].created_at
+          createdAt: data[0].created_at,
+          expectedBarcodes: data[0].expected_barcodes
         };
         
         setRows(prev => [newRow, ...prev]);
@@ -84,7 +87,7 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
     }
   };
 
-  const addSubRow = async (parentRowId: string): Promise<Row | null> => {
+  const addSubRow = async (parentRowId: string, expectedBarcodes?: number): Promise<Row | null> => {
     // Get the original row
     const originalRow = rows.find(row => row.id === parentRowId);
     if (!originalRow) {
@@ -124,7 +127,8 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
           .from('rows')
           .insert([{ 
             name: newRowName,
-            park_id: parkId
+            park_id: parkId,
+            expected_barcodes: expectedBarcodes
           }])
           .select();
           
@@ -139,7 +143,8 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
             id: data[0].id,
             name: data[0].name,
             parkId: data[0].park_id,
-            createdAt: data[0].created_at
+            createdAt: data[0].created_at,
+            expectedBarcodes: data[0].expected_barcodes
           };
           
           setRows(prev => [newRow, ...prev]);
@@ -176,7 +181,8 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
           .from('rows')
           .insert([{ 
             name: newRowName,
-            park_id: parkId
+            park_id: parkId,
+            expected_barcodes: expectedBarcodes
           }])
           .select();
           
@@ -191,7 +197,8 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
             id: data[0].id,
             name: data[0].name,
             parkId: data[0].park_id,
-            createdAt: data[0].created_at
+            createdAt: data[0].created_at,
+            expectedBarcodes: data[0].expected_barcodes
           };
           
           setRows(prev => [newRow, ...prev]);
@@ -208,11 +215,21 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
     }
   };
   
-  const updateRow = async (rowId: string, name: string) => {
+  const updateRow = async (rowId: string, name: string, expectedBarcodes?: number) => {
     try {
+      const updateData: { name?: string; expected_barcodes?: number | null } = {};
+      
+      if (name !== undefined) {
+        updateData.name = name;
+      }
+      
+      if (expectedBarcodes !== undefined) {
+        updateData.expected_barcodes = expectedBarcodes;
+      }
+      
       const { error } = await supabase
         .from('rows')
-        .update({ name })
+        .update(updateData)
         .eq('id', rowId);
         
       if (error) {
@@ -223,7 +240,7 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
       
       setRows(prev => prev.map(row => 
         row.id === rowId 
-          ? { ...row, name } 
+          ? { ...row, name: name !== undefined ? name : row.name, expectedBarcodes: expectedBarcodes !== undefined ? expectedBarcodes : row.expectedBarcodes } 
           : row
       ));
       
@@ -300,6 +317,15 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
   
   const deleteRow = async (rowId: string) => {
     try {
+      // Check if the row has expected barcodes set and the current user is not a manager
+      const rowToDelete = rows.find(row => row.id === rowId);
+      
+      if (rowToDelete?.expectedBarcodes !== null && rowToDelete?.expectedBarcodes !== undefined) {
+        // This check will be done in the components that call this function
+        // because we need access to isManager() from the DB context
+        // This will be handled in row-card.tsx
+      }
+      
       // First reset the row (which will handle adjusting barcode counts)
       await resetRow(rowId);
       

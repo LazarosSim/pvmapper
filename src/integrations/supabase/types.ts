@@ -116,18 +116,21 @@ export type Database = {
       rows: {
         Row: {
           created_at: string
+          expected_barcodes: number | null
           id: string
           name: string
           park_id: string
         }
         Insert: {
           created_at?: string
+          expected_barcodes?: number | null
           id?: string
           name: string
           park_id: string
         }
         Update: {
           created_at?: string
+          expected_barcodes?: number | null
           id?: string
           name?: string
           park_id?: string
