@@ -9,7 +9,7 @@ import { LogOut, BarChart3, User, Award, Star, Trophy, Medal } from 'lucide-reac
 import { formatDistanceToNow } from 'date-fns';
 
 const ProfilePage = () => {
-  const { currentUser, logout, getUserDailyScans, getUserTotalScans, getUserBarcodesScanned, barcodes } = useDB();
+  const { currentUser, logout, getUserDailyScans, getUserTotalScans, getUserBarcodesScanned } = useDB();
   const navigate = useNavigate();
 
   React.useEffect(() => {
@@ -22,10 +22,11 @@ const ProfilePage = () => {
     return null;
   }
 
-  // Pass the current user's ID to correctly count the scans
+  // Call the functions without passing arguments as they're wrapper functions
+  // that internally use the current user's ID
   const dailyScans = getUserDailyScans();
-  const totalScans = getUserTotalScans(currentUser.id, barcodes);
-  const recentBarcodes = getUserBarcodesScanned(currentUser.id, barcodes).slice(0, 5);
+  const totalScans = getUserTotalScans();
+  const recentBarcodes = getUserBarcodesScanned().slice(0, 5);
 
   const handleLogout = () => {
     logout();
