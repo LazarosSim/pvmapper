@@ -124,7 +124,9 @@ export const useStats = () => {
   
   const getUserBarcodesScanned = (userId: string, barcodes: Barcode[]): Barcode[] => {
     if (!userId) return [];
-    return barcodes.filter(barcode => barcode.userId === userId);
+    return barcodes
+      .filter(barcode => barcode.userId === userId)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   };
   
   const getAllUserStats = (

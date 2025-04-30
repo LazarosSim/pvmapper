@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -8,7 +9,7 @@ import { LogOut, BarChart3, User, Award, Star, Trophy, Medal } from 'lucide-reac
 import { formatDistanceToNow } from 'date-fns';
 
 const ProfilePage = () => {
-  const { currentUser, logout, getUserDailyScans, getUserTotalScans, getUserBarcodesScanned } = useDB();
+  const { currentUser, logout, getUserDailyScans, getUserTotalScans, getUserBarcodesScanned, barcodes } = useDB();
   const navigate = useNavigate();
 
   React.useEffect(() => {
@@ -21,9 +22,10 @@ const ProfilePage = () => {
     return null;
   }
 
+  // Pass the current user's ID to correctly count the scans
   const dailyScans = getUserDailyScans();
-  const totalScans = getUserTotalScans();
-  const recentBarcodes = getUserBarcodesScanned().slice(0, 5);
+  const totalScans = getUserTotalScans(currentUser.id, barcodes);
+  const recentBarcodes = getUserBarcodesScanned(currentUser.id, barcodes).slice(0, 5);
 
   const handleLogout = () => {
     logout();

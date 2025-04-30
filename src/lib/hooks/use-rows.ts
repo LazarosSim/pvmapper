@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -280,8 +281,8 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
           .maybeSingle();
           
         if (scanData) {
-          // Subtract the count - this can result in negative values
-          const newCount = scanData.count - count;
+          // Subtract the count and allow negative values
+          const newCount = Math.max(scanData.count - count, -999999);  // Set a reasonable lower bound
           
           await supabase
             .from('daily_scans')

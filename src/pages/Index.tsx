@@ -9,13 +9,16 @@ import CreateParkDialog from '@/components/dialog/create-park-dialog';
 import { Input } from '@/components/ui/input';
 
 const Index = () => {
-  const { parks } = useDB();
+  const { parks, currentUser, isManager } = useDB();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredParks = parks ? parks.filter(park => 
     park.name.toLowerCase().includes(searchQuery.toLowerCase())
   ) : [];
+
+  // Check if the user is a manager
+  const isUserManager = isManager();
 
   return (
     <Layout title={
@@ -54,12 +57,15 @@ const Index = () => {
           )}
         </div>
         
-        <Button 
-          onClick={() => setIsDialogOpen(true)}
-          className="fixed bottom-20 right-4 rounded-full w-14 h-14 shadow-lg bg-gradient-to-r from-xpenergy-primary to-xpenergy-secondary hover:from-xpenergy-primary/90 hover:to-xpenergy-secondary/90 transition-all duration-300"
-        >
-          <Plus className="h-6 w-6" />
-        </Button>
+        {/* Only show the add park button to managers */}
+        {isUserManager && (
+          <Button 
+            onClick={() => setIsDialogOpen(true)}
+            className="fixed bottom-20 right-4 rounded-full w-14 h-14 shadow-lg bg-gradient-to-r from-xpenergy-primary to-xpenergy-secondary hover:from-xpenergy-primary/90 hover:to-xpenergy-secondary/90 transition-all duration-300"
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        )}
         
         <CreateParkDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
       </div>
