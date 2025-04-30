@@ -41,7 +41,8 @@ const ParkDetail = () => {
   );
 
   const handleAddRow = async () => {
-    await addRow(parkId, false);
+    // Fix: passing undefined instead of false for the expectedBarcodes parameter
+    await addRow(parkId, undefined);
   };
 
   const groupRows = () => {
