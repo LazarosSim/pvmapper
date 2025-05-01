@@ -3,8 +3,6 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
 import { useDB } from '@/lib/db-provider';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Card,
   CardContent,
@@ -13,38 +11,33 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from 'sonner';
-import { Barcode, RotateCcw, Edit, Check, X, Loader2, ArrowRight } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import AuthGuard from '@/components/auth/auth-guard';
-import useSoundEffects from '@/hooks/use-sound-effects';
+import BarcodeScanInput from '@/components/scan/BarcodeScanInput';
+import RecentScans from '@/components/scan/RecentScans';
+import ResetRowDialog from '@/components/scan/ResetRowDialog';
+import RowHeader from '@/components/scan/RowHeader';
 
+// Audio notification for success/error
 const NOTIF_SOUND = "data:audio/wav;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAFAAAGUACFhYWFhYWFhYWFhYWFhYWFhYWFra2tra2tra2tra2tra2tra2traOjo6Ojo6Ojo6Ojo6Ojo6Ojo6P///////////////////////////////////////////wAAADJMQVNNRTMuOTlyAc0AAAAAAAAAABSAJAJAQgAAgAAAA+aieizgAAAAAAAAAAAAAAAAAAAA//uQZAAAApEGUFUGAAArIMoKoMAABZAZnW40AAClAzOtxpgALEwy1AAAAAEVf7kGQRmBmD3QEAgEDhnePhI/JH4iByB+SPxA/IH5gQB+IPzAQA+TAMDhOIPA/IEInjB4P4fn///jHJ+T/ngfgYAgEAgEAgEAgg5nwuZIuZw5QmCvG0Ooy0JtC2CnAp1vdSlLMuOQylYZl0LERgAAAAAAlMy5z3O+n//zTjN/9/+Z//O//9y5/8ud/z//5EHL/D+KDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDEppqampqampqampqampqampqampqampqampqampqamgAAA//tQZAAAAtAeUqsMAARfA7pVYYACCUCXPqggAEAAAP8AAAAATEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkYA/wAAB/gAAACAAAD/AAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=";
 
 const ScanRowPage = () => {
   const { rowId } = useParams<{ rowId: string }>();
-  const { rows, getRowById, getParkById, addBarcode, getBarcodesByRowId, countBarcodesInRow, resetRow, currentUser, updateRow } = useDB();
-  const [barcodeInput, setBarcodeInput] = useState('');
-  const [success, setSuccess] = useState<boolean | null>(null);
+  const { 
+    rows, 
+    getRowById, 
+    getParkById, 
+    getBarcodesByRowId, 
+    countBarcodesInRow, 
+    resetRow, 
+    currentUser 
+  } = useDB();
+  
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
-  const [isEditingRowName, setIsEditingRowName] = useState(false);
-  const [rowName, setRowName] = useState('');
   const [isResetting, setIsResetting] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [latestBarcodes, setLatestBarcodes] = useState<any[]>([]);
-  const [totalScannedBarcodes, setTotalScannedBarcodes] = useState(0); // Renamed from totalBarcodes
-  const { playSuccessSound, playErrorSound } = useSoundEffects();
-
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [totalScannedBarcodes, setTotalScannedBarcodes] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Function to focus the input field
   const focusInput = () => {
@@ -102,94 +95,7 @@ const ScanRowPage = () => {
 
   const row = getRowById(rowId);
   const park = row ? getParkById(row.parkId) : undefined;
-  // Use the state variable instead of declaring a new constant
-  // const totalBarcodes = countBarcodesInRow(rowId);
-
   const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
-
-  const registerBarcode = async () => {
-    if (!barcodeInput.trim() || isProcessing) return;
-    
-    try {
-      setIsProcessing(true);
-      
-      const row = getRowById(rowId);
-      const park = row ? getParkById(row.parkId) : undefined;
-      
-      // Check if the row has reached its expected barcode limit
-      if (row?.expectedBarcodes !== undefined && row.expectedBarcodes !== null) {
-        const currentCount = countBarcodesInRow(rowId);
-        if (currentCount >= row.expectedBarcodes) {
-          playErrorSound();
-          toast.error(`Maximum barcode limit reached (${row.expectedBarcodes}). Cannot add more barcodes to this row.`);
-          setBarcodeInput('');
-          focusInput();
-          return;
-        }
-      }
-      
-      if (park?.validateBarcodeLength) {
-        const length = barcodeInput.trim().length;
-        if (length < 19 || length > 26) {
-          playErrorSound();
-          toast.error('Barcode must be between 19 and 26 digits');
-          setBarcodeInput('');
-          focusInput();
-          return;
-        }
-      }
-      
-      const duplicates = getBarcodesByRowId(rowId).filter(b => 
-        b.code.toLowerCase() === barcodeInput.trim().toLowerCase()
-      );
-
-      if (duplicates.length > 0) {
-        playErrorSound();
-        toast.error('Duplicate barcode detected');
-        setBarcodeInput('');
-        focusInput();
-        return;
-      }
-      
-      const result = await addBarcode(barcodeInput.trim(), rowId);
-      
-      if (result !== undefined && result !== null) {
-        setBarcodeInput('');
-        playSuccessSound();
-        toast.success('Barcode added successfully');
-        
-        const updatedBarcodes = [
-          { ...result, timestamp: new Date().toISOString() },
-          ...latestBarcodes.slice(0, 9)
-        ];
-        setLatestBarcodes(updatedBarcodes);
-        // Update the total count when a new barcode is added
-        setTotalScannedBarcodes(prev => prev + 1);
-      } else {
-        playErrorSound();
-        toast.error('Failed to add barcode');
-      }
-    } catch (error) {
-      console.error("Error registering barcode:", error);
-      playErrorSound();
-      toast.error("Failed to add barcode");
-    } finally {
-      setIsProcessing(false);
-      focusInput();
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await registerBarcode();
-  };
-
-  const handleInputKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      await registerBarcode();
-    }
-  };
 
   const handleReset = async () => {
     setIsResetting(true);
@@ -209,163 +115,54 @@ const ScanRowPage = () => {
       focusInput();
     }
   };
-  
-  const startEditingName = () => {
-    if (row) {
-      setRowName(row.name);
-      setIsEditingRowName(true);
-    }
-  };
-  
-  const saveRowName = async () => {
-    if (row && rowName.trim()) {
-      const result = await updateRow(rowId, rowName);
-      if (result !== undefined && result !== null) {
-        toast.success("Row name updated successfully");
-        setIsEditingRowName(false);
-      } else {
-        toast.error("Failed to update row name");
-      }
-    } else {
-      toast.error("Row name cannot be empty");
-    }
-    focusInput();
-  };
 
-  const cancelEditName = () => {
-    setIsEditingRowName(false);
-    focusInput();
+  const handleBarcodeAdded = (barcode: any) => {
+    const updatedBarcodes = [
+      { ...barcode, timestamp: new Date().toISOString() },
+      ...latestBarcodes.slice(0, 9)
+    ];
+    setLatestBarcodes(updatedBarcodes);
+    setTotalScannedBarcodes(prev => prev + 1);
   };
-
-  const titleContent = isEditingRowName ? (
-    <div className="flex items-center space-x-2">
-      <Input
-        value={rowName}
-        onChange={(e) => setRowName(e.target.value)}
-        className="w-40 bg-white text-gray-900 border-gray-300"
-        autoFocus
-      />
-      <Button variant="ghost" size="icon" onClick={saveRowName}>
-        <Check className="h-4 w-4 text-green-500" />
-      </Button>
-      <Button variant="ghost" size="icon" onClick={cancelEditName}>
-        <X className="h-4 w-4 text-red-500" />
-      </Button>
-    </div>
-  ) : (
-    <div className="flex items-center space-x-2">
-      <span>{breadcrumb || 'Scan Barcode'}</span>
-      <Button variant="ghost" size="icon" onClick={startEditingName}>
-        <Edit className="h-4 w-4 text-muted-foreground" />
-      </Button>
-    </div>
-  );
 
   return (
     <AuthGuard>
-      <Layout title={breadcrumb || 'Scan Barcode'} showBack titleAction={titleContent}>
+      <Layout title={breadcrumb || 'Scan Barcode'} showBack>
         <Card className="glass-card">
           <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle className="flex items-center">
-                <Barcode className="mr-2 h-5 w-5 text-inventory-primary" />
-                Scan Barcode
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium bg-secondary px-3 py-1 rounded-full">
-                  {totalScannedBarcodes} {row?.expectedBarcodes ? `/ ${row.expectedBarcodes}` : ''} barcodes
-                </span>
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  onClick={() => setIsResetDialogOpen(true)}
-                  className="text-inventory-secondary hover:bg-inventory-secondary/10 border-inventory-secondary/30"
-                  disabled={isResetting}
-                >
-                  {isResetting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RotateCcw className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
+            <CardTitle className="flex items-center">
+              <RowHeader
+                rowId={rowId}
+                breadcrumb={breadcrumb}
+                totalScannedBarcodes={totalScannedBarcodes}
+                expectedBarcodes={row?.expectedBarcodes}
+                isResetting={isResetting}
+                onResetClick={() => setIsResetDialogOpen(true)}
+                focusInput={focusInput}
+              />
+            </CardTitle>
             <CardDescription>
               Scan or enter a barcode to add it to this row
               {row?.expectedBarcodes ? ` (max: ${row.expectedBarcodes})` : ''}
             </CardDescription>
           </CardHeader>
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            registerBarcode();
-          }}>
-            <CardContent className="space-y-4">
-              <div className="relative">
-                <Input
-                  ref={inputRef}
-                  value={barcodeInput}
-                  onChange={(e) => setBarcodeInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      registerBarcode();
-                    }
-                  }}
-                  placeholder="Scan or enter barcode"
-                  className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30 pr-16"
-                  autoComplete="off"
-                />
-                <Button 
-                  type="submit" 
-                  disabled={!barcodeInput.trim() || isProcessing}
-                  className="absolute right-0 top-0 bg-inventory-primary hover:bg-inventory-primary/90 h-full px-3 text-sm"
-                >
-                  {isProcessing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <span className="flex items-center">
-                      <span className="hidden sm:inline mr-1">Add</span>
-                      <ArrowRight className="h-4 w-4" />
-                    </span>
-                  )}
-                </Button>
-              </div>
-              <audio ref={audioRef} src={NOTIF_SOUND} />
-              {latestBarcodes.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">Recent Scans ({latestBarcodes.length})</h3>
-                  <div className="space-y-1">
-                    {latestBarcodes.map((barcode, index) => (
-                      <div 
-                        key={barcode.id} 
-                        className={`text-sm ${index === 0 ? 'text-foreground font-medium animate-in fade-in slide-in-from-bottom-2' : 'text-muted-foreground'}`}
-                      >
-                        {barcode.code}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </form>
+          <CardContent className="space-y-4">
+            <BarcodeScanInput
+              rowId={rowId}
+              onBarcodeAdded={handleBarcodeAdded}
+              focusInput={focusInput}
+            />
+            <audio ref={audioRef} src={NOTIF_SOUND} />
+            <RecentScans barcodes={latestBarcodes} />
+          </CardContent>
         </Card>
 
-        <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will delete all your scanned barcodes in this row. This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => focusInput()}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleReset} className="bg-destructive text-destructive-foreground">
-                Reset Row
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ResetRowDialog
+          isOpen={isResetDialogOpen}
+          onOpenChange={setIsResetDialogOpen}
+          onReset={handleReset}
+          onCancel={() => focusInput()}
+        />
       </Layout>
     </AuthGuard>
   );
