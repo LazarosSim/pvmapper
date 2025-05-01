@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -39,7 +40,7 @@ const ScanRowPage = () => {
   const [isResetting, setIsResetting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [latestBarcodes, setLatestBarcodes] = useState<any[]>([]);
-  const [totalBarcodes, setTotalBarcodes] = useState(0);
+  const [totalScannedBarcodes, setTotalScannedBarcodes] = useState(0); // Renamed from totalBarcodes
   const { playSuccessSound, playErrorSound } = useSoundEffects();
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -71,7 +72,7 @@ const ScanRowPage = () => {
       setLatestBarcodes(barcodes);
       
       // Update the total barcode count
-      setTotalBarcodes(countBarcodesInRow(rowId));
+      setTotalScannedBarcodes(countBarcodesInRow(rowId));
     }
   }, [rowId, getBarcodesByRowId, countBarcodesInRow]);
 
@@ -101,7 +102,8 @@ const ScanRowPage = () => {
 
   const row = getRowById(rowId);
   const park = row ? getParkById(row.parkId) : undefined;
-  const totalBarcodes = countBarcodesInRow(rowId);
+  // Use the state variable instead of declaring a new constant
+  // const totalBarcodes = countBarcodesInRow(rowId);
 
   const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
 
@@ -161,6 +163,8 @@ const ScanRowPage = () => {
           ...latestBarcodes.slice(0, 9)
         ];
         setLatestBarcodes(updatedBarcodes);
+        // Update the total count when a new barcode is added
+        setTotalScannedBarcodes(prev => prev + 1);
       } else {
         playErrorSound();
         toast.error('Failed to add barcode');
@@ -194,7 +198,7 @@ const ScanRowPage = () => {
       // Clear the local state of barcodes
       setLatestBarcodes([]);
       // Update total count to reflect the reset
-      setTotalBarcodes(0);
+      setTotalScannedBarcodes(0);
       setIsResetDialogOpen(false);
       toast.success('Row reset successfully');
     } catch (error) {
@@ -269,7 +273,7 @@ const ScanRowPage = () => {
               </CardTitle>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium bg-secondary px-3 py-1 rounded-full">
-                  {totalBarcodes} {row?.expectedBarcodes ? `/ ${row.expectedBarcodes}` : ''} barcodes
+                  {totalScannedBarcodes} {row?.expectedBarcodes ? `/ ${row.expectedBarcodes}` : ''} barcodes
                 </span>
                 <Button 
                   variant="outline" 
