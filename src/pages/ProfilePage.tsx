@@ -1,22 +1,32 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
 import { useDB } from '@/lib/db-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { LogOut, BarChart3, User, Award, Star, Trophy, Medal } from 'lucide-react';
+import { LogOut, BarChart3, User, Award, Star, Trophy, Medal, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 const ProfilePage = () => {
-  const { currentUser, logout, getUserDailyScans, getUserTotalScans, getUserBarcodesScanned } = useDB();
+  const { currentUser, logout, getUserDailyScans, getUserTotalScans, getUserBarcodesScanned, barcodes } = useDB();
   const navigate = useNavigate();
+  const [refreshKey, setRefreshKey] = useState(0);
 
   React.useEffect(() => {
     if (!currentUser) {
       navigate('/login');
     }
   }, [currentUser, navigate]);
+  
+  // Set up auto-refresh of stats every 10 seconds
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setRefreshKey(prev => prev + 1);
+    }, 10000);
+    
+    return () => clearInterval(intervalId);
+  }, []);
 
   if (!currentUser) {
     return null;
@@ -27,6 +37,10 @@ const ProfilePage = () => {
   const dailyScans = getUserDailyScans();
   const totalScans = getUserTotalScans();
   const recentBarcodes = getUserBarcodesScanned().slice(0, 5);
+
+  const handleRefresh = () => {
+    setRefreshKey(prev => prev + 1);
+  };
 
   const handleLogout = () => {
     logout();
@@ -79,10 +93,15 @@ const ProfilePage = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <BarChart3 className="mr-2 h-5 w-5" />
-              Your Statistics
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center">
+                <BarChart3 className="mr-2 h-5 w-5" />
+                Your Statistics
+              </CardTitle>
+              <Button variant="ghost" size="icon" onClick={handleRefresh} title="Refresh stats">
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">

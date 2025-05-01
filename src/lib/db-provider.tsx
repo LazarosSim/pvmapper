@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useSupabase } from './supabase-provider';
 import { toast } from 'sonner';
@@ -30,7 +31,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   // Initialize stats module (needed by barcodes)
   const {
     dailyScans, setDailyScans, fetchDailyScans, updateDailyScans,
-    getUserDailyScans, getUserTotalScans, getUserBarcodesScanned,
+    decreaseDailyScans, getUserDailyScans, getUserTotalScans, getUserBarcodesScanned,
     getAllUserStats, getDailyScans, getScansForDateRange
   } = useStats();
   
@@ -47,7 +48,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   const {
     fetchBarcodes, addBarcode, updateBarcode, deleteBarcode,
     getBarcodesByRowId, searchBarcodes, countBarcodesInPark
-  } = useBarcodes(rows, () => updateDailyScans(user?.id));
+  } = useBarcodes(rows, () => updateDailyScans(user?.id), decreaseDailyScans);
   
   // Initialize parks module with dependencies
   const {
@@ -98,9 +99,22 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     
     // Parks
     parks,
-    addPark: (name, expectedBarcodes, validateBarcodeLength) => 
-      addPark(name, expectedBarcodes, validateBarcodeLength, user?.id),
-    deletePark,
+    addPark: (name, expectedBarcodes, validateBarcodeLength) => {
+      // Only allow managers to add parks
+      if (!isManager()) {
+        toast.error('Only managers can add parks');
+        return Promise.resolve(false);
+      }
+      return addPark(name, expectedBarcodes, validateBarcodeLength, user?.id);
+    },
+    deletePark: (parkId) => {
+      // Only allow managers to delete parks
+      if (!isManager()) {
+        toast.error('Only managers can delete parks');
+        return Promise.resolve();
+      }
+      return deletePark(parkId);
+    },
     updatePark,
     getParkById,
     getParkProgress,

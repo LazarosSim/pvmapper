@@ -110,6 +110,45 @@ export const useStats = () => {
     }
   };
 
+  // Function to decrease daily scan count when barcodes are deleted
+  const decreaseDailyScans = async (userId?: string, date?: string, count: number = 1) => {
+    if (!userId || !date) return;
+    
+    try {
+      // Check if entry exists for this date
+      const { data, error } = await supabase
+        .from('daily_scans')
+        .select()
+        .eq('user_id', userId)
+        .eq('date', date)
+        .maybeSingle();
+        
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
+        console.error('Error checking daily scans:', error);
+        return;
+      }
+      
+      if (data) {
+        // Update existing entry - allow it to go negative for accurate tracking
+        const newCount = data.count - count;
+        
+        await supabase
+          .from('daily_scans')
+          .update({ count: newCount })
+          .eq('id', data.id);
+          
+        // Update local data
+        setDailyScans(prev => prev.map(scan => 
+          scan.userId === userId && scan.date === date
+            ? { ...scan, count: newCount } 
+            : scan
+        ));
+      }
+    } catch (error: any) {
+      console.error('Error decreasing daily scans:', error.message);
+    }
+  };
+
   const getUserDailyScans = (userId?: string): number => {
     if (!userId) return 0;
     const today = new Date().toISOString().split('T')[0];
@@ -117,8 +156,10 @@ export const useStats = () => {
     return todayScan?.count || 0;
   };
 
+  // Enhanced to count directly from barcodes instead of using cached value
   const getUserTotalScans = (userId: string, barcodes: Barcode[]): number => {
     if (!userId) return 0;
+    // Count directly from barcodes array for real-time accuracy
     return barcodes.filter(barcode => barcode.userId === userId).length;
   };
   
@@ -284,6 +325,7 @@ export const useStats = () => {
     setDailyScans,
     fetchDailyScans,
     updateDailyScans,
+    decreaseDailyScans,
     getUserDailyScans,
     getUserTotalScans,
     getUserBarcodesScanned,

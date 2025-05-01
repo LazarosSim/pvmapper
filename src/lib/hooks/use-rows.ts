@@ -256,6 +256,11 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
       // First get all barcodes for this row to track what needs to be subtracted
       const rowBarcodes = barcodes.filter(barcode => barcode.rowId === rowId);
       
+      if (rowBarcodes.length === 0) {
+        toast.info('No barcodes to reset');
+        return;
+      }
+      
       // Group barcodes by user and date for adjustment
       const userBarcodeCounts: {[key: string]: number} = {};
       
@@ -308,7 +313,7 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
         }
       }
       
-      toast.success('Row reset successfully');
+      toast.success(`Reset ${rowBarcodes.length} barcodes successfully`);
     } catch (error: any) {
       console.error('Error in resetRow:', error.message);
       toast.error(`Failed to reset row: ${error.message}`);
@@ -356,6 +361,7 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
   };
   
   const countBarcodesInRow = (rowId: string): number => {
+    // Count directly from barcodes for real-time accuracy
     return barcodes.filter(barcode => barcode.rowId === rowId).length;
   };
 

@@ -6,7 +6,8 @@ import type { Barcode, Row } from '../types/db-types';
 
 export const useBarcodes = (
   rows: Row[],
-  updateDailyScans: () => Promise<void>
+  updateDailyScans: () => Promise<void>,
+  decreaseDailyScans?: (userId?: string, date?: string, count?: number) => Promise<void>
 ) => {
   const [barcodes, setBarcodes] = useState<Barcode[]>([]);
 
@@ -140,6 +141,14 @@ export const useBarcodes = (
   
   const deleteBarcode = async (barcodeId: string) => {
     try {
+      // Get the barcode to be deleted so we can adjust daily scan count
+      const barcodeToDelete = barcodes.find(barcode => barcode.id === barcodeId);
+      
+      if (!barcodeToDelete) {
+        toast.error('Barcode not found');
+        return;
+      }
+      
       const { error } = await supabase
         .from('barcodes')
         .delete()
@@ -151,7 +160,14 @@ export const useBarcodes = (
         return;
       }
       
+      // Remove from local state
       setBarcodes(prev => prev.filter(barcode => barcode.id !== barcodeId));
+      
+      // Adjust daily scan count
+      if (decreaseDailyScans && barcodeToDelete) {
+        const scanDate = new Date(barcodeToDelete.timestamp).toISOString().split('T')[0];
+        await decreaseDailyScans(barcodeToDelete.userId, scanDate, 1);
+      }
       
       toast.success('Barcode deleted successfully');
     } catch (error: any) {
