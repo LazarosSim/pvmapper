@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useSupabase } from './supabase-provider';
 import { toast } from 'sonner';
@@ -11,7 +12,7 @@ import type {
 // Import hooks
 import { useUser } from './hooks/use-user';
 import { useParks } from './hooks/use-parks';
-import { useRows } from './hooks/use-rows';
+import { useRows } from './hooks/rows/use-rows';
 import { useBarcodes } from './hooks/use-barcodes';
 import { useStats } from './hooks/use-stats';
 import { useDataManagement } from './hooks/use-data-management';
