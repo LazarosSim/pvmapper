@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useSupabase } from './supabase-provider';
 import { toast } from 'sonner';
@@ -147,7 +146,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     register,
     logout,
     
-    // User stats
+    // User stats - ensure we're passing the barcodes array to functions that need it
     getUserDailyScans: () => getUserDailyScans(user?.id),
     getUserTotalScans: () => getUserTotalScans(user?.id || '', barcodes),
     getUserBarcodesScanned: () => getUserBarcodesScanned(user?.id || '', barcodes),

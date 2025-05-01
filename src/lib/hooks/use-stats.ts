@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -156,13 +155,14 @@ export const useStats = () => {
     return todayScan?.count || 0;
   };
 
-  // Enhanced to count directly from barcodes instead of using cached value
+  // Enhanced to ensure it accurately counts all barcodes for a user
   const getUserTotalScans = (userId: string, barcodes: Barcode[]): number => {
     if (!userId) return 0;
-    // Count directly from barcodes array for real-time accuracy
+    // Count all barcodes in the array that belong to this user
     return barcodes.filter(barcode => barcode.userId === userId).length;
   };
   
+  // Get user's scanned barcodes
   const getUserBarcodesScanned = (userId: string, barcodes: Barcode[]): Barcode[] => {
     if (!userId) return [];
     return barcodes

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -32,10 +31,9 @@ const ProfilePage = () => {
     return null;
   }
 
-  // Call the functions without passing arguments as they're wrapper functions
-  // that internally use the current user's ID
+  // Use refreshKey to trigger re-evaluation of these values
   const dailyScans = getUserDailyScans();
-  const totalScans = getUserTotalScans();
+  const totalScans = refreshKey >= 0 ? getUserTotalScans() : 0; // Using refreshKey to force re-evaluation
   const recentBarcodes = getUserBarcodesScanned().slice(0, 5);
 
   const handleRefresh = () => {
