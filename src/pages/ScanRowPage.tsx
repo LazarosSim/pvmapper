@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -40,6 +39,7 @@ const ScanRowPage = () => {
   const [isResetting, setIsResetting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [latestBarcodes, setLatestBarcodes] = useState<any[]>([]);
+  const [totalBarcodes, setTotalBarcodes] = useState(0);
   const { playSuccessSound, playErrorSound } = useSoundEffects();
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -69,8 +69,11 @@ const ScanRowPage = () => {
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, 10);
       setLatestBarcodes(barcodes);
+      
+      // Update the total barcode count
+      setTotalBarcodes(countBarcodesInRow(rowId));
     }
-  }, [rowId, getBarcodesByRowId]);
+  }, [rowId, getBarcodesByRowId, countBarcodesInRow]);
 
   useEffect(() => {
     focusInput();
@@ -188,9 +191,15 @@ const ScanRowPage = () => {
     setIsResetting(true);
     try {
       await resetRow(rowId);
+      // Clear the local state of barcodes
       setLatestBarcodes([]);
+      // Update total count to reflect the reset
+      setTotalBarcodes(0);
       setIsResetDialogOpen(false);
       toast.success('Row reset successfully');
+    } catch (error) {
+      console.error("Error resetting row:", error);
+      toast.error("Failed to reset row");
     } finally {
       setIsResetting(false);
       focusInput();

@@ -126,7 +126,15 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     deleteRow,
     updateRow,
     getRowById,
-    resetRow,
+    resetRow: async (rowId) => {
+      try {
+        // Directly call the resetRow function that will now fetch from DB
+        return await resetRow(rowId);
+      } catch (error) {
+        console.error('Error in resetRow:', error);
+        return Promise.reject(error);
+      }
+    },
     countBarcodesInRow,
     addSubRow: (rowId, expectedBarcodes) => 
       addSubRow(rowId, expectedBarcodes),

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -253,13 +252,34 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
   
   const resetRow = async (rowId: string) => {
     try {
-      // First get all barcodes for this row to track what needs to be subtracted
-      const rowBarcodes = barcodes.filter(barcode => barcode.rowId === rowId);
+      // First check if we have any barcodes for this row directly from the database
+      // This ensures we get the most up-to-date information rather than relying on local state
+      const { data: rowBarcodesData, error: fetchError } = await supabase
+        .from('barcodes')
+        .select('*')
+        .eq('row_id', rowId);
+        
+      if (fetchError) {
+        console.error('Error fetching row barcodes:', fetchError);
+        toast.error(`Failed to check row barcodes: ${fetchError.message}`);
+        return;
+      }
       
-      if (rowBarcodes.length === 0) {
+      // Now use the data directly from the database to check if there are barcodes
+      if (!rowBarcodesData || rowBarcodesData.length === 0) {
         toast.info('No barcodes to reset');
         return;
       }
+      
+      // Format the barcodes from the database to match our local state format
+      const rowBarcodes = rowBarcodesData.map(barcode => ({
+        id: barcode.id,
+        code: barcode.code,
+        rowId: barcode.row_id,
+        userId: barcode.user_id,
+        timestamp: barcode.timestamp,
+        displayOrder: barcode.display_order || 0
+      }));
       
       // Group barcodes by user and date for adjustment
       const userBarcodeCounts: {[key: string]: number} = {};
