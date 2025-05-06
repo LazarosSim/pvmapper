@@ -14,6 +14,8 @@ export type Database = {
           code: string
           display_order: number | null
           id: string
+          latitude: number | null
+          longitude: number | null
           row_id: string
           timestamp: string
           user_id: string
@@ -22,6 +24,8 @@ export type Database = {
           code: string
           display_order?: number | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           row_id: string
           timestamp?: string
           user_id: string
@@ -30,6 +34,8 @@ export type Database = {
           code?: string
           display_order?: number | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           row_id?: string
           timestamp?: string
           user_id?: string
