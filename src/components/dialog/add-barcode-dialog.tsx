@@ -56,7 +56,7 @@ const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({ open, onOpenChange,
   
   const handleSubmit = async () => {
     if (code.trim()) {
-      // Capture GPS location if this is the first barcode in the row
+      // Capture GPS location only if this is the first barcode in the row and location capture is enabled
       let location = null;
       if (isFirstBarcode && captureLocation) {
         toast.loading("Capturing location...");

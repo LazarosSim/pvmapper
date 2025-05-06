@@ -64,7 +64,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       const row = getRowById(rowId);
       const park = row ? getParkById(row.parkId) : undefined;
       
-      // Capture GPS location if this is the first barcode in the row
+      // Capture GPS location only if this is the first barcode in the row and location capture is enabled
       let location = null;
       if (isFirstBarcode && captureLocation) {
         toast.loading("Capturing location...");
@@ -150,7 +150,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       const timestamp = new Date().getTime();
       const placeholderCode = `X_PLACEHOLDER_${timestamp}`;
       
-      // Capture GPS location if this is the first barcode in the row
+      // Capture GPS location if this is the first barcode in the row and location capture is enabled
       let location = null;
       if (isFirstBarcode && captureLocation) {
         toast.loading("Capturing location...");
