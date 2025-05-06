@@ -34,7 +34,9 @@ export const useBarcodes = (
           rowId: barcode.row_id,
           userId: barcode.user_id,
           timestamp: barcode.timestamp,
-          displayOrder: barcode.display_order || 0
+          displayOrder: barcode.display_order || 0,
+          latitude: barcode.latitude,
+          longitude: barcode.longitude
         }));
         
         setBarcodes(formattedBarcodes);
@@ -44,7 +46,13 @@ export const useBarcodes = (
     }
   };
 
-  const addBarcode = async (code: string, rowId: string, afterBarcodeIndex?: number, userId?: string) => {
+  const addBarcode = async (
+    code: string, 
+    rowId: string, 
+    afterBarcodeIndex?: number, 
+    location?: { latitude: number, longitude: number } | null,
+    userId?: string
+  ) => {
     if (!userId) return null;
     
     try {
@@ -73,15 +81,24 @@ export const useBarcodes = (
           newDisplayOrder = rowBarcodes[0].displayOrder - 1000;
         }
       }
+
+      // Prepare the barcode data to insert
+      const barcodeData: any = { 
+        code,
+        row_id: rowId,
+        user_id: userId,
+        display_order: newDisplayOrder
+      };
+      
+      // Add location data if available
+      if (location) {
+        barcodeData.latitude = location.latitude;
+        barcodeData.longitude = location.longitude;
+      }
       
       const { data, error } = await supabase
         .from('barcodes')
-        .insert([{ 
-          code,
-          row_id: rowId,
-          user_id: userId,
-          display_order: newDisplayOrder
-        }])
+        .insert([barcodeData])
         .select();
         
       if (error) {
@@ -97,7 +114,9 @@ export const useBarcodes = (
           rowId: data[0].row_id,
           userId: data[0].user_id,
           timestamp: data[0].timestamp,
-          displayOrder: data[0].display_order || 0
+          displayOrder: data[0].display_order || 0,
+          latitude: data[0].latitude,
+          longitude: data[0].longitude
         };
         
         setBarcodes(prev => [newBarcode, ...prev]);

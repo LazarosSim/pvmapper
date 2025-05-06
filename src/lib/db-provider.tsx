@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useSupabase } from './supabase-provider';
 import { toast } from 'sonner';
@@ -142,8 +141,8 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     
     // Barcodes
     barcodes,
-    addBarcode: (code, rowId, afterBarcodeIndex) => 
-      addBarcode(code, rowId, afterBarcodeIndex, user?.id),
+    addBarcode: (code, rowId, afterBarcodeIndex, location) => 
+      addBarcode(code, rowId, afterBarcodeIndex, location, user?.id),
     deleteBarcode,
     updateBarcode,
     getBarcodesByRowId,

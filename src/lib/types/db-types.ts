@@ -36,6 +36,8 @@ export type Barcode = {
   userId: string;
   timestamp: string;
   displayOrder: number;
+  latitude?: number;
+  longitude?: number;
 };
 
 // Progress type for tracking completion
@@ -90,7 +92,7 @@ export type DBContextType = {
   
   // Barcodes
   barcodes: Barcode[];
-  addBarcode: (code: string, rowId: string, afterBarcodeIndex?: number) => Promise<Barcode | null>;
+  addBarcode: (code: string, rowId: string, afterBarcodeIndex?: number, location?: { latitude: number, longitude: number } | null) => Promise<Barcode | null>;
   deleteBarcode: (barcodeId: string) => Promise<void>;
   updateBarcode: (barcodeId: string, code: string) => Promise<void>;
   getBarcodesByRowId: (rowId: string) => Barcode[];
