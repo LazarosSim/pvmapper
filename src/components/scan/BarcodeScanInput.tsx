@@ -3,7 +3,7 @@ import React, { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, ArrowRight } from 'lucide-react';
+import { Loader2, ArrowRight, X } from 'lucide-react';
 import useSoundEffects from '@/hooks/use-sound-effects';
 import { useDB } from '@/lib/db-provider';
 
@@ -95,8 +95,37 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
     await registerBarcode();
   };
 
+  const registerPlaceholder = async () => {
+    try {
+      setIsProcessing(true);
+      
+      // Generate unique placeholder barcode with timestamp to avoid duplicates
+      const timestamp = new Date().getTime();
+      const placeholderCode = `X_PLACEHOLDER_${timestamp}`;
+      
+      // We bypass validation for this special code
+      const result = await addBarcode(placeholderCode, rowId);
+      
+      if (result !== undefined && result !== null) {
+        playSuccessSound();
+        toast.success('Placeholder added');
+        onBarcodeAdded(result);
+      } else {
+        playErrorSound();
+        toast.error('Failed to add placeholder');
+      }
+    } catch (error) {
+      console.error("Error adding placeholder:", error);
+      playErrorSound();
+      toast.error("Failed to add placeholder");
+    } finally {
+      setIsProcessing(false);
+      focusInput();
+    }
+  };
+
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="relative">
       <div className="relative">
         <Input
           ref={inputRef}
@@ -127,6 +156,16 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
           )}
         </Button>
       </div>
+      <Button
+        type="button"
+        onClick={registerPlaceholder}
+        disabled={isProcessing}
+        className="absolute -right-10 top-0 h-full bg-gray-200 hover:bg-gray-300 px-2 rounded-md text-gray-600"
+        variant="ghost"
+        size="icon"
+      >
+        <X className="h-4 w-4" />
+      </Button>
     </form>
   );
 };

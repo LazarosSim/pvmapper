@@ -148,11 +148,13 @@ const ScanRowPage = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <BarcodeScanInput
-              rowId={rowId}
-              onBarcodeAdded={handleBarcodeAdded}
-              focusInput={focusInput}
-            />
+            <div className="pr-12 relative">
+              <BarcodeScanInput
+                rowId={rowId}
+                onBarcodeAdded={handleBarcodeAdded}
+                focusInput={focusInput}
+              />
+            </div>
             <audio ref={audioRef} src={NOTIF_SOUND} />
             <RecentScans barcodes={latestBarcodes} />
           </CardContent>
