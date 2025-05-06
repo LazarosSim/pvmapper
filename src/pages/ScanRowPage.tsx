@@ -58,12 +58,13 @@ const ScanRowPage = () => {
     }
   }, [rowId, rows, getRowById]);
 
+  // Update barcodes list and count when rowId or barcodes change
   useEffect(() => {
     if (rowId) {
-      const barcodes = getBarcodesByRowId(rowId)
+      const rowBarcodes = getBarcodesByRowId(rowId)
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, 10);
-      setLatestBarcodes(barcodes);
+      setLatestBarcodes(rowBarcodes);
       
       // Update the total barcode count
       setTotalScannedBarcodes(countBarcodesInRow(rowId));
@@ -118,11 +119,14 @@ const ScanRowPage = () => {
   };
 
   const handleBarcodeAdded = (barcode: any) => {
+    // Update the list of recent barcodes
     const updatedBarcodes = [
       { ...barcode, timestamp: new Date().toISOString() },
       ...latestBarcodes.slice(0, 9)
     ];
     setLatestBarcodes(updatedBarcodes);
+    
+    // Update the total count directly
     setTotalScannedBarcodes(prev => prev + 1);
   };
 
