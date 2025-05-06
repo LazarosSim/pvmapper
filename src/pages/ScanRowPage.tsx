@@ -37,6 +37,7 @@ const ScanRowPage = () => {
   const [isResetting, setIsResetting] = useState(false);
   const [latestBarcodes, setLatestBarcodes] = useState<any[]>([]);
   const [totalScannedBarcodes, setTotalScannedBarcodes] = useState(0);
+  const [localCounterIncremented, setLocalCounterIncremented] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -66,10 +67,16 @@ const ScanRowPage = () => {
         .slice(0, 10);
       setLatestBarcodes(rowBarcodes);
       
-      // Update the total barcode count
-      setTotalScannedBarcodes(countBarcodesInRow(rowId));
+      // Only update the total count from DB if we haven't just incremented locally
+      // This prevents the counter from reverting to its previous value
+      if (!localCounterIncremented) {
+        setTotalScannedBarcodes(countBarcodesInRow(rowId));
+      } else {
+        // Reset the flag after the effect has run
+        setLocalCounterIncremented(false);
+      }
     }
-  }, [rowId, barcodes, getBarcodesByRowId, countBarcodesInRow]);
+  }, [rowId, barcodes, getBarcodesByRowId, countBarcodesInRow, localCounterIncremented]);
 
   useEffect(() => {
     focusInput();
@@ -128,6 +135,9 @@ const ScanRowPage = () => {
     
     // Update the total count directly
     setTotalScannedBarcodes(prev => prev + 1);
+    
+    // Set flag to prevent the useEffect from overriding our count
+    setLocalCounterIncremented(true);
   };
 
   return (

@@ -70,9 +70,14 @@ const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({ open, onOpenChange,
         }
       }
       
-      await addBarcode(code.trim(), rowId, undefined, location);
-      setCode('');
-      onOpenChange(false);
+      const result = await addBarcode(code.trim(), rowId, undefined, location);
+      if (result) {
+        setCode('');
+        toast.success('Barcode added successfully');
+        onOpenChange(false);
+      } else {
+        toast.error('Failed to add barcode');
+      }
     }
   };
   
