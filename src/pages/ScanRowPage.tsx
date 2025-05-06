@@ -25,7 +25,8 @@ const ScanRowPage = () => {
   const { 
     rows, 
     getRowById, 
-    getParkById, 
+    getParkById,
+    barcodes,
     getBarcodesByRowId, 
     countBarcodesInRow, 
     resetRow, 
@@ -67,7 +68,7 @@ const ScanRowPage = () => {
       // Update the total barcode count
       setTotalScannedBarcodes(countBarcodesInRow(rowId));
     }
-  }, [rowId, getBarcodesByRowId, countBarcodesInRow]);
+  }, [rowId, barcodes, getBarcodesByRowId, countBarcodesInRow]);
 
   useEffect(() => {
     focusInput();
