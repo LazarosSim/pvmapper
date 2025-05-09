@@ -59,7 +59,15 @@ const ScanRowPage = () => {
     }
   }, [rowId, rows, getRowById]);
 
-  // Update barcodes list and count when rowId or barcodes change
+  // Initialize total count when component mounts
+  useEffect(() => {
+    if (rowId) {
+      // Set initial count from the DB
+      setTotalScannedBarcodes(countBarcodesInRow(rowId));
+    }
+  }, [rowId, countBarcodesInRow]);
+
+  // Update barcodes list when rowId or barcodes change
   useEffect(() => {
     if (rowId) {
       const rowBarcodes = getBarcodesByRowId(rowId)
