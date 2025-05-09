@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -28,7 +27,8 @@ const ScanRowPage = () => {
     getParkById,
     barcodes,
     getBarcodesByRowId, 
-    currentUser 
+    currentUser,
+    resetRow // Make sure to include this in the destructuring
   } = useDB();
   
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
