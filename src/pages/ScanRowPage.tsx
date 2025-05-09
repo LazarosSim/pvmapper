@@ -1,5 +1,5 @@
 
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
 import { useDB } from '@/lib/db-provider';
@@ -28,16 +28,16 @@ const ScanRowPage = () => {
     getParkById,
     barcodes,
     getBarcodesByRowId, 
-    countBarcodesInRow, 
-    resetRow, 
     currentUser 
   } = useDB();
   
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [latestBarcodes, setLatestBarcodes] = useState<any[]>([]);
+  
+  // We'll manage our own count of scanned barcodes
   const [totalScannedBarcodes, setTotalScannedBarcodes] = useState(0);
-  const [localCounterIncremented, setLocalCounterIncremented] = useState(false);
+  
   const audioRef = useRef<HTMLAudioElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -59,36 +59,32 @@ const ScanRowPage = () => {
     }
   }, [rowId, rows, getRowById]);
 
-  // Initialize total count when component mounts or rowId changes
-  useEffect(() => {
-    if (rowId) {
-      // Set initial count from the DB directly
-      const count = countBarcodesInRow(rowId);
-      setTotalScannedBarcodes(count);
-      console.log(`Initial count for row ${rowId}: ${count}`);
-    }
-  }, [rowId, countBarcodesInRow]);
+  // Calculate the barcode count directly from the barcodes array
+  const calculateBarcodeCount = () => {
+    if (!rowId || !barcodes) return 0;
+    return barcodes.filter(b => b.rowId === rowId).length;
+  };
 
-  // Update barcodes list when rowId or barcodes change
+  // Update barcodes list and count whenever barcodes array changes
   useEffect(() => {
     if (rowId) {
+      // Update the list of most recent barcodes
       const rowBarcodes = getBarcodesByRowId(rowId)
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, 10);
+      
       setLatestBarcodes(rowBarcodes);
       
-      // Only update the total count from DB if we haven't just incremented locally
-      if (!localCounterIncremented) {
-        const count = countBarcodesInRow(rowId);
-        console.log(`DB count for row ${rowId}: ${count} (not locally incremented)`);
-        setTotalScannedBarcodes(count);
-      } else {
-        // Reset the flag after the effect has run
-        console.log(`Keeping locally incremented count: ${totalScannedBarcodes}`);
-        setLocalCounterIncremented(false);
+      // Calculate the new count from the barcodes array directly
+      const newCount = calculateBarcodeCount();
+      console.log(`Updating barcode count from ${totalScannedBarcodes} to ${newCount}`);
+      
+      // Only update if the count has actually changed to prevent unnecessary re-renders
+      if (newCount !== totalScannedBarcodes) {
+        setTotalScannedBarcodes(newCount);
       }
     }
-  }, [rowId, barcodes, getBarcodesByRowId, countBarcodesInRow, localCounterIncremented]);
+  }, [rowId, barcodes, getBarcodesByRowId]);
 
   // Focus the input when the component mounts
   useEffect(() => {
@@ -146,12 +142,9 @@ const ScanRowPage = () => {
     ];
     setLatestBarcodes(updatedBarcodes);
     
-    // Update the total count directly
+    // Increment the count immediately for better user feedback
     setTotalScannedBarcodes(prev => prev + 1);
-    console.log(`Barcode added locally. New count: ${totalScannedBarcodes + 1}`);
-    
-    // Set flag to prevent the useEffect from overriding our count
-    setLocalCounterIncremented(true);
+    console.log(`Barcode added, incrementing count to: ${totalScannedBarcodes + 1}`);
   };
 
   return (

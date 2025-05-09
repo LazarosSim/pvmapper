@@ -28,10 +28,10 @@ const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({
 }) => {
   const [code, setCode] = useState('');
   const [captureLocation, setCaptureLocation] = useState(false);
-  const { addBarcode, countBarcodesInRow } = useDB();
+  const { addBarcode, barcodes } = useDB();
   
   // Check if this is the first barcode in the row
-  const isFirstBarcode = countBarcodesInRow(rowId) === 0;
+  const isFirstBarcode = barcodes.filter(b => b.rowId === rowId).length === 0;
   
   const captureGPSLocation = async (): Promise<{latitude: number, longitude: number} | null> => {
     try {

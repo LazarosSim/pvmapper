@@ -22,3 +22,11 @@ export const countBarcodesInRow = (barcodes: Barcode[], rowId: string): number =
   if (!barcodes || !rowId) return 0;
   return barcodes.filter(barcode => barcode.rowId === rowId).length;
 };
+
+/**
+ * Get all barcodes for a specific row
+ */
+export const getBarcodesByRowId = (barcodes: Barcode[], rowId: string): Barcode[] => {
+  if (!barcodes || !rowId) return [];
+  return barcodes.filter(barcode => barcode.rowId === rowId);
+};
