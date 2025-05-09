@@ -19,5 +19,6 @@ export const getRowById = (rows: Row[], rowId: string): Row | undefined => {
  * Count barcodes in a specific row
  */
 export const countBarcodesInRow = (barcodes: Barcode[], rowId: string): number => {
+  if (!barcodes || !rowId) return 0;
   return barcodes.filter(barcode => barcode.rowId === rowId).length;
 };

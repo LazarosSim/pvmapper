@@ -1,5 +1,5 @@
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
 import { useDB } from '@/lib/db-provider';
@@ -59,11 +59,13 @@ const ScanRowPage = () => {
     }
   }, [rowId, rows, getRowById]);
 
-  // Initialize total count when component mounts
+  // Initialize total count when component mounts or rowId changes
   useEffect(() => {
     if (rowId) {
-      // Set initial count from the DB
-      setTotalScannedBarcodes(countBarcodesInRow(rowId));
+      // Set initial count from the DB directly
+      const count = countBarcodesInRow(rowId);
+      setTotalScannedBarcodes(count);
+      console.log(`Initial count for row ${rowId}: ${count}`);
     }
   }, [rowId, countBarcodesInRow]);
 
@@ -76,16 +78,19 @@ const ScanRowPage = () => {
       setLatestBarcodes(rowBarcodes);
       
       // Only update the total count from DB if we haven't just incremented locally
-      // This prevents the counter from reverting to its previous value
       if (!localCounterIncremented) {
-        setTotalScannedBarcodes(countBarcodesInRow(rowId));
+        const count = countBarcodesInRow(rowId);
+        console.log(`DB count for row ${rowId}: ${count} (not locally incremented)`);
+        setTotalScannedBarcodes(count);
       } else {
         // Reset the flag after the effect has run
+        console.log(`Keeping locally incremented count: ${totalScannedBarcodes}`);
         setLocalCounterIncremented(false);
       }
     }
   }, [rowId, barcodes, getBarcodesByRowId, countBarcodesInRow, localCounterIncremented]);
 
+  // Focus the input when the component mounts
   useEffect(() => {
     focusInput();
   }, []);
@@ -143,6 +148,7 @@ const ScanRowPage = () => {
     
     // Update the total count directly
     setTotalScannedBarcodes(prev => prev + 1);
+    console.log(`Barcode added locally. New count: ${totalScannedBarcodes + 1}`);
     
     // Set flag to prevent the useEffect from overriding our count
     setLocalCounterIncremented(true);

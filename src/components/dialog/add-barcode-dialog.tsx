@@ -17,9 +17,15 @@ interface AddBarcodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rowId: string;
+  onBarcodeAdded?: (barcode: any) => void;
 }
 
-const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({ open, onOpenChange, rowId }) => {
+const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({ 
+  open, 
+  onOpenChange, 
+  rowId, 
+  onBarcodeAdded 
+}) => {
   const [code, setCode] = useState('');
   const [captureLocation, setCaptureLocation] = useState(false);
   const { addBarcode, countBarcodesInRow } = useDB();
@@ -74,6 +80,12 @@ const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({ open, onOpenChange,
       if (result) {
         setCode('');
         toast.success('Barcode added successfully');
+        
+        // Call the onBarcodeAdded callback if provided
+        if (onBarcodeAdded) {
+          onBarcodeAdded(result);
+        }
+        
         onOpenChange(false);
       } else {
         toast.error('Failed to add barcode');
