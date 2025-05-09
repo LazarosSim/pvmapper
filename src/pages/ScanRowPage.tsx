@@ -16,6 +16,7 @@ import BarcodeScanInput from '@/components/scan/BarcodeScanInput';
 import RecentScans from '@/components/scan/RecentScans';
 import ResetRowDialog from '@/components/scan/ResetRowDialog';
 import RowHeader from '@/components/scan/RowHeader';
+import AddBarcodeDialog from '@/components/dialog/add-barcode-dialog';
 
 // Audio notification for success/error
 const NOTIF_SOUND = "data:audio/wav;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAFAAAGUACFhYWFhYWFhYWFhYWFhYWFhYWFra2tra2tra2tra2tra2tra2traOjo6Ojo6Ojo6Ojo6Ojo6Ojo6P///////////////////////////////////////////wAAADJMQVNNRTMuOTlyAc0AAAAAAAAAABSAJAJAQgAAgAAAA+aieizgAAAAAAAAAAAAAAAAAAAA//uQZAAAApEGUFUGAAArIMoKoMAABZAZnW40AAClAzOtxpgALEwy1AAAAAEVf7kGQRmBmD3QEAgEDhnePhI/JH4iByB+SPxA/IH5gQB+IPzAQA+TAMDhOIPA/IEInjB4P4fn///jHJ+T/ngfgYAgEAgEAgEAgg5nwuZIuZw5QmCvG0Ooy0JtC2CnAp1vdSlLMuOQylYZl0LERgAAAAAAlMy5z3O+n//zTjN/9/+Z//O//9y5/8ud/z//5EHL/D+KDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDEppqampqampqampqampqampqampqampqampqampqamgAAA//tQZAAAAtAeUqsMAARfA7pVYYACCUCXPqggAEAAAP8AAAAATEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkYA/wAAB/gAAACAAAD/AAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=";
@@ -29,12 +30,16 @@ const ScanRowPage = () => {
     barcodes,
     getBarcodesByRowId, 
     currentUser,
-    resetRow
+    resetRow,
+    countBarcodesInRow // Import this function to count barcodes consistently
   } = useDB();
   
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [latestBarcodes, setLatestBarcodes] = useState<any[]>([]);
+  
+  // Track barcode count for UI updates
+  const [scanCount, setScanCount] = useState(0);
   
   // Reference to the audio element
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -47,7 +52,7 @@ const ScanRowPage = () => {
     }
   };
 
-  // Save selected row and park to localStorage for consistent navigation
+  // Update count and save selected row and park to localStorage for consistent navigation
   useEffect(() => {
     if (rowId && rows.some(r => r.id === rowId)) {
       localStorage.setItem('selectedRowId', rowId);
@@ -55,8 +60,14 @@ const ScanRowPage = () => {
       if (row) {
         localStorage.setItem('selectedParkId', row.parkId);
       }
+      
+      // Set initial count
+      if (rowId && barcodes) {
+        const count = countBarcodesInRow(rowId);
+        setScanCount(count);
+      }
     }
-  }, [rowId, rows, getRowById]);
+  }, [rowId, rows, getRowById, barcodes, countBarcodesInRow]);
 
   // Update barcodes list whenever barcodes array changes
   useEffect(() => {
@@ -67,8 +78,12 @@ const ScanRowPage = () => {
         .slice(0, 10);
       
       setLatestBarcodes(rowBarcodes);
+      
+      // Update scan count whenever barcodes change
+      const count = countBarcodesInRow(rowId);
+      setScanCount(count);
     }
-  }, [rowId, barcodes, getBarcodesByRowId]);
+  }, [rowId, barcodes, getBarcodesByRowId, countBarcodesInRow]);
 
   // Focus the input when the component mounts
   useEffect(() => {
@@ -102,19 +117,15 @@ const ScanRowPage = () => {
   // Create breadcrumb format
   const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
 
-  // Calculate the current count of barcodes in this row
-  // This is called whenever we need the current count, ensuring it's always up-to-date
-  const getCurrentBarcodeCount = () => {
-    if (!rowId || !barcodes) return 0;
-    return barcodes.filter(b => b.rowId === rowId).length;
-  };
-
   const handleReset = async () => {
     setIsResetting(true);
     try {
       await resetRow(rowId);
       // Clear the local state of barcodes
       setLatestBarcodes([]);
+      // Reset scan count to 0
+      setScanCount(0);
+      
       setIsResetDialogOpen(false);
       toast.success('Row reset successfully');
     } catch (error) {
@@ -133,10 +144,10 @@ const ScanRowPage = () => {
       ...latestBarcodes.slice(0, 9)
     ];
     setLatestBarcodes(updatedBarcodes);
+    
+    // Increment scan count immediately for better UI feedback
+    setScanCount(prevCount => prevCount + 1);
   };
-
-  // Current barcode count - computed at render time from the barcodes array
-  const totalScannedBarcodes = getCurrentBarcodeCount();
 
   return (
     <AuthGuard>
@@ -147,7 +158,7 @@ const ScanRowPage = () => {
               <RowHeader
                 rowId={rowId}
                 breadcrumb={breadcrumb}
-                totalScannedBarcodes={totalScannedBarcodes}
+                totalScannedBarcodes={scanCount}
                 expectedBarcodes={row?.expectedBarcodes}
                 isResetting={isResetting}
                 onResetClick={() => setIsResetDialogOpen(true)}

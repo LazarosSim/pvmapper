@@ -1,4 +1,3 @@
-
 import React, { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -122,6 +121,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
         playSuccessSound();
         toast.success('Barcode added successfully');
         
+        // Call onBarcodeAdded with the result to update the UI immediately
         onBarcodeAdded(result);
       } else {
         playErrorSound();
@@ -170,6 +170,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       if (result !== undefined && result !== null) {
         playSuccessSound();
         toast.success('Placeholder added');
+        // Make sure to update parent component
         onBarcodeAdded(result);
       } else {
         playErrorSound();
