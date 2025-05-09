@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -28,16 +29,14 @@ const ScanRowPage = () => {
     barcodes,
     getBarcodesByRowId, 
     currentUser,
-    resetRow // Make sure to include this in the destructuring
+    resetRow
   } = useDB();
   
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [latestBarcodes, setLatestBarcodes] = useState<any[]>([]);
   
-  // We'll manage our own count of scanned barcodes
-  const [totalScannedBarcodes, setTotalScannedBarcodes] = useState(0);
-  
+  // Reference to the audio element
   const audioRef = useRef<HTMLAudioElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -59,30 +58,15 @@ const ScanRowPage = () => {
     }
   }, [rowId, rows, getRowById]);
 
-  // Calculate the barcode count directly from the barcodes array
-  const calculateBarcodeCount = () => {
-    if (!rowId || !barcodes) return 0;
-    return barcodes.filter(b => b.rowId === rowId).length;
-  };
-
-  // Update barcodes list and count whenever barcodes array changes
+  // Update barcodes list whenever barcodes array changes
   useEffect(() => {
     if (rowId) {
-      // Update the list of most recent barcodes
+      // Get the latest 10 barcodes for this row, sorted by timestamp (newest first)
       const rowBarcodes = getBarcodesByRowId(rowId)
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, 10);
       
       setLatestBarcodes(rowBarcodes);
-      
-      // Calculate the new count from the barcodes array directly
-      const newCount = calculateBarcodeCount();
-      console.log(`Updating barcode count from ${totalScannedBarcodes} to ${newCount}`);
-      
-      // Only update if the count has actually changed to prevent unnecessary re-renders
-      if (newCount !== totalScannedBarcodes) {
-        setTotalScannedBarcodes(newCount);
-      }
     }
   }, [rowId, barcodes, getBarcodesByRowId]);
 
@@ -111,9 +95,19 @@ const ScanRowPage = () => {
     return <Navigate to="/scan" replace />;
   }
 
+  // Get the current row
   const row = getRowById(rowId);
+  // Get the park this row belongs to
   const park = row ? getParkById(row.parkId) : undefined;
+  // Create breadcrumb format
   const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
+
+  // Calculate the current count of barcodes in this row
+  // This is called whenever we need the current count, ensuring it's always up-to-date
+  const getCurrentBarcodeCount = () => {
+    if (!rowId || !barcodes) return 0;
+    return barcodes.filter(b => b.rowId === rowId).length;
+  };
 
   const handleReset = async () => {
     setIsResetting(true);
@@ -121,8 +115,6 @@ const ScanRowPage = () => {
       await resetRow(rowId);
       // Clear the local state of barcodes
       setLatestBarcodes([]);
-      // Update total count to reflect the reset
-      setTotalScannedBarcodes(0);
       setIsResetDialogOpen(false);
       toast.success('Row reset successfully');
     } catch (error) {
@@ -135,17 +127,16 @@ const ScanRowPage = () => {
   };
 
   const handleBarcodeAdded = (barcode: any) => {
-    // Update the list of recent barcodes
+    // Update the list of recent barcodes (newest first)
     const updatedBarcodes = [
       { ...barcode, timestamp: new Date().toISOString() },
       ...latestBarcodes.slice(0, 9)
     ];
     setLatestBarcodes(updatedBarcodes);
-    
-    // Increment the count immediately for better user feedback
-    setTotalScannedBarcodes(prev => prev + 1);
-    console.log(`Barcode added, incrementing count to: ${totalScannedBarcodes + 1}`);
   };
+
+  // Current barcode count - computed at render time from the barcodes array
+  const totalScannedBarcodes = getCurrentBarcodeCount();
 
   return (
     <AuthGuard>
