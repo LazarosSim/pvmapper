@@ -1,3 +1,4 @@
+
 import React, { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
 
   // Check if this is the first barcode in the row
   const isFirstBarcode = countBarcodesInRow(rowId) === 0;
+  
   const captureGPSLocation = async (): Promise<{
     latitude: number;
     longitude: number;
@@ -59,6 +61,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       return null;
     }
   };
+  
   const registerBarcode = async () => {
     if (!barcodeInput.trim() || isProcessing) return;
     try {
@@ -96,6 +99,8 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
           return;
         }
       }
+      
+      // Apply validation if required by the park
       if (park?.validateBarcodeLength) {
         const length = barcodeInput.trim().length;
         if (length < 19 || length > 26) {
@@ -106,6 +111,8 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
           return;
         }
       }
+      
+      // Check for duplicates
       const duplicates = getBarcodesByRowId(rowId).filter(b => b.code.toLowerCase() === barcodeInput.trim().toLowerCase());
       if (duplicates.length > 0) {
         playErrorSound();
@@ -137,10 +144,12 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       focusInput();
     }
   };
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await registerBarcode();
   };
+  
   const registerPlaceholder = async () => {
     try {
       setIsProcessing(true);
@@ -188,6 +197,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       focusInput();
     }
   };
+  
   return <form onSubmit={handleSubmit} className="relative">
       <div className="relative">
         <Input ref={inputRef} value={barcodeInput} onChange={e => setBarcodeInput(e.target.value)} onKeyDown={e => {
