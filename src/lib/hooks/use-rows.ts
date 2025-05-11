@@ -6,7 +6,7 @@ import type { Row, Barcode } from '../types/db-types';
 import { fetchRows } from './rows/row-operations/fetch-rows';
 import { addRow, addSubRow } from './rows/row-operations/add-row';
 import { updateRow, resetRow, deleteRow } from './rows/row-operations/update-row';
-import { getRowsByParkId, getRowById, countBarcodesInRow } from './rows/row-utils';
+import { getRowsByParkId, getRowById } from './rows/row-utils';
 
 export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.SetStateAction<Barcode[]>>) => {
   const [rows, setRows] = useState<Row[]>([]);
