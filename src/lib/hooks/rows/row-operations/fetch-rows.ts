@@ -30,8 +30,7 @@ export const fetchRows = async (
         name: row.name,
         parkId: row.park_id,
         createdAt: row.created_at,
-        expectedBarcodes: row.expected_barcodes,
-        currentBarcodes: row.current_barcodes || 0 // Add the currentBarcodes field with a fallback to 0
+        expectedBarcodes: row.expected_barcodes
       }));
       
       if (setRows) {
