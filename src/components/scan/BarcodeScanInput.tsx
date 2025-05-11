@@ -1,3 +1,4 @@
+
 import React, { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -32,8 +33,9 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   } = useSoundEffects();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Check if this is the first barcode in the row
-  const isFirstBarcode = countBarcodesInRow(rowId) === 0;
+  // Get the row and check if this is the first barcode
+  const row = getRowById(rowId);
+  const isFirstBarcode = row?.currentBarcodes === 0;
   
   const captureGPSLocation = async (): Promise<{
     latitude: number;
@@ -77,7 +79,6 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       const park = row ? getParkById(row.parkId) : undefined;
 
       // Get the captureLocation state from the parent component through the row
-      // Using optional chaining and type assertion to safely access the property
       const captureLocation = row ? (row as any).captureLocation || false : false;
 
       // Capture GPS location only if this is the first barcode in the row and location capture is enabled
@@ -92,7 +93,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
 
       // Check if the row has reached its expected barcode limit
       if (row?.expectedBarcodes !== undefined && row.expectedBarcodes !== null) {
-        const currentCount = countBarcodesInRow(rowId);
+        const currentCount = row.currentBarcodes || 0;
         if (currentCount >= row.expectedBarcodes) {
           playErrorSound();
           toast.error(`Maximum barcode limit reached (${row.expectedBarcodes}). Cannot add more barcodes to this row.`);

@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -69,15 +70,11 @@ const ScanRowPage = () => {
       if (row) {
         localStorage.setItem('selectedParkId', row.parkId);
         setRowName(row.name);
-      }
-      
-      // Set initial count
-      if (rowId) {
-        const count = countBarcodesInRow(rowId);
-        setScanCount(count);
+        // Use the currentBarcodes property from the row
+        setScanCount(row.currentBarcodes);
       }
     }
-  }, [rowId, rows, getRowById, countBarcodesInRow]);
+  }, [rowId, rows, getRowById]);
 
   // Update barcodes list whenever barcodes array changes
   useEffect(() => {
@@ -89,11 +86,13 @@ const ScanRowPage = () => {
       
       setLatestBarcodes(rowBarcodes);
       
-      // Update scan count whenever barcodes change
-      const count = countBarcodesInRow(rowId);
-      setScanCount(count);
+      // Get the current row to update scan count directly from row data
+      const row = getRowById(rowId);
+      if (row) {
+        setScanCount(row.currentBarcodes);
+      }
     }
-  }, [rowId, barcodes, getBarcodesByRowId, countBarcodesInRow]);
+  }, [rowId, barcodes, getBarcodesByRowId, getRowById, rows]);
 
   // Focus the input when the component mounts
   useEffect(() => {
@@ -133,8 +132,7 @@ const ScanRowPage = () => {
       await resetRow(rowId);
       // Clear the local state of barcodes
       setLatestBarcodes([]);
-      // Reset scan count to 0
-      setScanCount(0);
+      // Scan count will be updated by the row's currentBarcodes from useEffect
       
       setIsResetDialogOpen(false);
       toast.success('Row reset successfully');
@@ -156,6 +154,7 @@ const ScanRowPage = () => {
     setLatestBarcodes(updatedBarcodes);
     
     // Increment scan count immediately for better UI feedback
+    // The real count will be updated by the useEffect using currentBarcodes
     setScanCount(prevCount => prevCount + 1);
   };
 

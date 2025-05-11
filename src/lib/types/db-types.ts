@@ -26,6 +26,7 @@ export type Row = {
   parkId: string;
   createdAt: string;
   expectedBarcodes?: number | null;
+  currentBarcodes: number;
 };
 
 // Barcode type

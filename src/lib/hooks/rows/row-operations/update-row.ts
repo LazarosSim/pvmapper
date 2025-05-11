@@ -37,7 +37,10 @@ export const updateRow = async (
     
     setRows(prev => prev.map(row => 
       row.id === rowId 
-        ? { ...row, name: name !== undefined ? name : row.name, expectedBarcodes: expectedBarcodes !== undefined ? expectedBarcodes : row.expectedBarcodes } 
+        ? { ...row, 
+            name: name !== undefined ? name : row.name, 
+            expectedBarcodes: expectedBarcodes !== undefined ? expectedBarcodes : row.expectedBarcodes 
+          } 
         : row
     ));
     

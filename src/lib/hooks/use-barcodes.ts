@@ -120,6 +120,13 @@ export const useBarcodes = (
         };
         
         setBarcodes(prev => [newBarcode, ...prev]);
+        
+        // Update the barcodes count in row
+        const updatedRow = rows.find(row => row.id === rowId);
+        if (updatedRow) {
+          updatedRow.currentBarcodes = (updatedRow.currentBarcodes || 0) + 1;
+        }
+        
         await updateDailyScans();
         return newBarcode;
       }
@@ -181,6 +188,13 @@ export const useBarcodes = (
       
       // Remove from local state
       setBarcodes(prev => prev.filter(barcode => barcode.id !== barcodeId));
+      
+      // Update the barcodes count in the row
+      const rowId = barcodeToDelete.rowId;
+      const updatedRow = rows.find(row => row.id === rowId);
+      if (updatedRow && updatedRow.currentBarcodes > 0) {
+        updatedRow.currentBarcodes -= 1;
+      }
       
       // Adjust daily scan count
       if (decreaseDailyScans && barcodeToDelete) {

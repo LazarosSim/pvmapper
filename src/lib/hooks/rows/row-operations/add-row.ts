@@ -25,7 +25,8 @@ export const addRow = async (
       .insert([{ 
         name: rowName,
         park_id: parkId,
-        expected_barcodes: expectedBarcodes
+        expected_barcodes: expectedBarcodes,
+        current_barcodes: 0 // Initialize with 0 barcodes
       }])
       .select();
       
@@ -41,7 +42,8 @@ export const addRow = async (
         name: data[0].name,
         parkId: data[0].park_id,
         createdAt: data[0].created_at,
-        expectedBarcodes: data[0].expected_barcodes
+        expectedBarcodes: data[0].expected_barcodes,
+        currentBarcodes: data[0].current_barcodes || 0
       };
       
       setRows(prev => [newRow, ...prev]);
@@ -106,7 +108,8 @@ export const addSubRow = async (
         .insert([{ 
           name: newRowName,
           park_id: parkId,
-          expected_barcodes: expectedBarcodes
+          expected_barcodes: expectedBarcodes,
+          current_barcodes: 0 // Initialize with 0 barcodes
         }])
         .select();
         
@@ -122,7 +125,8 @@ export const addSubRow = async (
           name: data[0].name,
           parkId: data[0].park_id,
           createdAt: data[0].created_at,
-          expectedBarcodes: data[0].expected_barcodes
+          expectedBarcodes: data[0].expected_barcodes,
+          currentBarcodes: data[0].current_barcodes || 0
         };
         
         setRows(prev => [newRow, ...prev]);
@@ -160,7 +164,8 @@ export const addSubRow = async (
         .insert([{ 
           name: newRowName,
           park_id: parkId,
-          expected_barcodes: expectedBarcodes
+          expected_barcodes: expectedBarcodes,
+          current_barcodes: 0 // Initialize with 0 barcodes
         }])
         .select();
         
@@ -176,7 +181,8 @@ export const addSubRow = async (
           name: data[0].name,
           parkId: data[0].park_id,
           createdAt: data[0].created_at,
-          expectedBarcodes: data[0].expected_barcodes
+          expectedBarcodes: data[0].expected_barcodes,
+          currentBarcodes: data[0].current_barcodes || 0
         };
         
         setRows(prev => [newRow, ...prev]);

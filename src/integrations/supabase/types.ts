@@ -122,6 +122,7 @@ export type Database = {
       rows: {
         Row: {
           created_at: string
+          current_barcodes: number | null
           expected_barcodes: number | null
           id: string
           name: string
@@ -129,6 +130,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          current_barcodes?: number | null
           expected_barcodes?: number | null
           id?: string
           name: string
@@ -136,6 +138,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          current_barcodes?: number | null
           expected_barcodes?: number | null
           id?: string
           name?: string
