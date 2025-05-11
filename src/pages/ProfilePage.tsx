@@ -62,7 +62,7 @@ const ProfilePage = () => {
       }
       
       // Re-fetch the user profile to get updated counts
-      await refetchUser(currentUser.id);
+      await refetchUser();
       
       toast.success('Stats refreshed successfully');
       setRefreshKey(prev => prev + 1);
