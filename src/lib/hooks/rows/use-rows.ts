@@ -1,7 +1,5 @@
 
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import type { Row, Barcode } from '../../types/db-types';
 import { fetchRows } from './row-operations/fetch-rows';
 import { addRow, addSubRow } from './row-operations/add-row';

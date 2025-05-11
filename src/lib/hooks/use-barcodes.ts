@@ -5,11 +5,7 @@ import { toast } from 'sonner';
 import type { Barcode, Row } from '../types/db-types';
 
 export const useBarcodes = (
-  rows: Row[],
-  updateDailyScans: () => Promise<void>,
-  decreaseDailyScans?: (userId?: string, date?: string, count?: number) => Promise<void>
-) => {
-  const [barcodes, setBarcodes] = useState<Barcode[]>([]);
+    rows: Row[], barcodes: Barcode[], setBarcodes: React.Dispatch<React.SetStateAction<Barcode[]>>, updateDailyScans: () => Promise<void>, decreaseDailyScans?: (userId?: string, date?: string, count?: number) => Promise<void>) => {
 
   // Fetch barcodes data
   const fetchBarcodes = async (userId?: string) => {

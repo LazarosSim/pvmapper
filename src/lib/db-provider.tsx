@@ -53,7 +53,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   const {
     fetchBarcodes, addBarcode, updateBarcode, deleteBarcode,
     getBarcodesByRowId, searchBarcodes, countBarcodesInPark
-  } = useBarcodes(rows, () => updateDailyScans(user?.id), decreaseDailyScans);
+  } = useBarcodes(rows, barcodes, setBarcodes, () => updateDailyScans(user?.id), decreaseDailyScans);
   
   // Initialize parks module with dependencies
   const {
