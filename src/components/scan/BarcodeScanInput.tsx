@@ -1,8 +1,9 @@
+
 import React, { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, ArrowRight, X, MapPin } from 'lucide-react';
+import { Loader2, ArrowRight, X } from 'lucide-react';
 import useSoundEffects from '@/hooks/use-sound-effects';
 import { useDB } from '@/lib/db-provider';
 
@@ -19,7 +20,6 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
 }) => {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [captureLocation, setCaptureLocation] = useState(false);
   const { addBarcode, getRowById, getParkById, getBarcodesByRowId, countBarcodesInRow } = useDB();
   const { playSuccessSound, playErrorSound } = useSoundEffects();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -62,6 +62,9 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       
       const row = getRowById(rowId);
       const park = row ? getParkById(row.parkId) : undefined;
+      
+      // Get the captureLocation state from the parent component through props
+      const captureLocation = row?.captureLocation || false;
       
       // Capture GPS location only if this is the first barcode in the row and location capture is enabled
       let location = null;
@@ -150,6 +153,10 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       const timestamp = new Date().getTime();
       const placeholderCode = `X_PLACEHOLDER_${timestamp}`;
       
+      // Get the captureLocation state from the parent component through props
+      const row = getRowById(rowId);
+      const captureLocation = row?.captureLocation || false;
+      
       // Capture GPS location if this is the first barcode in the row and location capture is enabled
       let location = null;
       if (isFirstBarcode && captureLocation) {
@@ -220,18 +227,6 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       </div>
       
       <div className="absolute right-0 top-0 flex h-full">
-        {isFirstBarcode && (
-          <Button
-            type="button"
-            onClick={() => setCaptureLocation(!captureLocation)}
-            className={`h-full px-2 mr-1 ${captureLocation ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
-            variant="ghost"
-            size="icon"
-            title={captureLocation ? "GPS location will be captured" : "Click to enable GPS location capture"}
-          >
-            <MapPin className={`h-4 w-4 ${captureLocation ? 'text-green-600' : 'text-gray-400'}`} />
-          </Button>
-        )}
         <Button
           type="button"
           onClick={registerPlaceholder}

@@ -8,10 +8,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { useDB } from '@/lib/db-provider';
+import { Switch } from '@/components/ui/switch';
 
 interface HeaderProps {
   title: string;
@@ -74,6 +76,7 @@ const Header: React.FC<HeaderProps> = ({
   const handleToggleLocation = () => {
     if (setCaptureLocation) {
       setCaptureLocation(!captureLocation);
+      toast.success(captureLocation ? "GPS location capture disabled" : "GPS location capture enabled");
     }
   };
   
@@ -130,7 +133,18 @@ const Header: React.FC<HeaderProps> = ({
                   <div className="flex items-center w-full">
                     <MapPin className="mr-2 h-4 w-4" />
                     <span>Capture GPS Location</span>
-                    {captureLocation && <Check className="ml-auto h-4 w-4" />}
+                    <div className="ml-auto">
+                      <Switch 
+                        checked={captureLocation} 
+                        onCheckedChange={(checked) => {
+                          if (setCaptureLocation) {
+                            setCaptureLocation(checked);
+                            toast.success(checked ? "GPS location capture enabled" : "GPS location capture disabled");
+                          }
+                        }}
+                        className="data-[state=checked]:bg-green-500"
+                      />
+                    </div>
                   </div>
                 </DropdownMenuItem>
               )}
