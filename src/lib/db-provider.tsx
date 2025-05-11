@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useSupabase } from './supabase-provider';
 import { toast } from 'sonner';
@@ -15,6 +16,11 @@ import { useRows } from './hooks/rows/use-rows';
 import { useBarcodes } from './hooks/use-barcodes';
 import { useStats } from './hooks/use-stats';
 import { useDataManagement } from './hooks/use-data-management';
+
+// Extend the Row type to include captureLocation
+export interface ExtendedRow extends Row {
+  captureLocation?: boolean;
+}
 
 const DBContext = createContext<DBContextType | undefined>(undefined);
 
@@ -177,7 +183,8 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export { type User, type Park, type Row, type Barcode };
+export { type User, type Park, type Barcode };
+export type { ExtendedRow as Row };
 
 export const useDB = () => {
   const context = useContext(DBContext);

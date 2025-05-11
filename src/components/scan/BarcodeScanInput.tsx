@@ -63,8 +63,9 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       const row = getRowById(rowId);
       const park = row ? getParkById(row.parkId) : undefined;
       
-      // Get the captureLocation state from the parent component through props
-      const captureLocation = row?.captureLocation || false;
+      // Get the captureLocation state from the parent component through the row
+      // Using optional chaining and type assertion to safely access the property
+      const captureLocation = row ? (row as any).captureLocation || false : false;
       
       // Capture GPS location only if this is the first barcode in the row and location capture is enabled
       let location = null;
@@ -153,9 +154,10 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       const timestamp = new Date().getTime();
       const placeholderCode = `X_PLACEHOLDER_${timestamp}`;
       
-      // Get the captureLocation state from the parent component through props
+      // Get the captureLocation state from the parent component through the row
+      // Using optional chaining and type assertion to safely access the property
       const row = getRowById(rowId);
-      const captureLocation = row?.captureLocation || false;
+      const captureLocation = row ? (row as any).captureLocation || false : false;
       
       // Capture GPS location if this is the first barcode in the row and location capture is enabled
       let location = null;
