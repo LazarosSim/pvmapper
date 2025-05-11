@@ -7,11 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { LogOut, BarChart3, User, Award, Star, Trophy, Medal, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const ProfilePage = () => {
-  const { currentUser, logout, getUserDailyScans, getUserBarcodesScanned, barcodes } = useDB();
+  const { currentUser, logout, getUserDailyScans, getUserBarcodesScanned, barcodes, refetchUser } = useDB();
   const navigate = useNavigate();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   React.useEffect(() => {
     if (!currentUser) {
@@ -36,8 +39,39 @@ const ProfilePage = () => {
   const dailyScans = getUserDailyScans();
   const recentBarcodes = getUserBarcodesScanned().slice(0, 5);
 
-  const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
+  const handleRefresh = async () => {
+    if (isRefreshing || !currentUser?.id) return;
+    
+    setIsRefreshing(true);
+    try {
+      // Call the update-user-total-scans function to refresh the count
+      const response = await fetch(
+        'https://ynslzmpfhmoghvcacwzd.supabase.co/functions/v1/update-user-total-scans',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          },
+          body: JSON.stringify({ userId: currentUser.id })
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to refresh total scans count');
+      }
+      
+      // Re-fetch the user profile to get updated counts
+      await refetchUser(currentUser.id);
+      
+      toast.success('Stats refreshed successfully');
+      setRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error('Error refreshing stats:', error);
+      toast.error('Failed to refresh stats');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleLogout = () => {
@@ -96,8 +130,14 @@ const ProfilePage = () => {
                 <BarChart3 className="mr-2 h-5 w-5" />
                 Your Statistics
               </CardTitle>
-              <Button variant="ghost" size="icon" onClick={handleRefresh} title="Refresh stats">
-                <RefreshCw className="h-4 w-4" />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleRefresh} 
+                title="Refresh stats"
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               </Button>
             </div>
           </CardHeader>

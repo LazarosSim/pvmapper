@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Row, Barcode } from '../../../types/db-types';
@@ -92,6 +91,9 @@ export const resetRow = async (
     // Group barcodes by user and date for adjustment
     const userBarcodeCounts: {[key: string]: number} = {};
     
+    // Track all affected users to update their total counts later
+    const affectedUsers = new Set<string>();
+    
     // Format: userId_date -> count
     rowBarcodes.forEach(barcode => {
       const scanDate = new Date(barcode.timestamp).toISOString().split('T')[0];
@@ -101,6 +103,11 @@ export const resetRow = async (
         userBarcodeCounts[key] = 0;
       }
       userBarcodeCounts[key]++;
+      
+      // Add to affected users set
+      if (barcode.userId) {
+        affectedUsers.add(barcode.userId);
+      }
     });
     
     // Delete all barcodes for this row
@@ -141,10 +148,35 @@ export const resetRow = async (
       }
     }
     
+    // Update total scans count for each affected user
+    for (const userId of affectedUsers) {
+      try {
+        const response = await fetch(
+          'https://ynslzmpfhmoghvcacwzd.supabase.co/functions/v1/update-user-total-scans',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+            },
+            body: JSON.stringify({ userId })
+          }
+        );
+        
+        if (!response.ok) {
+          console.error('Failed to update user total scans:', await response.text());
+        }
+      } catch (error) {
+        console.error('Error calling update-user-total-scans function:', error);
+      }
+    }
+    
     toast.success(`Reset ${rowBarcodes.length} barcodes successfully`);
+    return true;
   } catch (error: any) {
     console.error('Error in resetRow:', error.message);
     toast.error(`Failed to reset row: ${error.message}`);
+    return false;
   }
 };
 

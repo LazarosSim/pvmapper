@@ -41,6 +41,7 @@ export const updateUserScans = async (userId: string) => {
       return { success: false, error: updateError };
     }
     
+    console.log(`User ${userId} total scans updated to ${count || 0}`);
     return { success: true, count: count || 0 };
   } catch (error) {
     console.error('Unexpected error:', error);
@@ -73,6 +74,7 @@ Deno.serve(async (req) => {
         { status: result.success ? 200 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } catch (error) {
+      console.error('Error handling request:', error);
       return new Response(
         JSON.stringify({ error: 'Invalid request' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
