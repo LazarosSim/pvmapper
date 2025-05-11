@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -8,7 +9,7 @@ import { LogOut, BarChart3, User, Award, Star, Trophy, Medal, RefreshCw } from '
 import { formatDistanceToNow } from 'date-fns';
 
 const ProfilePage = () => {
-  const { currentUser, logout, getUserDailyScans, getUserTotalScans, getUserBarcodesScanned, barcodes } = useDB();
+  const { currentUser, logout, getUserDailyScans, getUserBarcodesScanned, barcodes } = useDB();
   const navigate = useNavigate();
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -33,7 +34,6 @@ const ProfilePage = () => {
 
   // Use refreshKey to trigger re-evaluation of these values
   const dailyScans = getUserDailyScans();
-  const totalScans = refreshKey >= 0 ? getUserTotalScans() : 0; // Using refreshKey to force re-evaluation
   const recentBarcodes = getUserBarcodesScanned().slice(0, 5);
 
   const handleRefresh = () => {
@@ -112,7 +112,7 @@ const ProfilePage = () => {
             <div className="pt-2">
               <div className="flex justify-between items-center">
                 <span>Total Scans</span>
-                <span className="text-xl font-bold">{totalScans}</span>
+                <span className="text-xl font-bold">{currentUser.totalScans || 0}</span>
               </div>
             </div>
             

@@ -15,7 +15,7 @@ export const useUser = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, role, created_at')
+        .select('id, username, role, created_at, user_total_scans')
         .eq('id', userId)
         .single();
 
@@ -31,7 +31,8 @@ export const useUser = () => {
           id: data.id,
           username: data.username,
           role: data.role,
-          createdAt: data.created_at
+          createdAt: data.created_at,
+          totalScans: data.user_total_scans || 0
         };
         setCurrentUser(user);
         return user;
