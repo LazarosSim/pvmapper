@@ -39,6 +39,7 @@ const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({
   
   const captureGPSLocation = async (): Promise<{latitude: number, longitude: number} | null> => {
     try {
+      toast.loading("Capturing GPS location...");
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         if (!navigator.geolocation) {
           toast.error("Geolocation is not supported by this browser");
@@ -53,13 +54,17 @@ const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({
         });
       });
       
+      toast.dismiss();
+      toast.success("GPS location captured successfully");
+      
       return {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude
       };
     } catch (error) {
       console.error("Error getting location:", error);
-      toast.error("Unable to get location. Please ensure location services are enabled.");
+      toast.dismiss();
+      toast.error("Unable to get GPS location. Please ensure location services are enabled.");
       return null;
     }
   };
@@ -69,21 +74,22 @@ const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({
       // Capture GPS location only if this is the first barcode in the row and location capture is enabled
       let location = null;
       if (isFirstBarcode && captureLocation) {
-        toast.loading("Capturing location...");
         location = await captureGPSLocation();
         if (!location) {
-          toast.dismiss();
-          toast.warning("Location capture failed, but proceeding with barcode registration");
-        } else {
-          toast.dismiss();
-          toast.success("Location captured successfully");
+          toast.warning("GPS location capture failed, but proceeding with barcode registration");
         }
       }
       
       const result = await addBarcode(code.trim(), rowId, undefined, location);
       if (result) {
         setCode('');
-        toast.success('Barcode added successfully');
+        
+        // Show success message with location info if captured
+        if (location && isFirstBarcode) {
+          toast.success(`Barcode added with GPS location: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`);
+        } else {
+          toast.success('Barcode added successfully');
+        }
         
         // Call the onBarcodeAdded callback if provided
         if (onBarcodeAdded) {
@@ -126,7 +132,7 @@ const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({
                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center"
                 >
                   <MapPin className="h-4 w-4 mr-1 text-gray-600" />
-                  Capture location
+                  Capture GPS location
                 </label>
               </div>
               <span className="ml-2 text-gray-500 text-xs">

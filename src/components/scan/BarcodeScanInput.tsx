@@ -1,4 +1,3 @@
-
 import React, { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -6,11 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Loader2, ArrowRight, X } from 'lucide-react';
 import useSoundEffects from '@/hooks/use-sound-effects';
 import { useDB } from '@/lib/db-provider';
+
 interface BarcodeScanInputProps {
   rowId: string;
   onBarcodeAdded: (barcode: any) => void;
   focusInput: () => void;
 }
+
 const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   rowId,
   onBarcodeAdded,
@@ -39,6 +40,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
     longitude: number;
   } | null> => {
     try {
+      toast.loading("Capturing GPS location...");
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         if (!navigator.geolocation) {
           toast.error("Geolocation is not supported by this browser");
@@ -51,13 +53,18 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
           maximumAge: 0
         });
       });
+      
+      toast.dismiss();
+      toast.success("GPS location captured successfully");
+      
       return {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude
       };
     } catch (error) {
       console.error("Error getting location:", error);
-      toast.error("Unable to get location. Please ensure location services are enabled.");
+      toast.dismiss();
+      toast.error("Unable to get GPS location. Please ensure location services are enabled.");
       return null;
     }
   };
@@ -76,15 +83,10 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       // Capture GPS location only if this is the first barcode in the row and location capture is enabled
       let location = null;
       if (isFirstBarcode && captureLocation) {
-        toast.loading("Capturing location...");
         location = await captureGPSLocation();
         if (!location) {
           // Allow the user to continue even if location capture fails
-          toast.dismiss();
-          toast.warning("Location capture failed, but proceeding with barcode registration");
-        } else {
-          toast.dismiss();
-          toast.success("Location captured successfully");
+          toast.warning("GPS location capture failed, but proceeding with barcode registration");
         }
       }
 
@@ -127,7 +129,13 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       if (result !== undefined && result !== null) {
         setBarcodeInput('');
         playSuccessSound();
-        toast.success('Barcode added successfully');
+        
+        // Show success message with location info if captured
+        if (location && isFirstBarcode) {
+          toast.success(`Barcode added with GPS location: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`);
+        } else {
+          toast.success('Barcode added successfully');
+        }
 
         // Call onBarcodeAdded with the result to update the UI immediately
         onBarcodeAdded(result);
@@ -159,21 +167,15 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       const placeholderCode = `X_PLACEHOLDER_${timestamp}`;
 
       // Get the captureLocation state from the parent component through the row
-      // Using optional chaining and type assertion to safely access the property
       const row = getRowById(rowId);
       const captureLocation = row ? (row as any).captureLocation || false : false;
 
       // Capture GPS location if this is the first barcode in the row and location capture is enabled
       let location = null;
       if (isFirstBarcode && captureLocation) {
-        toast.loading("Capturing location...");
         location = await captureGPSLocation();
         if (!location) {
-          toast.dismiss();
-          toast.warning("Location capture failed, but proceeding with placeholder");
-        } else {
-          toast.dismiss();
-          toast.success("Location captured successfully");
+          toast.warning("GPS location capture failed, but proceeding with placeholder");
         }
       }
 
@@ -181,7 +183,14 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       const result = await addBarcode(placeholderCode, rowId, undefined, location);
       if (result !== undefined && result !== null) {
         playSuccessSound();
-        toast.success('Placeholder added');
+        
+        // Show success message with location info if captured
+        if (location && isFirstBarcode) {
+          toast.success(`Placeholder added with GPS location: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`);
+        } else {
+          toast.success('Placeholder added');
+        }
+        
         // Make sure to update parent component
         onBarcodeAdded(result);
       } else {
@@ -221,4 +230,5 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       </div>
     </form>;
 };
+
 export default BarcodeScanInput;
