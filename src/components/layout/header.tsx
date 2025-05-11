@@ -12,7 +12,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { useDB } from '@/lib/db-provider';
-import { Checkbox } from '@/components/ui/checkbox';
 
 interface HeaderProps {
   title: string;
@@ -75,7 +74,6 @@ const Header: React.FC<HeaderProps> = ({
   const handleToggleLocation = () => {
     if (setCaptureLocation) {
       setCaptureLocation(!captureLocation);
-      toast.success(`Location capture ${!captureLocation ? 'enabled' : 'disabled'}`);
     }
   };
   
@@ -132,12 +130,7 @@ const Header: React.FC<HeaderProps> = ({
                   <div className="flex items-center w-full">
                     <MapPin className="mr-2 h-4 w-4" />
                     <span>Capture GPS Location</span>
-                    <div className="ml-auto">
-                      <Checkbox 
-                        checked={captureLocation}
-                        className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
-                      />
-                    </div>
+                    {captureLocation && <Check className="ml-auto h-4 w-4" />}
                   </div>
                 </DropdownMenuItem>
               )}
