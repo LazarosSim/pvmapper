@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,7 +47,8 @@ const RowCard: React.FC<RowCardProps> = ({ row, onOpen }) => {
     row.expectedBarcodes !== undefined && row.expectedBarcodes !== null ? String(row.expectedBarcodes) : ''
   );
   
-  const barcodeCount = countBarcodesInRow(row.id);
+  // Use the currentBarcodes directly from the row object
+  const barcodeCount = row.currentBarcodes || 0;
   const createdAt = formatDistanceToNow(new Date(row.createdAt), { addSuffix: true });
   
   const handleEdit = () => {

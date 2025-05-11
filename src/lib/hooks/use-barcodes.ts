@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -130,7 +131,7 @@ export const useBarcodes = (
         
         setBarcodes(prev => [newBarcode, ...prev]);
         
-        // Update the barcodes count in row
+        // Update the barcodes count in row - the database trigger will handle this now
         const updatedRow = rows.find(row => row.id === rowId);
         if (updatedRow) {
           updatedRow.currentBarcodes = (updatedRow.currentBarcodes || 0) + 1;
@@ -204,11 +205,12 @@ export const useBarcodes = (
       // First, get the barcode to know which user it belongs to
       const { data: barcodeData } = await supabase
         .from('barcodes')
-        .select('user_id')
+        .select('user_id, row_id')
         .eq('id', barcodeId)
         .single();
         
       const userId = barcodeData?.user_id;
+      const rowId = barcodeData?.row_id;
       
       // Now delete the barcode
       const { error } = await supabase
@@ -218,6 +220,15 @@ export const useBarcodes = (
 
       if (error) {
         throw error;
+      }
+
+      // Update the state to remove the deleted barcode
+      setBarcodes(prev => prev.filter(barcode => barcode.id !== barcodeId));
+
+      // Update the currentBarcodes count in the row - the database trigger will handle this now
+      const updatedRow = rows.find(row => row.id === rowId);
+      if (updatedRow && updatedRow.currentBarcodes && updatedRow.currentBarcodes > 0) {
+        updatedRow.currentBarcodes -= 1;
       }
 
       if (userId) {
