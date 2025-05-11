@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -10,6 +11,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button"; // Added missing import
+import { Check, X } from "lucide-react"; // Added missing import
 import { toast } from 'sonner';
 import AuthGuard from '@/components/auth/auth-guard';
 import BarcodeScanInput from '@/components/scan/BarcodeScanInput';
