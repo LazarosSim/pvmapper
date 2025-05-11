@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useDB } from '@/lib/db-provider';
@@ -49,6 +48,7 @@ const RowDetail = () => {
   const [rowName, setRowName] = useState('');
   const [isInserting, setIsInserting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [captureLocation, setCaptureLocation] = useState(false);
 
   if (!rowId || !rows.some(r => r.id === rowId)) {
     return <Navigate to="/" replace />;
@@ -268,6 +268,8 @@ const RowDetail = () => {
           open={isDialogOpen} 
           onOpenChange={setIsDialogOpen} 
           rowId={rowId}
+          captureLocation={captureLocation}
+          setCaptureLocation={setCaptureLocation}
         />
 
         <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
