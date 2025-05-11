@@ -1,4 +1,3 @@
-
 import React, { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -6,13 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Loader2, ArrowRight, X } from 'lucide-react';
 import useSoundEffects from '@/hooks/use-sound-effects';
 import { useDB } from '@/lib/db-provider';
-
 interface BarcodeScanInputProps {
   rowId: string;
   onBarcodeAdded: (barcode: any) => void;
   focusInput: () => void;
 }
-
 const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   rowId,
   onBarcodeAdded,
@@ -20,14 +17,25 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
 }) => {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const { addBarcode, getRowById, getParkById, getBarcodesByRowId, countBarcodesInRow } = useDB();
-  const { playSuccessSound, playErrorSound } = useSoundEffects();
+  const {
+    addBarcode,
+    getRowById,
+    getParkById,
+    getBarcodesByRowId,
+    countBarcodesInRow
+  } = useDB();
+  const {
+    playSuccessSound,
+    playErrorSound
+  } = useSoundEffects();
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Check if this is the first barcode in the row
   const isFirstBarcode = countBarcodesInRow(rowId) === 0;
-
-  const captureGPSLocation = async (): Promise<{latitude: number, longitude: number} | null> => {
+  const captureGPSLocation = async (): Promise<{
+    latitude: number;
+    longitude: number;
+  } | null> => {
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         if (!navigator.geolocation) {
@@ -35,14 +43,12 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
           reject("Geolocation not supported");
           return;
         }
-        
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
           timeout: 5000,
           maximumAge: 0
         });
       });
-      
       return {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude
@@ -53,20 +59,17 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       return null;
     }
   };
-
   const registerBarcode = async () => {
     if (!barcodeInput.trim() || isProcessing) return;
-    
     try {
       setIsProcessing(true);
-      
       const row = getRowById(rowId);
       const park = row ? getParkById(row.parkId) : undefined;
-      
+
       // Get the captureLocation state from the parent component through the row
       // Using optional chaining and type assertion to safely access the property
       const captureLocation = row ? (row as any).captureLocation || false : false;
-      
+
       // Capture GPS location only if this is the first barcode in the row and location capture is enabled
       let location = null;
       if (isFirstBarcode && captureLocation) {
@@ -81,7 +84,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
           toast.success("Location captured successfully");
         }
       }
-      
+
       // Check if the row has reached its expected barcode limit
       if (row?.expectedBarcodes !== undefined && row.expectedBarcodes !== null) {
         const currentCount = countBarcodesInRow(rowId);
@@ -93,7 +96,6 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
           return;
         }
       }
-      
       if (park?.validateBarcodeLength) {
         const length = barcodeInput.trim().length;
         if (length < 19 || length > 26) {
@@ -104,11 +106,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
           return;
         }
       }
-      
-      const duplicates = getBarcodesByRowId(rowId).filter(b => 
-        b.code.toLowerCase() === barcodeInput.trim().toLowerCase()
-      );
-
+      const duplicates = getBarcodesByRowId(rowId).filter(b => b.code.toLowerCase() === barcodeInput.trim().toLowerCase());
       if (duplicates.length > 0) {
         playErrorSound();
         toast.error('Duplicate barcode detected');
@@ -116,15 +114,14 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
         focusInput();
         return;
       }
-      
+
       // Pass the location data to the addBarcode function
       const result = await addBarcode(barcodeInput.trim(), rowId, undefined, location);
-      
       if (result !== undefined && result !== null) {
         setBarcodeInput('');
         playSuccessSound();
         toast.success('Barcode added successfully');
-        
+
         // Call onBarcodeAdded with the result to update the UI immediately
         onBarcodeAdded(result);
       } else {
@@ -140,25 +137,23 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       focusInput();
     }
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await registerBarcode();
   };
-
   const registerPlaceholder = async () => {
     try {
       setIsProcessing(true);
-      
+
       // Generate unique placeholder barcode with timestamp to avoid duplicates
       const timestamp = new Date().getTime();
       const placeholderCode = `X_PLACEHOLDER_${timestamp}`;
-      
+
       // Get the captureLocation state from the parent component through the row
       // Using optional chaining and type assertion to safely access the property
       const row = getRowById(rowId);
       const captureLocation = row ? (row as any).captureLocation || false : false;
-      
+
       // Capture GPS location if this is the first barcode in the row and location capture is enabled
       let location = null;
       if (isFirstBarcode && captureLocation) {
@@ -172,10 +167,9 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
           toast.success("Location captured successfully");
         }
       }
-      
+
       // We bypass validation for this special code
       const result = await addBarcode(placeholderCode, rowId, undefined, location);
-      
       if (result !== undefined && result !== null) {
         playSuccessSound();
         toast.success('Placeholder added');
@@ -194,54 +188,27 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       focusInput();
     }
   };
-
-  return (
-    <form onSubmit={handleSubmit} className="relative">
+  return <form onSubmit={handleSubmit} className="relative">
       <div className="relative">
-        <Input
-          ref={inputRef}
-          value={barcodeInput}
-          onChange={(e) => setBarcodeInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              registerBarcode();
-            }
-          }}
-          placeholder="Scan or enter barcode"
-          className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30 pr-16"
-          autoComplete="off"
-        />
-        <Button 
-          type="submit" 
-          disabled={!barcodeInput.trim() || isProcessing}
-          className="absolute right-0 top-0 bg-inventory-primary hover:bg-inventory-primary/90 h-full px-3 text-sm"
-        >
-          {isProcessing ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <span className="flex items-center">
+        <Input ref={inputRef} value={barcodeInput} onChange={e => setBarcodeInput(e.target.value)} onKeyDown={e => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          registerBarcode();
+        }
+      }} placeholder="Scan or enter barcode" className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30 pr-16" autoComplete="off" />
+        <Button type="submit" disabled={!barcodeInput.trim() || isProcessing} className="absolute right-0 top-0 bg-inventory-primary hover:bg-inventory-primary/90 h-full px-3 text-sm">
+          {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <span className="flex items-center">
               <span className="hidden sm:inline mr-1">Add</span>
               <ArrowRight className="h-4 w-4" />
-            </span>
-          )}
+            </span>}
         </Button>
       </div>
       
       <div className="absolute right-0 top-0 flex h-full">
-        <Button
-          type="button"
-          onClick={registerPlaceholder}
-          disabled={isProcessing}
-          className="h-full bg-gray-200 hover:bg-gray-300 px-2 rounded-md text-gray-600 ml-1"
-          variant="ghost"
-          size="icon"
-        >
+        <Button type="button" onClick={registerPlaceholder} disabled={isProcessing} variant="ghost" size="icon" className="h-full rounded-md ml-1 px-[2px] py-[2px] mx-0 my-[40px] text-center text-base bg-gray-400 hover:bg-gray-300 text-zinc-950">
           <X className="h-4 w-4" />
         </Button>
       </div>
-    </form>
-  );
+    </form>;
 };
-
 export default BarcodeScanInput;
