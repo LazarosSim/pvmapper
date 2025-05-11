@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -130,7 +131,13 @@ export const useBarcodes = (
         
         setBarcodes(prev => [newBarcode, ...prev]);
         
-        // Update daily scan count
+        // Update the barcodes count in row - the database trigger will handle this now
+        const updatedRow = rows.find(row => row.id === rowId);
+        if (updatedRow) {
+          updatedRow.currentBarcodes = (updatedRow.currentBarcodes || 0) + 1;
+        }
+        
+        // If successful, update daily scan count
         await updateDailyScans(userId);
         
         // Update the user's total scans count in profile

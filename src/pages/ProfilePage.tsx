@@ -44,14 +44,6 @@ const ProfilePage = () => {
     
     setIsRefreshing(true);
     try {
-      // Get the current session to use its token
-      const sessionResponse = await supabase.auth.getSession();
-      const accessToken = sessionResponse.data.session?.access_token;
-      
-      if (!accessToken) {
-        throw new Error('No valid session found');
-      }
-      
       // Call the update-user-total-scans function to refresh the count
       const response = await fetch(
         'https://ynslzmpfhmoghvcacwzd.supabase.co/functions/v1/update-user-total-scans',
@@ -59,7 +51,7 @@ const ProfilePage = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
           },
           body: JSON.stringify({ userId: currentUser.id })
         }
