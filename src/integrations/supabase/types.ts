@@ -103,18 +103,21 @@ export type Database = {
           created_at: string
           id: string
           role: string
+          user_total_scans: number | null
           username: string
         }
         Insert: {
           created_at?: string
           id: string
           role?: string
+          user_total_scans?: number | null
           username: string
         }
         Update: {
           created_at?: string
           id?: string
           role?: string
+          user_total_scans?: number | null
           username?: string
         }
         Relationships: []

@@ -5,10 +5,10 @@ import { toast } from 'sonner';
 import type { Barcode, Row } from '../types/db-types';
 
 export const useBarcodes = (
-    rows: Row[], barcodes: Barcode[], setBarcodes: React.Dispatch<React.SetStateAction<Barcode[]>>, updateDailyScans: () => Promise<void>, decreaseDailyScans?: (userId?: string, date?: string, count?: number) => Promise<void>) => {
+    rows: Row[], barcodes: Barcode[], setBarcodes: React.Dispatch<React.SetStateAction<Barcode[]>>, updateDailyScans: (userId?: string) => Promise<void>, decreaseDailyScans: (userId?: string) => Promise<void>) => {
 
   // Fetch barcodes data
-  const fetchBarcodes = async (userId?: string) => {
+  const fetchBarcodes = async (userId: string) => {
     if (!userId) return;
     
     try {
@@ -42,15 +42,25 @@ export const useBarcodes = (
     }
   };
 
+  // Add a barcode
   const addBarcode = async (
-    code: string, 
-    rowId: string, 
-    afterBarcodeIndex?: number, 
+    code: string,
+    rowId: string,
+    afterBarcodeIndex?: number,
     location?: { latitude: number, longitude: number } | null,
     userId?: string
-  ) => {
-    if (!userId) return null;
-    
+  ): Promise<Barcode | null> => {
+    if (!code.trim()) {
+      toast.error('Barcode cannot be empty');
+      return null;
+    }
+
+    const row = rows.find(r => r.id === rowId);
+    if (!row) {
+      toast.error('Row not found');
+      return null;
+    }
+
     try {
       // Get barcodes for this row to determine display order
       const rowBarcodes = barcodes
@@ -117,13 +127,38 @@ export const useBarcodes = (
         
         setBarcodes(prev => [newBarcode, ...prev]);
         
-        // Update the barcodes count in row
+        // Update the barcodes count in row - the database trigger will handle this now
         const updatedRow = rows.find(row => row.id === rowId);
         if (updatedRow) {
           updatedRow.currentBarcodes = (updatedRow.currentBarcodes || 0) + 1;
         }
         
-        await updateDailyScans();
+        // If successful, update daily scan count
+        await updateDailyScans(userId);
+
+        // Update the user's total scans count in profile
+        if (userId) {
+          try {
+            const response = await fetch(
+              'https://ynslzmpfhmoghvcacwzd.supabase.co/functions/v1/update-user-total-scans',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+                },
+                body: JSON.stringify({ userId })
+              }
+            );
+
+            if (!response.ok) {
+              console.error('Failed to update user total scans:', await response.text());
+            }
+          } catch (error) {
+            console.error('Error calling update-user-total-scans function:', error);
+          }
+        }
+
         return newBarcode;
       }
       
@@ -161,46 +196,66 @@ export const useBarcodes = (
     }
   };
   
-  const deleteBarcode = async (barcodeId: string) => {
+  const deleteBarcode = async (barcodeId: string): Promise<void> => {
     try {
-      // Get the barcode to be deleted so we can adjust daily scan count
-      const barcodeToDelete = barcodes.find(barcode => barcode.id === barcodeId);
+      // First, get the barcode to know which user it belongs to
+      const { data: barcodeData } = await supabase
+        .from('barcodes')
+        .select('user_id, row_id')
+        .eq('id', barcodeId)
+        .single();
+
+      const userId = barcodeData?.user_id;
+      const rowId = barcodeData?.row_id;
       
-      if (!barcodeToDelete) {
-        toast.error('Barcode not found');
-        return;
-      }
-      
+      // Now delete the barcode
       const { error } = await supabase
         .from('barcodes')
         .delete()
         .eq('id', barcodeId);
-        
+
       if (error) {
-        console.error('Error deleting barcode:', error);
-        toast.error(`Failed to delete barcode: ${error.message}`);
-        return;
+        throw error;
       }
-      
-      // Remove from local state
+
+      // Update the state to remove the deleted barcode
       setBarcodes(prev => prev.filter(barcode => barcode.id !== barcodeId));
-      
-      // Update the barcodes count in the row
-      const rowId = barcodeToDelete.rowId;
+
+      // Update the currentBarcodes count in the row - the database trigger will handle this now
       const updatedRow = rows.find(row => row.id === rowId);
-      if (updatedRow && updatedRow.currentBarcodes > 0) {
+      if (updatedRow && updatedRow.currentBarcodes && updatedRow.currentBarcodes > 0) {
         updatedRow.currentBarcodes -= 1;
       }
-      
-      // Adjust daily scan count
-      if (decreaseDailyScans && barcodeToDelete) {
-        const scanDate = new Date(barcodeToDelete.timestamp).toISOString().split('T')[0];
-        await decreaseDailyScans(barcodeToDelete.userId, scanDate, 1);
+
+      if (userId) {
+        // Decrease daily scans count
+        await decreaseDailyScans(userId);
+
+        // Update the user's total scans count
+        try {
+          const response = await fetch(
+            'https://ynslzmpfhmoghvcacwzd.supabase.co/functions/v1/update-user-total-scans',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+              },
+              body: JSON.stringify({ userId })
+            }
+          );
+
+          if (!response.ok) {
+            console.error('Failed to update user total scans:', await response.text());
+          }
+        } catch (error) {
+          console.error('Error calling update-user-total-scans function:', error);
+        }
       }
-      
+
       toast.success('Barcode deleted successfully');
     } catch (error: any) {
-      console.error('Error in deleteBarcode:', error.message);
+      console.error('Error deleting barcode:', error);
       toast.error(`Failed to delete barcode: ${error.message}`);
     }
   };
