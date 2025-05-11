@@ -10,13 +10,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Settings, Edit, MapPin, RotateCcw, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import AuthGuard from '@/components/auth/auth-guard';
 import BarcodeScanInput from '@/components/scan/BarcodeScanInput';
 import RecentScans from '@/components/scan/RecentScans';
 import ResetRowDialog from '@/components/scan/ResetRowDialog';
-import RowHeader from '@/components/scan/RowHeader';
 import AddBarcodeDialog from '@/components/dialog/add-barcode-dialog';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 // Audio notification for success/error
 const NOTIF_SOUND = "data:audio/wav;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAFAAAGUACFhYWFhYWFhYWFhYWFhYWFhYWFra2tra2tra2tra2tra2tra2traOjo6Ojo6Ojo6Ojo6Ojo6Ojo6P///////////////////////////////////////////wAAADJMQVNNRTMuOTlyAc0AAAAAAAAAABSAJAJAQgAAgAAAA+aieizgAAAAAAAAAAAAAAAAAAAA//uQZAAAApEGUFUGAAArIMoKoMAABZAZnW40AAClAzOtxpgALEwy1AAAAAEVf7kGQRmBmD3QEAgEDhnePhI/JH4iByB+SPxA/IH5gQB+IPzAQA+TAMDhOIPA/IEInjB4P4fn///jHJ+T/ngfgYAgEAgEAgEAgg5nwuZIuZw5QmCvG0Ooy0JtC2CnAp1vdSlLMuOQylYZl0LERgAAAAAAlMy5z3O+n//zTjN/9/+Z//O//9y5/8ud/z//5EHL/D+KDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDEppqampqampqampqampqampqampqampqampqampqamgAAA//tQZAAAAtAeUqsMAARfA7pVYYACCUCXPqggAEAAAP8AAAAATEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkYA/wAAB/gAAACAAAD/AAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=";
@@ -31,15 +40,23 @@ const ScanRowPage = () => {
     getBarcodesByRowId, 
     currentUser,
     resetRow,
-    countBarcodesInRow // Import this function to count barcodes consistently
+    countBarcodesInRow,
+    updateRow
   } = useDB();
   
+  // State for dialogs and UI
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [latestBarcodes, setLatestBarcodes] = useState<any[]>([]);
-  
-  // Track barcode count for UI updates
   const [scanCount, setScanCount] = useState(0);
+  const [isAddBarcodeDialogOpen, setIsAddBarcodeDialogOpen] = useState(false);
+  
+  // State for editing row name
+  const [isEditingRowName, setIsEditingRowName] = useState(false);
+  const [rowName, setRowName] = useState('');
+  
+  // State for location capture
+  const [captureLocation, setCaptureLocation] = useState(false);
   
   // Reference to the audio element
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -59,15 +76,16 @@ const ScanRowPage = () => {
       const row = getRowById(rowId);
       if (row) {
         localStorage.setItem('selectedParkId', row.parkId);
+        setRowName(row.name);
       }
       
       // Set initial count
-      if (rowId && barcodes) {
+      if (rowId) {
         const count = countBarcodesInRow(rowId);
         setScanCount(count);
       }
     }
-  }, [rowId, rows, getRowById, barcodes, countBarcodesInRow]);
+  }, [rowId, rows, getRowById, countBarcodesInRow]);
 
   // Update barcodes list whenever barcodes array changes
   useEffect(() => {
@@ -149,25 +167,100 @@ const ScanRowPage = () => {
     setScanCount(prevCount => prevCount + 1);
   };
 
+  const startEditingName = () => {
+    if (row) {
+      setRowName(row.name);
+      setIsEditingRowName(true);
+    }
+  };
+  
+  const saveRowName = async () => {
+    if (rowName.trim()) {
+      await updateRow(rowId, rowName);
+      setIsEditingRowName(false);
+      toast.success("Row name updated successfully");
+    } else {
+      toast.error("Row name cannot be empty");
+    }
+    focusInput();
+  };
+
+  const cancelEditName = () => {
+    setIsEditingRowName(false);
+    focusInput();
+  };
+
   return (
     <AuthGuard>
-      <Layout title={breadcrumb || 'Scan Barcode'} showBack>
+      <Layout 
+        title={
+          <div className="flex items-center justify-between w-full">
+            <div className="flex-1 truncate">
+              {breadcrumb || 'Scan Barcode'}
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="ml-2">
+                  <Settings className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onSelect={startEditingName}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  <span>Rename Row</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setIsResetDialogOpen(true)}>
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  <span>Reset Row</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setCaptureLocation(!captureLocation)}>
+                  <div className="flex items-center w-full">
+                    <MapPin className="mr-2 h-4 w-4" />
+                    <span>Capture GPS Location</span>
+                    {captureLocation && <Check className="ml-auto h-4 w-4" />}
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        }
+        showBack
+      >
+        {isEditingRowName && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white p-4 rounded-lg shadow-lg w-80">
+              <h3 className="font-medium mb-2">Rename Row</h3>
+              <Input
+                value={rowName}
+                onChange={(e) => setRowName(e.target.value)}
+                className="mb-4"
+                autoFocus
+              />
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" size="sm" onClick={cancelEditName}>
+                  <X className="h-4 w-4 mr-1" />
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={saveRowName}>
+                  <Check className="h-4 w-4 mr-1" />
+                  Save
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
         <Card className="glass-card">
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <RowHeader
-                rowId={rowId}
-                breadcrumb={breadcrumb}
-                totalScannedBarcodes={scanCount}
-                expectedBarcodes={row?.expectedBarcodes}
-                isResetting={isResetting}
-                onResetClick={() => setIsResetDialogOpen(true)}
-                focusInput={focusInput}
-              />
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <span>
+                  Scanned: <span className="font-bold">{scanCount}</span> 
+                  {row?.expectedBarcodes ? ` / ${row.expectedBarcodes}` : ''}
+                </span>
+              </div>
             </CardTitle>
             <CardDescription>
               Scan or enter a barcode to add it to this row
-              {row?.expectedBarcodes ? ` (max: ${row.expectedBarcodes})` : ''}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -188,6 +281,15 @@ const ScanRowPage = () => {
           onOpenChange={setIsResetDialogOpen}
           onReset={handleReset}
           onCancel={() => focusInput()}
+        />
+
+        <AddBarcodeDialog
+          open={isAddBarcodeDialogOpen}
+          onOpenChange={setIsAddBarcodeDialogOpen}
+          rowId={rowId}
+          onBarcodeAdded={handleBarcodeAdded}
+          captureLocation={captureLocation}
+          setCaptureLocation={setCaptureLocation}
         />
       </Layout>
     </AuthGuard>

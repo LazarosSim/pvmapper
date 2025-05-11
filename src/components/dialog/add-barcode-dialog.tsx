@@ -12,22 +12,26 @@ import { Input } from '@/components/ui/input';
 import { useDB } from '@/lib/db-provider';
 import { MapPin, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface AddBarcodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rowId: string;
   onBarcodeAdded?: (barcode: any) => void;
+  captureLocation: boolean;
+  setCaptureLocation: (capture: boolean) => void;
 }
 
 const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({ 
   open, 
   onOpenChange, 
   rowId, 
-  onBarcodeAdded 
+  onBarcodeAdded,
+  captureLocation,
+  setCaptureLocation
 }) => {
   const [code, setCode] = useState('');
-  const [captureLocation, setCaptureLocation] = useState(false);
   const { addBarcode, countBarcodesInRow } = useDB();
   
   // Check if this is the first barcode in the row
@@ -110,17 +114,21 @@ const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({
           
           {isFirstBarcode && (
             <div className="flex items-center mt-3 text-sm">
-              <Button
-                type="button"
-                onClick={() => setCaptureLocation(!captureLocation)}
-                className={`h-8 px-2 ${captureLocation ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
-                variant="ghost"
-                size="sm"
-              >
-                <MapPin className={`h-4 w-4 mr-1 ${captureLocation ? 'text-green-600' : 'text-gray-400'}`} />
-                Capture location
-                {captureLocation && <Check className="h-3 w-3 ml-1 text-green-600" />}
-              </Button>
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="capture-location"
+                  checked={captureLocation}
+                  onCheckedChange={(checked) => setCaptureLocation(!!checked)}
+                  className="border-gray-400"
+                />
+                <label
+                  htmlFor="capture-location"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center"
+                >
+                  <MapPin className="h-4 w-4 mr-1 text-gray-600" />
+                  Capture location
+                </label>
+              </div>
               <span className="ml-2 text-gray-500 text-xs">
                 This is the first barcode of this row
               </span>
