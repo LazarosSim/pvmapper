@@ -25,6 +25,10 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
     deleteRow: (rowId: string) => deleteRow(rows, setRows, barcodes, setBarcodes, rowId),
     getRowById: (rowId: string) => getRowById(rows, rowId),
     resetRow: (rowId: string) => resetRow(barcodes, setBarcodes, rowId),
-    countBarcodesInRow: (rowId: string) => countBarcodesInRow(barcodes, rowId)
+    countBarcodesInRow: (rowId: string) => {
+      // Use the currentBarcodes property from the row
+      const row = getRowById(rows, rowId);
+      return row ? row.currentBarcodes : 0;
+    }
   };
 };
