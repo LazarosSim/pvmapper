@@ -69,6 +69,7 @@ const RowDetail = () => {
     try {
       await resetRow(rowId);
       setIsResetDialogOpen(false);
+      toast.success("Row reset successfully");
     } finally {
       setIsResetting(false);
     }
@@ -132,32 +133,18 @@ const RowDetail = () => {
     }
   };
 
-  const titleContent = editingRowName ? (
-    <div className="flex items-center space-x-2">
-      <Input
-        value={rowName}
-        onChange={(e) => setRowName(e.target.value)}
-        className="w-40"
-        autoFocus
-      />
-      <Button variant="ghost" size="icon" onClick={saveRowName} className="h-8 w-8">
-        <Check className="h-4 w-4 text-green-500" />
-      </Button>
-      <Button variant="ghost" size="icon" onClick={() => setEditingRowName(false)} className="h-8 w-8">
-        <X className="h-4 w-4 text-red-500" />
-      </Button>
-    </div>
-  ) : (
-    <div className="flex items-center space-x-2">
-      <span>{breadcrumb || 'Row Detail'}</span>
-      <Button variant="ghost" size="icon" onClick={startRowRename} className="h-6 w-6">
-        <Edit className="h-3 w-3 text-muted-foreground" />
-      </Button>
-    </div>
-  );
-
+  // Use the new settings dropdown in the header
   return (
-    <Layout title={breadcrumb || 'Row Detail'} showBack titleAction={titleContent}>
+    <Layout 
+      title={breadcrumb || 'Row Detail'} 
+      showBack 
+      showSettings={true}
+      rowId={rowId}
+      captureLocation={captureLocation}
+      setCaptureLocation={setCaptureLocation}
+      onReset={() => setIsResetDialogOpen(true)}
+      onRename={startRowRename}
+    >
       <div className="flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <Input
@@ -166,19 +153,6 @@ const RowDetail = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 mr-2 bg-white/80 backdrop-blur-sm border border-inventory-secondary/30"
           />
-          <Button 
-            variant="outline"
-            onClick={() => setIsResetDialogOpen(true)}
-            disabled={isResetting}
-            className="gap-2 text-inventory-secondary border-inventory-secondary/30 hover:bg-inventory-secondary/10"
-          >
-            {isResetting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RotateCcw className="h-4 w-4" />
-            )}
-            Reset Row
-          </Button>
         </div>
 
         {filteredBarcodes.length > 0 ? (

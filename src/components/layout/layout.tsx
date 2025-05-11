@@ -6,12 +6,29 @@ import XPLogo from './xp-logo';
 
 interface LayoutProps {
   children: React.ReactNode;
-  title: React.ReactNode | string; // Allow both ReactNode and string
+  title: React.ReactNode | string;
   showBack?: boolean;
   titleAction?: React.ReactNode;
+  showSettings?: boolean;
+  rowId?: string;
+  captureLocation?: boolean;
+  setCaptureLocation?: (value: boolean) => void;
+  onReset?: () => void;
+  onRename?: () => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, title, showBack, titleAction }) => {
+const Layout: React.FC<LayoutProps> = ({ 
+  children, 
+  title, 
+  showBack, 
+  titleAction, 
+  showSettings,
+  rowId,
+  captureLocation,
+  setCaptureLocation,
+  onReset,
+  onRename
+}) => {
   // Convert non-string titles to string to ensure compatibility
   const titleString = typeof title === 'string' 
     ? title 
@@ -24,7 +41,13 @@ const Layout: React.FC<LayoutProps> = ({ children, title, showBack, titleAction 
       <Header 
         title={titleString} 
         showBack={showBack} 
-        titleAction={titleAction} 
+        titleAction={titleAction}
+        showSettings={showSettings}
+        rowId={rowId}
+        captureLocation={captureLocation}
+        setCaptureLocation={setCaptureLocation}
+        onReset={onReset}
+        onRename={onRename}
       />
       <main className="flex-1 p-4 pb-20 overflow-y-auto bg-gradient-to-b from-[#D6EFFF] to-[#B3DEFF]">
         {children}
