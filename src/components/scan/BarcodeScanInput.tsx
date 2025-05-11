@@ -1,4 +1,3 @@
-
 import React, { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -25,7 +24,6 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
     getRowById,
     getParkById,
     getBarcodesByRowId,
-    countBarcodesInRow
   } = useDB();
   const {
     playSuccessSound,
