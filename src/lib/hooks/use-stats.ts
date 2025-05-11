@@ -1,7 +1,8 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import type { DailyScanStat, UserStat, Barcode } from '../types/db-types';
+import type { DailyScanStat, UserStat, Barcode, Row } from '../types/db-types';
 
 export const useStats = () => {
   const [dailyScans, setDailyScans] = useState<DailyScanStat[]>([]);
@@ -170,11 +171,13 @@ export const useStats = () => {
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   };
   
+  // Modified to correctly count the total scans as the sum of all barcodes
   const getAllUserStats = (
     barcodes: Barcode[], 
     users: { id: string; username: string }[], 
     currentUserId?: string,
-    currentUsername?: string
+    currentUsername?: string,
+    rows?: Row[]
   ): UserStat[] => {
     // Collect unique users from barcodes and daily scans
     const userIdsFromBarcodes = [...new Set(barcodes.map(b => b.userId))];

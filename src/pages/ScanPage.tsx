@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
 import { useDB } from '@/lib/db-provider';
@@ -16,13 +16,20 @@ import { FolderOpen } from 'lucide-react';
 const ScanPage = () => {
   const { parks } = useDB();
   const navigate = useNavigate();
+  // Set captureLocation to true by default
+  const [captureLocation, setCaptureLocation] = useState(true);
 
   if (parks.length === 0) {
     return <Navigate to="/" replace />;
   }
 
   return (
-    <Layout title="Select Park" showBack>
+    <Layout 
+      title="Select Park" 
+      showBack
+      captureLocation={captureLocation}
+      setCaptureLocation={setCaptureLocation}
+    >
       <div className="space-y-4">
         {parks.map(park => (
           <Card key={park.id} className="hover:shadow-md transition-shadow">

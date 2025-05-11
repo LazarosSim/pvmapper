@@ -35,7 +35,16 @@ import {
 } from 'recharts';
 
 const DashboardPage = () => {
-  const { currentUser, parks, getAllUserStats, getParkProgress, getDailyScans, getScansForDateRange } = useDB();
+  const { 
+    currentUser, 
+    parks, 
+    rows,
+    getAllUserStats, 
+    getParkProgress, 
+    getDailyScans, 
+    getScansForDateRange, 
+    barcodes 
+  } = useDB();
   const navigate = useNavigate();
   const [selectedTab, setSelectedTab] = useState('overview');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
@@ -138,7 +147,10 @@ const DashboardPage = () => {
     return result;
   };
 
-  const totalScans = userStats.reduce((total, user) => total + user.totalScans, 0);
+  // Calculate total scans (sum of all barcodes from all users)
+  const totalScans = barcodes.length;
+  
+  // Calculate today's scans
   const totalDailyScans = userStats.reduce((total, user) => total + user.dailyScans, 0);
   const prevDayScans = userStats.reduce((total, user) => total + (user.prevDayScans || 0), 0);
   const scanChange = totalDailyScans > 0 && prevDayScans > 0 
