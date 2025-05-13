@@ -40,7 +40,6 @@ const ScanRowPage = () => {
   
   // State for dialogs and UI
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
   const [latestBarcodes, setLatestBarcodes] = useState<Barcode[]>([]);
   const [scanCount, setScanCount] = useState(0);
   const [isAddBarcodeDialogOpen, setIsAddBarcodeDialogOpen] = useState(false);
@@ -128,21 +127,19 @@ const ScanRowPage = () => {
   const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
 
   const handleReset = async () => {
-    setIsResetting(true);
     try {
-      await resetRow(rowId);
-      // Clear the local state of barcodes
-      setLatestBarcodes([]);
-      // Scan count will be updated by the row's currentBarcodes from useEffect
-      
+      const affectedRows = await resetRow(rowId);
+      if (affectedRows === 0) {
+        toast.info("Row is already empty");
+      }
+      else {
+        toast.success("Successfully reset " + affectedRows + " row" + (affectedRows > 1 ? "s" : ""));
+      }
       setIsResetDialogOpen(false);
-      toast.success('Row reset successfully');
-    } catch (error) {
+    }
+    catch (error) {
       console.error("Error resetting row:", error);
       toast.error("Failed to reset row");
-    } finally {
-      setIsResetting(false);
-      focusInput();
     }
   };
 

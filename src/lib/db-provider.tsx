@@ -47,7 +47,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   const {
     rows, setRows, fetchRows, getRowsByParkId, addRow, addSubRow,
     updateRow, deleteRow, getRowById, resetRow, countBarcodesInRow
-  } = useRows(barcodes, setBarcodes);
+  } = useRows();
   
   // Initialize barcodes module with rows and daily scan update function
   const {

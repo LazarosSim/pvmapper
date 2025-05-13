@@ -67,7 +67,7 @@ const App = () => {
                 <Route path="/login" element={<LoginPage />} />
                 
                 {/* Protected routes */}
-                <Route path="/" element={<AuthGuard><Index /></AuthGuard>} />
+                <Route path={"/"} element={<AuthGuard><Index /></AuthGuard>} />
                 <Route path="/park/:parkId" element={<AuthGuard><ParkDetail /></AuthGuard>} />
                 <Route path="/row/:rowId" element={<AuthGuard><RowDetail /></AuthGuard>} />
                 <Route path="/scan" element={<AuthGuard><ScanPage /></AuthGuard>} />

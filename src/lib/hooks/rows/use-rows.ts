@@ -6,7 +6,7 @@ import { addRow, addSubRow } from './row-operations/add-row';
 import { updateRow, resetRow, deleteRow } from './row-operations/update-row';
 import { getRowsByParkId, getRowById, countBarcodesInRow } from './row-utils';
 
-export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.SetStateAction<Barcode[]>>) => {
+export const useRows = () => {
   const [rows, setRows] = useState<Row[]>([]);
 
   return {
@@ -20,9 +20,9 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
       addSubRow(rows, setRows, parentRowId, expectedBarcodes),
     updateRow: (rowId: string, name: string, expectedBarcodes?: number) => 
       updateRow(rows, setRows, rowId, name, expectedBarcodes),
-    deleteRow: (rowId: string) => deleteRow(rows, setRows, barcodes, setBarcodes, rowId),
+    deleteRow: (rowId: string) => deleteRow(rows, setRows, rowId),
     getRowById: (rowId: string) => getRowById(rows, rowId),
-    resetRow: (rowId: string) => resetRow(barcodes, setBarcodes, rowId),
+    resetRow: (rowId: string) => resetRow(rowId),
     countBarcodesInRow: (rowId: string) => {
       // Use the currentBarcodes property from the row
       const row = getRowById(rows, rowId);
