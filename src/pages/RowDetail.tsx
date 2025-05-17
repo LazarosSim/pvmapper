@@ -67,9 +67,18 @@ const RowDetail = () => {
   const handleReset = async () => {
     setIsResetting(true);
     try {
-      await resetRow(rowId);
+      const affectedRows = await resetRow(rowId);
+      if (affectedRows === 0) {
+        toast.info("Row is already empty");
+      }
+      else{
+        toast.success("Successfully reset " + affectedRows + " row" +(affectedRows > 1 ? "s" : ""));
+      }
       setIsResetDialogOpen(false);
-      toast.success("Row reset successfully");
+    }
+    catch (error) {
+      console.error("Error resetting row:", error);
+      toast.error("Failed to reset row");
     } finally {
       setIsResetting(false);
     }

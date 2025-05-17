@@ -88,7 +88,7 @@ export type DBContextType = {
   deleteRow: (rowId: string) => Promise<void>;
   updateRow: (rowId: string, name: string, expectedBarcodes?: number) => Promise<void>;
   getRowById: (rowId: string) => Row | undefined;
-  resetRow: (rowId: string) => Promise<void>;
+  resetRow: (rowId: string) => Promise<number>;
   countBarcodesInRow: (rowId: string) => number;
   addSubRow: (rowId: string, expectedBarcodes?: number) => Promise<Row | null>;
   
