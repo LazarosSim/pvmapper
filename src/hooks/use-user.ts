@@ -1,8 +1,8 @@
 
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase/client.ts';
 import { toast } from 'sonner';
-import type { User } from '../types/db-types';
+import type { User } from '../lib/types/db-types.ts';
 
 export const useUser = () => {
   const [currentUser, setCurrentUser] = useState<User | null | undefined>(undefined);

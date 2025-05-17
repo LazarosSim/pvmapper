@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase/client';
 import { useSupabase } from '@/lib/supabase-provider';
 import { useAuthForm } from '@/hooks/use-auth-form';
 import { LoginForm } from '@/components/auth/login-form';

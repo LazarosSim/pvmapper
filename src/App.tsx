@@ -18,6 +18,7 @@ import ProfilePage from "./pages/ProfilePage";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import NotFound from "./pages/NotFound";
+import RowDetailPage from "@/pages/RowDetailPage.tsx";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -69,7 +70,7 @@ const App = () => {
                 {/* Protected routes */}
                 <Route path={"/"} element={<AuthGuard><Index /></AuthGuard>} />
                 <Route path="/park/:parkId" element={<AuthGuard><ParkDetail /></AuthGuard>} />
-                <Route path="/row/:rowId" element={<AuthGuard><RowDetail /></AuthGuard>} />
+                <Route path="/row/:rowId" element={<AuthGuard><RowDetailPage /></AuthGuard>} />
                 <Route path="/scan" element={<AuthGuard><ScanPage /></AuthGuard>} />
                 <Route path="/scan/park/:parkId" element={<AuthGuard><ScanParkPage /></AuthGuard>} />
                 <Route path="/scan/row/:rowId" element={<AuthGuard><ScanRowPage /></AuthGuard>} />

@@ -1,7 +1,7 @@
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase/client.ts';
 import { toast } from 'sonner';
-import type { Row } from '../../../types/db-types';
+import type { Row } from '../../../lib/types/db-types.ts';
 
 /**
  * Fetch rows data from Supabase

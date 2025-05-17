@@ -10,12 +10,12 @@ import type {
 } from './types/db-types';
 
 // Import hooks
-import { useUser } from './hooks/use-user';
-import { useParks } from './hooks/use-parks';
-import { useRows } from './hooks/rows/use-rows';
-import { useBarcodes } from './hooks/use-barcodes';
-import { useStats } from './hooks/use-stats';
-import { useDataManagement } from './hooks/use-data-management';
+import { useUser } from '../hooks/use-user.ts';
+import { useParks } from '../hooks/use-parks.ts';
+import { useRows } from '../hooks/rows/use-rows.ts';
+import { useBarcodes } from '../hooks/use-barcodes.ts';
+import { useStats } from '../hooks/use-stats.ts';
+import { useDataManagement } from '../hooks/use-data-management.ts';
 
 // Extend the Row type to include captureLocation
 export interface ExtendedRow extends Row {

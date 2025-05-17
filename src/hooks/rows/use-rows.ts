@@ -1,12 +1,12 @@
 
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase/client.ts';
 import { toast } from 'sonner';
-import type { Row, Barcode } from '../../types/db-types';
-import { fetchRows } from './row-operations/fetch-rows';
-import { addRow, addSubRow } from './row-operations/add-row';
-import { updateRow, resetRow, deleteRow } from './row-operations/update-row';
-import { getRowsByParkId, getRowById, countBarcodesInRow } from './row-utils';
+import type { Row, Barcode } from '../../lib/types/db-types.ts';
+import { fetchRows } from '@/hooks/rows/row-operations/fetch-rows.ts';
+import { addRow, addSubRow } from '@/hooks/rows/row-operations/add-row.ts';
+import { updateRow, resetRow, deleteRow } from '@/hooks/rows/row-operations/update-row.ts';
+import { getRowsByParkId, getRowById, countBarcodesInRow } from './row-utils.ts';
 
 export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.SetStateAction<Barcode[]>>) => {
   const [rows, setRows] = useState<Row[]>([]);

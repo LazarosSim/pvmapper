@@ -1,8 +1,8 @@
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase/client.ts';
 import { toast } from 'sonner';
-import type { Row } from '../../../types/db-types';
-import { getRowById } from '../row-utils';
+import type { Row } from '../../../lib/types/db-types.ts';
+import { getRowById } from '../row-utils.ts';
 
 /**
  * Add a new row

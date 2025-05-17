@@ -1,6 +1,6 @@
 
 import { toast } from 'sonner';
-import type { Park, Row, Barcode } from '../types/db-types';
+import type { Park, Row, Barcode } from '../lib/types/db-types.ts';
 
 export const useDataManagement = (
   parks: Park[],

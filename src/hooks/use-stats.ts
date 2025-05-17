@@ -1,8 +1,8 @@
 
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase/client.ts';
 import { format } from 'date-fns';
-import type { DailyScanStat, UserStat, Barcode, Row } from '../types/db-types';
+import type { DailyScanStat, UserStat, Barcode, Row } from '../lib/types/db-types.ts';
 
 export const useStats = () => {
   const [dailyScans, setDailyScans] = useState<DailyScanStat[]>([]);

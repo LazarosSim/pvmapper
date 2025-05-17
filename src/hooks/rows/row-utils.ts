@@ -1,5 +1,5 @@
 
-import type { Row, Barcode } from '../../types/db-types';
+import type { Row, Barcode } from '../../lib/types/db-types.ts';
 
 /**
  * Get rows for a specific park

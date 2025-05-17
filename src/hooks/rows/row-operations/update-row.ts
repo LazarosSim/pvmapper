@@ -1,6 +1,6 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase/client.ts';
 import { toast } from 'sonner';
-import type { Row, Barcode } from '../../../types/db-types';
+import type { Row, Barcode } from '../../../lib/types/db-types.ts';
 
 /**
  * Update a row's properties
