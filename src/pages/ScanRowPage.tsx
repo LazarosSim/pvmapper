@@ -40,7 +40,7 @@ const ScanRowPage = () => {
   
   // State for dialogs and UI
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
-  const [latestBarcodes, setLatestBarcodes] = useState<Barcode[]>([]);
+  const [latestBarcodes, setLatestBarcodes] = useState([]);
   const [scanCount, setScanCount] = useState(0);
   const [isAddBarcodeDialogOpen, setIsAddBarcodeDialogOpen] = useState(false);
   

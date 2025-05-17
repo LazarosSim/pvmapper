@@ -47,13 +47,13 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   const {
     rows, setRows, fetchRows, getRowsByParkId, addRow, addSubRow,
     updateRow, deleteRow, getRowById, resetRow, countBarcodesInRow
-  } = useRows();
+  } = useRows(barcodes, setBarcodes);
   
   // Initialize barcodes module with rows and daily scan update function
   const {
     fetchBarcodes, addBarcode, updateBarcode, deleteBarcode,
     getBarcodesByRowId, searchBarcodes, countBarcodesInPark
-  } = useBarcodes(rows, barcodes, setBarcodes, () => updateDailyScans(user?.id), decreaseDailyScans);
+  } = useBarcodes(rows, () => updateDailyScans(user?.id), decreaseDailyScans);
   
   // Initialize parks module with dependencies
   const {

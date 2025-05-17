@@ -53,38 +53,131 @@ export const updateRow = async (
 /**
  * Reset all barcodes for a row
  */
-export const resetRow = async (rowId: string) => {
-
-  console.log('Resetting row:', rowId);
-
-  // First check if we have any barcodes for this row directly from the database
-  // This ensures we get the most up-to-date information rather than relying on local state
-  const { data: rowBarcodesData, error: fetchError } = await supabase
-    .from('barcodes')
-    .select('*')
-    .eq('row_id', rowId);
-
-  if (fetchError) {
-    console.error('Error fetching row barcodes:', fetchError);
-    throw new Error(`Failed to fetch row barcodes: ${fetchError.message}`);
-  }
-
-  // Now use the data directly from the database to check if there are barcodes
-  if (!rowBarcodesData || rowBarcodesData.length === 0) {
-    return 0;
-  }
-  // Delete all barcodes for this row
-  const {error} = await supabase
+export const resetRow = async (
+  barcodes: Barcode[],
+  setBarcodes: React.Dispatch<React.SetStateAction<Barcode[]>>,
+  rowId: string
+) => {
+  try {
+    // First check if we have any barcodes for this row directly from the database
+    // This ensures we get the most up-to-date information rather than relying on local state
+    const { data: rowBarcodesData, error: fetchError } = await supabase
+      .from('barcodes')
+      .select('*')
+      .eq('row_id', rowId);
+      
+    if (fetchError) {
+      console.error('Error fetching row barcodes:', fetchError);
+      toast.error(`Failed to check row barcodes: ${fetchError.message}`);
+      return;
+    }
+    
+    // Now use the data directly from the database to check if there are barcodes
+    if (!rowBarcodesData || rowBarcodesData.length === 0) {
+      toast.info('No barcodes to reset');
+      return;
+    }
+    
+    // Format the barcodes from the database to match our local state format
+    const rowBarcodes = rowBarcodesData.map(barcode => ({
+      id: barcode.id,
+      code: barcode.code,
+      rowId: barcode.row_id,
+      userId: barcode.user_id,
+      timestamp: barcode.timestamp,
+      displayOrder: barcode.display_order || 0
+    }));
+    
+    // Group barcodes by user and date for adjustment
+    const userBarcodeCounts: {[key: string]: number} = {};
+    
+    // Track all affected users to update their total counts later
+    const affectedUsers = new Set<string>();
+    
+    // Format: userId_date -> count
+    rowBarcodes.forEach(barcode => {
+      const scanDate = new Date(barcode.timestamp).toISOString().split('T')[0];
+      const key = `${barcode.userId}_${scanDate}`;
+      
+      if (!userBarcodeCounts[key]) {
+        userBarcodeCounts[key] = 0;
+      }
+      userBarcodeCounts[key]++;
+      
+      // Add to affected users set
+      if (barcode.userId) {
+        affectedUsers.add(barcode.userId);
+      }
+    });
+    
+    // Delete all barcodes for this row
+    const { error } = await supabase
       .from('barcodes')
       .delete()
       .eq('row_id', rowId);
-
-  if (error) {
-    console.error('Error resetting row:', error);
-    throw new Error(`Failed to fetch row barcodes: ${fetchError.message}`);
+      
+    if (error) {
+      console.error('Error resetting row:', error);
+      toast.error(`Failed to reset row: ${error.message}`);
+      return;
+    }
+    
+    // Remove barcodes from state
+    setBarcodes(prev => prev.filter(barcode => barcode.rowId !== rowId));
+    
+    // Adjust daily scans for each affected user and date
+    for (const [key, count] of Object.entries(userBarcodeCounts)) {
+      const [userId, date] = key.split('_');
+      
+      // Get current daily scan count
+      const { data: scanData } = await supabase
+        .from('daily_scans')
+        .select('id, count')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .maybeSingle();
+        
+      if (scanData) {
+        // Subtract the count and allow negative values
+        const newCount = Math.max(scanData.count - count, -999999);  // Set a reasonable lower bound
+        
+        await supabase
+          .from('daily_scans')
+          .update({ count: newCount })
+          .eq('id', scanData.id);
+      }
+    }
+    
+    // Update total scans count for each affected user
+    for (const userId of affectedUsers) {
+      try {
+        const response = await fetch(
+          'https://ynslzmpfhmoghvcacwzd.supabase.co/functions/v1/update-user-total-scans',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+            },
+            body: JSON.stringify({ userId })
+          }
+        );
+        
+        if (!response.ok) {
+          console.error('Failed to update user total scans:', await response.text());
+        }
+      } catch (error) {
+        console.error('Error calling update-user-total-scans function:', error);
+      }
+    }
+    
+    toast.success(`Reset ${rowBarcodes.length} barcodes successfully`);
+    return true;
+  } catch (error: any) {
+    console.error('Error in resetRow:', error.message);
+    toast.error(`Failed to reset row: ${error.message}`);
+    return false;
   }
-
-  return rowBarcodesData.length;
 };
 
 /**
@@ -93,7 +186,10 @@ export const resetRow = async (rowId: string) => {
 export const deleteRow = async (
   rows: Row[],
   setRows: React.Dispatch<React.SetStateAction<Row[]>>,
-  rowId: string) => {
+  barcodes: Barcode[],
+  setBarcodes: React.Dispatch<React.SetStateAction<Barcode[]>>,
+  rowId: string
+) => {
   try {
     // Check if the row has expected barcodes set and the current user is not a manager
     const rowToDelete = rows.find(row => row.id === rowId);
@@ -105,7 +201,7 @@ export const deleteRow = async (
     }
     
     // First reset the row (which will handle adjusting barcode counts)
-    await resetRow(rowId);
+    await resetRow(barcodes, setBarcodes, rowId);
     
     // Then delete the row
     const { error } = await supabase

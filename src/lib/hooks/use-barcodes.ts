@@ -5,7 +5,11 @@ import { toast } from 'sonner';
 import type { Barcode, Row } from '../types/db-types';
 
 export const useBarcodes = (
-    rows: Row[], barcodes: Barcode[], setBarcodes: React.Dispatch<React.SetStateAction<Barcode[]>>, updateDailyScans: (userId?: string) => Promise<void>, decreaseDailyScans: (userId?: string) => Promise<void>) => {
+  rows: Row[],
+  updateDailyScans: (userId?: string) => Promise<void>,
+  decreaseDailyScans: (userId?: string) => Promise<void>
+) => {
+  const [barcodes, setBarcodes] = useState<Barcode[]>([]);
 
   // Fetch barcodes data
   const fetchBarcodes = async (userId: string) => {
@@ -135,7 +139,7 @@ export const useBarcodes = (
         
         // If successful, update daily scan count
         await updateDailyScans(userId);
-
+        
         // Update the user's total scans count in profile
         if (userId) {
           try {
@@ -150,7 +154,7 @@ export const useBarcodes = (
                 body: JSON.stringify({ userId })
               }
             );
-
+            
             if (!response.ok) {
               console.error('Failed to update user total scans:', await response.text());
             }
@@ -158,7 +162,7 @@ export const useBarcodes = (
             console.error('Error calling update-user-total-scans function:', error);
           }
         }
-
+        
         return newBarcode;
       }
       
@@ -204,7 +208,7 @@ export const useBarcodes = (
         .select('user_id, row_id')
         .eq('id', barcodeId)
         .single();
-
+        
       const userId = barcodeData?.user_id;
       const rowId = barcodeData?.row_id;
       
@@ -230,7 +234,7 @@ export const useBarcodes = (
       if (userId) {
         // Decrease daily scans count
         await decreaseDailyScans(userId);
-
+        
         // Update the user's total scans count
         try {
           const response = await fetch(
@@ -244,7 +248,7 @@ export const useBarcodes = (
               body: JSON.stringify({ userId })
             }
           );
-
+          
           if (!response.ok) {
             console.error('Failed to update user total scans:', await response.text());
           }
