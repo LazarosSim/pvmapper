@@ -13,7 +13,7 @@ import { useDB } from '@/lib/db-provider';
 import { MapPin, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
-import {useAddBarcodeToRow} from "@/hooks/use-barcodes-queries.tsx";
+import {useAddBarcodeToRow, useRowBarcodes} from "@/hooks/use-barcodes-queries.tsx";
 
 interface AddBarcodeDialogProps {
   open: boolean;
@@ -40,11 +40,14 @@ const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({
   const isFirstBarcode = row?.currentBarcodes === 0;
 
   const {mutate: addBarcode} = useAddBarcodeToRow(rowId);
+  const {data: barcodes} = useRowBarcodes(rowId);
   
   const handleSubmit = async () => {
-
     try {
-      addBarcode(code);
+      addBarcode({
+        code: code,
+        displayOrder: barcodes[barcodes.length - 1]?.displayOrder + 1000 || 0,
+      });
       setCode('');
       onOpenChange(false);
     }catch (e) {

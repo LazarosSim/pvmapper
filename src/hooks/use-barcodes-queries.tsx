@@ -3,35 +3,20 @@ import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Barcode} from "@/lib/types/db-types.ts";
 import {useSupabase} from "@/lib/supabase-provider.tsx";
 
-const loadBarcodes = async () => {
-    const {data, error} = await supabase
-        .from('barcodes')
-        .select('id, code, rowId:row_id, userId:user_id, timestamp, displayOrder:display_order, latitude, longitude')
-        .order('timestamp', {ascending: false});
 
-    if (error) {
-        throw error;
-    }
 
-    return data;
-}
-
-const toDb = (code:string, rowId:string, userId?:string) => {
+const toDb = (code:string, rowId:string, displayOrder?:number, userId?:string) => {
+    const now = Date.now();
     return {
         code: code,
         row_id: rowId,
         user_id: userId,
-        timestamp: new Date(Date.now()).toISOString()
+        display_order: displayOrder || 0,
+        timestamp: new Date(now).toISOString()
     }
 }
 
 
-export const useBarcodes = () => {
-    return useQuery({
-        queryKey: ['barcodes'],
-        queryFn: loadBarcodes
-    });
-}
 
 export type BarcodeSearchQuery = {
     code?: string;
@@ -40,7 +25,7 @@ export type BarcodeSearchQuery = {
 const addBarcode = async (
     code: string,
     rowId: string,
-    afterBarcodeIndex?: number,
+    displayOrder?: number,
     userId?: string) => {
 
     if(!code.trim())
@@ -48,7 +33,7 @@ const addBarcode = async (
 
     const {data: insertedRow, error} = await supabase
         .from('barcodes')
-        .insert(toDb(code, rowId, userId))
+        .insert(toDb(code, rowId, displayOrder, userId))
         .select();
 
     if (error) {
@@ -58,15 +43,32 @@ const addBarcode = async (
     return insertedRow;
 }
 
+const resetRow = async (rowId: string)=> {
 
-//TODO: order them based on the display order instead of the timestamp
+    if(!rowId.trim())
+        throw new Error("Row ID is required");
+
+    const {error, count} = await supabase
+        .from('barcodes')
+        .delete()
+        .eq('row_id', rowId)
+        .select();
+    if (error) {
+        console.error("Error resetting row:", error);
+        throw error;
+    }
+    return count;
+    }
+
+
+
 const loadBarcodesByRow = async (rowId: string, searchQuery?: BarcodeSearchQuery) => {
     const { code } = searchQuery
     const query = supabase
         .from('barcodes')
         .select('id, code, rowId:row_id, userId:user_id, timestamp, displayOrder:display_order, latitude, longitude')
         .eq("row_id", rowId)
-        .order('timestamp', { ascending: false });
+        .order('display_order', { ascending: true });
 
     if (code) query.like("code", `%${code}%`);
     const {data: barcodes, error} = await query;
@@ -75,7 +77,6 @@ const loadBarcodesByRow = async (rowId: string, searchQuery?: BarcodeSearchQuery
         console.error("Error loading barcodes:", error);
         throw error;
     }
-
     return barcodes;
 }
 
@@ -87,11 +88,18 @@ export const useRowBarcodes = (rowId: string, searchQuery?: BarcodeSearchQuery) 
     });
 }
 
+
+
+class AddBarcodeVariables {
+    code: string;
+    displayOrder?: number;
+}
+
 export const useAddBarcodeToRow = (rowId: string) => {
     const queryClient = useQueryClient();
     const { user } = useSupabase();
     return useMutation({
-            mutationFn: (code:string) => addBarcode(code, rowId, null, user?.id),
+            mutationFn: ({ code, displayOrder }: AddBarcodeVariables) => addBarcode(code, rowId, displayOrder, user?.id),
             mutationKey: ['barcodes', rowId],
             onSuccess: () => {
                 queryClient.invalidateQueries({
@@ -101,4 +109,20 @@ export const useAddBarcodeToRow = (rowId: string) => {
             }
         }
     );
+}
+
+
+
+export const useResetRowBarcodes = (rowId: string) => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: () => resetRow(rowId),
+        mutationKey: ['barcodes', rowId],
+        onSuccess: () => {
+            queryClient.invalidateQueries({
+                queryKey: ['barcodes', rowId],
+                exact: true,    // only that one
+            })
+        }
+    })
 }

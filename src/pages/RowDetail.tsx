@@ -36,7 +36,7 @@ import { Label } from '@/components/ui/label';
 
 const RowDetail = () => {
   const { rowId } = useParams<{ rowId: string }>();
-  const { rows, getRowById, getBarcodesByRowId, getParkById, resetRow, updateRow, updateBarcode, addBarcode } = useDB();
+  const { rows, getRowById, getBarcodesByRowId, getParkById, updateRow, updateBarcode } = useDB();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isInsertDialogOpen, setIsInsertDialogOpen] = useState(false);
   const [insertAfterIndex, setInsertAfterIndex] = useState<number | null>(null);
@@ -59,6 +59,7 @@ const RowDetail = () => {
 
   const handleReset = async () => {
     setIsResetting(true);
+
     try {
       const affectedRows = await resetRow(rowId);
       if (affectedRows === 0) {
@@ -115,23 +116,24 @@ const RowDetail = () => {
   };
   
   const handleInsertBarcode = async () => {
-    if (insertCode.trim() && insertAfterIndex !== null) {
-      setIsInserting(true);
-      try {
-        // Now our addBarcode accepts the insertAfterIndex parameter
-        const result = await addBarcode(insertCode.trim(), rowId, insertAfterIndex);
-        
-        if (result !== undefined && result !== null) {
-          toast.success("Barcode inserted successfully");
-          setInsertCode('');
-          setIsInsertDialogOpen(false);
-        }
-      } catch (error) {
-        console.error("Error inserting barcode:", error);
-        toast.error("Failed to insert barcode");
-      } finally {
-        setIsInserting(false);
-      }
+    setIsInserting(true);
+
+    const displayOrder = (insertAfterIndex === barcodes.length - 1) ?
+        barcodes[insertAfterIndex].displayOrder + 1000 :
+        (barcodes[insertAfterIndex].displayOrder + barcodes[insertAfterIndex+1].displayOrder) / 2;
+
+    try {
+      addBarcode({
+        code: insertCode.trim(),
+        displayOrder: displayOrder});
+      toast.success("Barcode inserted successfully");
+    } catch (error) {
+      console.error("Error inserting barcode:", error);
+      toast.error("Failed to insert barcode");
+    } finally {
+      setIsInserting(false);
+      setInsertCode('');
+      setIsInsertDialogOpen(false)
     }
   };
 
@@ -299,7 +301,7 @@ const RowDetail = () => {
                 Cancel
               </Button>
               <Button 
-                onClick={handleInsertBarcode} 
+                onClick={handleInsertBarcode}
                 disabled={!insertCode.trim() || isInserting}
                 className="bg-inventory-primary hover:bg-inventory-primary/90"
               >
