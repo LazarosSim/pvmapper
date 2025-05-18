@@ -74,7 +74,10 @@ const ParkCard: React.FC<ParkCardProps> = ({
       rows.forEach(row => {
         const barcodes = getBarcodesByRowId(row.id);
         if (barcodes.length > 0) {
-          const rowData = barcodes.map(barcode => [barcode.code, new Date(barcode.timestamp).toLocaleString()]);
+          // Only include the barcode codes, not the timestamps
+          const rowData = barcodes.map(barcode => [barcode.code]);
+          // Add header row
+          rowData.unshift(["Barcode"]);
           const ws = XLSX.utils.aoa_to_sheet(rowData);
           const safeSheetName = row.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 31);
           XLSX.utils.book_append_sheet(wb, ws, safeSheetName);

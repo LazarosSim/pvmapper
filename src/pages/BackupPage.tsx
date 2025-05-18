@@ -42,20 +42,39 @@ const BackupPage = () => {
       parksToExport.forEach(park => {
         const parkRows = rows.filter(row => row.parkId === park.id);
         
-        const parkBarcodeData = parkRows.flatMap(row => {
+        // Create a worksheet for each row in the park
+        parkRows.forEach(row => {
           const rowBarcodes = barcodes.filter(barcode => barcode.rowId === row.id);
-          return rowBarcodes.map(barcode => ({
-            'Park Name': park.name,
-            'Row Name': row.name,
-            'Barcode': barcode.code,
-            'Scanned At': new Date(barcode.timestamp).toLocaleString(),
-          }));
+          
+          if (rowBarcodes.length > 0) {
+            // Create worksheet with only barcode values
+            const barcodeData = rowBarcodes.map(barcode => ({ 'Barcode': barcode.code }));
+            const worksheet = XLSXUtils.json_to_sheet(barcodeData);
+            
+            // Limit sheet name to 31 characters (Excel limitation)
+            const sheetName = `${park.name.slice(0, 15)}_${row.name.slice(0, 15)}`.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 31);
+            XLSXUtils.book_append_sheet(workbook, worksheet, sheetName);
+          }
         });
-
-        if (parkBarcodeData.length > 0) {
-          const worksheet = XLSXUtils.json_to_sheet(parkBarcodeData);
-          XLSXUtils.book_append_sheet(workbook, worksheet, park.name.slice(0, 31));
-        }
+        
+        // Create a summary sheet for the park
+        const parkSummaryData = [
+          ['Park Name', park.name],
+          ['Created', new Date(park.createdAt).toLocaleString()],
+          ['Expected Barcodes', park.expectedBarcodes.toString()],
+          ['Total Rows', parkRows.length.toString()],
+          ['Total Barcodes', parkRows.reduce((sum, row) => sum + (row.currentBarcodes || 0), 0).toString()],
+        ];
+        
+        parkRows.forEach(row => {
+          parkSummaryData.push([
+            `Row: ${row.name}`,
+            `${row.currentBarcodes || 0} barcodes`
+          ]);
+        });
+        
+        const summarySheet = XLSXUtils.aoa_to_sheet(parkSummaryData);
+        XLSXUtils.book_append_sheet(workbook, summarySheet, `${park.name.slice(0, 28)}_Summary`.replace(/[^a-zA-Z0-9]/g, '_'));
       });
 
       const fileName = selectedParkId === 'all' 
@@ -190,7 +209,6 @@ const BackupPage = () => {
                 Export & Email (Instructions)
               </Button>
             </div>
-            {/* Removed Export as JSON button */}
           </CardContent>
         </Card>
 
@@ -248,4 +266,3 @@ const BackupPage = () => {
 };
 
 export default BackupPage;
-

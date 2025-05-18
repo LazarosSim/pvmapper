@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
@@ -44,6 +43,14 @@ const ProfilePage = () => {
     
     setIsRefreshing(true);
     try {
+      // Get the session before making the request
+      const session = await supabase.auth.getSession();
+      const accessToken = session.data.session?.access_token;
+      
+      if (!accessToken) {
+        throw new Error('No valid session found');
+      }
+      
       // Call the update-user-total-scans function to refresh the count
       const response = await fetch(
         'https://ynslzmpfhmoghvcacwzd.supabase.co/functions/v1/update-user-total-scans',
@@ -51,7 +58,7 @@ const ProfilePage = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+            'Authorization': `Bearer ${accessToken}`
           },
           body: JSON.stringify({ userId: currentUser.id })
         }
@@ -62,7 +69,7 @@ const ProfilePage = () => {
       }
       
       // Re-fetch the user profile to get updated counts
-      await refetchUser(currentUser.id);
+      await refetchUser();
       
       toast.success('Stats refreshed successfully');
       setRefreshKey(prev => prev + 1);
