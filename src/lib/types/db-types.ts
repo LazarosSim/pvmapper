@@ -1,3 +1,4 @@
+
 // Type definitions for the database provider
 
 // User type
@@ -99,6 +100,7 @@ export interface DBContextType {
   getBarcodesByRowId: (rowId: string) => Barcode[];
   searchBarcodes: (query: string) => Barcode[];
   countBarcodesInPark: (parkId: string) => number;
+  fetchBarcodesForRow: (rowId: string) => Promise<Barcode[]>; // Added the missing function
   
   // User management
   users: User[];
