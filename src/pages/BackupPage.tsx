@@ -25,39 +25,65 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Download, Save, FileUp, AlertTriangle, FileText, RefreshCw, Mail } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import type { Barcode } from '@/lib/types/db-types';
 
 const BackupPage = () => {
   const { parks, rows, barcodes, importData, exportData } = useDB();
   const [importContent, setImportContent] = useState('');
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [selectedParkId, setSelectedParkId] = useState<string>('all');
+  const [isExporting, setIsExporting] = useState(false);
 
-  const handleExportExcel = () => {
+  // Function to fetch barcodes for a specific row directly from the database
+  const fetchBarcodesForRow = async (rowId: string): Promise<Barcode[]> => {
     try {
+      const { data, error } = await supabase
+        .from('barcodes')
+        .select('*')
+        .eq('row_id', rowId)
+        .order('display_order', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching barcodes for row:', error);
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      return data.map(barcode => ({
+        id: barcode.id,
+        code: barcode.code,
+        rowId: barcode.row_id,
+        userId: barcode.user_id,
+        timestamp: barcode.timestamp,
+        displayOrder: barcode.display_order || 0,
+        latitude: barcode.latitude,
+        longitude: barcode.longitude
+      }));
+    } catch (error) {
+      console.error('Error in fetchBarcodesForRow:', error);
+      return [];
+    }
+  };
+
+  const handleExportExcel = async () => {
+    if (isExporting) return;
+    try {
+      setIsExporting(true);
+      toast.info('Starting export, please wait...');
+      
       const workbook = XLSXUtils.book_new();
       const parksToExport = selectedParkId === 'all' 
         ? parks 
         : parks.filter(park => park.id === selectedParkId);
 
-      parksToExport.forEach(park => {
+      for (const park of parksToExport) {
         const parkRows = rows.filter(row => row.parkId === park.id);
         
-        // Create a worksheet for each row in the park
-        parkRows.forEach(row => {
-          const rowBarcodes = barcodes.filter(barcode => barcode.rowId === row.id);
-          
-          if (rowBarcodes.length > 0) {
-            // Create worksheet with only barcode values
-            const barcodeData = rowBarcodes.map(barcode => ({ 'Barcode': barcode.code }));
-            const worksheet = XLSXUtils.json_to_sheet(barcodeData);
-            
-            // Limit sheet name to 31 characters (Excel limitation)
-            const sheetName = `${park.name.slice(0, 15)}_${row.name.slice(0, 15)}`.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 31);
-            XLSXUtils.book_append_sheet(workbook, worksheet, sheetName);
-          }
-        });
-        
-        // Create a summary sheet for the park
+        // First create a summary sheet for the park
         const parkSummaryData = [
           ['Park Name', park.name],
           ['Created', new Date(park.createdAt).toLocaleString()],
@@ -66,34 +92,65 @@ const BackupPage = () => {
           ['Total Barcodes', parkRows.reduce((sum, row) => sum + (row.currentBarcodes || 0), 0).toString()],
         ];
         
+        // Add row information to the summary
         parkRows.forEach(row => {
           parkSummaryData.push([
             `Row: ${row.name}`,
-            `${row.currentBarcodes || 0} barcodes`
+            `Expected: ${row.expectedBarcodes || "N/A"}`,
+            `Current: ${row.currentBarcodes || 0} barcodes`
           ]);
         });
         
         const summarySheet = XLSXUtils.aoa_to_sheet(parkSummaryData);
-        XLSXUtils.book_append_sheet(workbook, summarySheet, `${park.name.slice(0, 28)}_Summary`.replace(/[^a-zA-Z0-9]/g, '_'));
-      });
+        const summarySheetName = `${park.name.slice(0, 28)}_Summary`.replace(/[^a-zA-Z0-9]/g, '_');
+        XLSXUtils.book_append_sheet(workbook, summarySheet, summarySheetName);
+        
+        // Create a worksheet for each row, regardless of whether it has barcodes or not
+        for (const row of parkRows) {
+          // Fetch barcodes for this row directly from the database
+          const rowBarcodes = await fetchBarcodesForRow(row.id);
+          
+          // Create worksheet data with header
+          const rowData = [["Barcode"]]; // Start with header row
+          
+          // Add all barcodes if available
+          if (rowBarcodes.length > 0) {
+            rowBarcodes.forEach(barcode => {
+              rowData.push([barcode.code]);
+            });
+          }
+          
+          // Create the worksheet (even if empty, it will just have the header)
+          const worksheet = XLSXUtils.aoa_to_sheet(rowData);
+          
+          // Limit sheet name to 31 characters (Excel limitation)
+          const sheetName = `${park.name.slice(0, 15)}_${row.name.slice(0, 15)}`
+            .replace(/[^a-zA-Z0-9]/g, '_')
+            .slice(0, 31);
+          
+          XLSXUtils.book_append_sheet(workbook, worksheet, sheetName);
+        }
+      }
 
       const fileName = selectedParkId === 'all' 
         ? `inventory-export-${new Date().toISOString().split('T')[0]}.xlsx`
         : `${parks.find(p => p.id === selectedParkId)?.name}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
 
       writeXLSXFile(workbook, fileName);
+      setIsExporting(false);
       toast.success("Excel file exported successfully");
       return fileName;
     } catch (error) {
       console.error("Export failed:", error);
       toast.error("Failed to export Excel file");
+      setIsExporting(false);
       return null;
     }
   };
 
   // NEW EMAIL EXPORT: exports and opens mail client for attachment
-  const handleExportAndEmail = () => {
-    const fileName = handleExportExcel();
+  const handleExportAndEmail = async () => {
+    const fileName = await handleExportExcel();
     if (fileName) {
       setTimeout(() => {
         toast.info(
@@ -200,11 +257,11 @@ const BackupPage = () => {
                   ))}
                 </SelectContent>
               </Select>
-              <Button onClick={handleExportExcel} className="w-full">
+              <Button onClick={handleExportExcel} className="w-full" disabled={isExporting}>
                 <FileText className="mr-2 h-4 w-4" />
-                Export to Excel
+                {isExporting ? 'Exporting...' : 'Export to Excel'}
               </Button>
-              <Button onClick={handleExportAndEmail} className="w-full" variant="secondary">
+              <Button onClick={handleExportAndEmail} className="w-full" variant="secondary" disabled={isExporting}>
                 <Mail className="mr-2 h-4 w-4" />
                 Export & Email (Instructions)
               </Button>

@@ -1,5 +1,6 @@
 
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import type { Park, Row, Barcode } from '../types/db-types';
 
 export const useDataManagement = (
@@ -46,8 +47,43 @@ export const useDataManagement = (
     return JSON.stringify(data, null, 2);
   };
 
+  // Function to fetch barcodes for a specific row directly from the database
+  const fetchBarcodesForRow = async (rowId: string): Promise<Barcode[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('barcodes')
+        .select('*')
+        .eq('row_id', rowId)
+        .order('display_order', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching barcodes for row:', error);
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      return data.map(barcode => ({
+        id: barcode.id,
+        code: barcode.code,
+        rowId: barcode.row_id,
+        userId: barcode.user_id,
+        timestamp: barcode.timestamp,
+        displayOrder: barcode.display_order || 0,
+        latitude: barcode.latitude,
+        longitude: barcode.longitude
+      }));
+    } catch (error: any) {
+      console.error('Error in fetchBarcodesForRow:', error.message);
+      return [];
+    }
+  };
+
   return {
     importData,
-    exportData
+    exportData,
+    fetchBarcodesForRow
   };
 };
