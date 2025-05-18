@@ -5,25 +5,39 @@ import {Button} from "@/components/ui/button.tsx";
 import {ArrowDown, Check, Edit, X} from "lucide-react";
 import {useRowBarcodes} from "@/hooks/use-barcodes-queries.tsx";
 import {Barcode} from "@/lib/types/db-types.ts";
+import {toast} from "sonner";
+import {useDB} from "@/lib/db-provider.tsx";
 
 type Props = {
     rowId: string,
     searchQuery?: string
+    setIsInsertDialogOpen: (value: boolean) => void;
 }
 
-const BarcodeTable = ({rowId, searchQuery}: Props) => {
+const BarcodeTable = ({rowId, searchQuery, setIsInsertDialogOpen}: Props) => {
     const [editingBarcode, setEditingBarcode] = useState<{id: string, code: string} | null>(null);
-    const [isInsertDialogOpen, setIsInsertDialogOpen] = useState(false);
     const [insertAfterIndex, setInsertAfterIndex] = useState<number | null>(null);
+    const { resetRow, updateRow, updateBarcode, addBarcode } = useDB();
+
 
     const {data: barcodes, isLoading, isError, error} = useRowBarcodes(rowId, { code: searchQuery });
 
-    const handleSaveEditedBarcode = () => {}
-    const toggleEditingBarcode = (barcode: Barcode) => {}
+    const handleSaveEditedBarcode = async () => {
+        if(!editingBarcode) return;
 
-    if (isLoading) {
-        return <div>Loading...</div>;
+        await updateBarcode(
+            editingBarcode.id,
+            editingBarcode.code);
+
+        toggleEditingBarcode(null);
     }
+
+
+    const toggleEditingBarcode = (barcode: Barcode) => {
+        return barcode ? setEditingBarcode({id: barcode.id, code: barcode.code}) : setEditingBarcode(null);
+    }
+
+
 
     if (!barcodes || barcodes.length === 0) {
         return (
@@ -48,62 +62,60 @@ const BarcodeTable = ({rowId, searchQuery}: Props) => {
                 </TableHeader>
                 <TableBody>
                     {barcodes.map((barcode, index) => (
-                        <React.Fragment key={barcode.id}>
-                            <TableRow>
-                                <TableCell className="font-medium">{index + 1}</TableCell>
-                                <TableCell>
-                                    {editingBarcode && editingBarcode.id === barcode.id ? (
-                                        <div className="flex items-center space-x-2">
-                                            <Input
-                                                value={editingBarcode.code}
-                                                onChange={(e) => setEditingBarcode({
-                                                    ...editingBarcode,
-                                                    code: e.target.value
-                                                })}
-                                                className="w-full"
-                                                autoFocus
-                                            />
-                                            <Button variant="ghost" size="icon" onClick={handleSaveEditedBarcode}
-                                                    className="text-inventory-secondary">
-                                                <Check className="h-4 w-4"/>
-                                            </Button>
-                                            <Button variant="ghost" size="icon" onClick={handleSaveEditedBarcode}
-                                                    className="text-red-500">
-                                                <X className="h-4 w-4"/>
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        barcode.code
-                                    )}
-                                </TableCell>
-                                <TableCell className="text-muted-foreground">
-                                    {new Date(barcode.timestamp).toLocaleString()}
-                                </TableCell>
-                                <TableCell>
-                                    <div className="flex items-center space-x-1">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => toggleEditingBarcode(barcode)}
-                                            className="h-8 w-8 text-inventory-secondary"
-                                        >
-                                            <Edit className="h-4 w-4"/>
+                        <TableRow key={barcode.id}>
+                            <TableCell className="font-medium">{index + 1}</TableCell>
+                            <TableCell>
+                                {editingBarcode && editingBarcode.id === barcode.id ? (
+                                    <div className="flex items-center space-x-2">
+                                        <Input
+                                            value={editingBarcode.code}
+                                            onChange={(e) => setEditingBarcode({
+                                                ...editingBarcode,
+                                                code: e.target.value
+                                            })}
+                                            className="w-full"
+                                            autoFocus
+                                        />
+                                        <Button variant="ghost" size="icon" onClick={handleSaveEditedBarcode}
+                                                className="text-inventory-secondary">
+                                            <Check className="h-4 w-4"/>
                                         </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => {
-                                                setInsertAfterIndex(index);
-                                                setIsInsertDialogOpen(true);
-                                            }}
-                                            className="h-8 w-8 text-inventory-primary"
-                                        >
-                                            <ArrowDown className="h-4 w-4"/>
+                                        <Button variant="ghost" size="icon" onClick={() => toggleEditingBarcode(null)}
+                                                className="text-red-500">
+                                            <X className="h-4 w-4"/>
                                         </Button>
                                     </div>
-                                </TableCell>
-                            </TableRow>
-                        </React.Fragment>
+                                ) : (
+                                    barcode.code
+                                )}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                                {new Date(barcode.timestamp).toLocaleString()}
+                            </TableCell>
+                            <TableCell>
+                                <div className="flex items-center space-x-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => toggleEditingBarcode(barcode)}
+                                        className="h-8 w-8 text-inventory-secondary"
+                                    >
+                                        <Edit className="h-4 w-4"/>
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => {
+                                            setInsertAfterIndex(index);
+                                            setIsInsertDialogOpen(true);
+                                        }}
+                                        className="h-8 w-8 text-inventory-primary"
+                                    >
+                                        <ArrowDown className="h-4 w-4"/>
+                                    </Button>
+                                </div>
+                            </TableCell>
+                        </TableRow>
                     ))}
                 </TableBody>
             </Table>
@@ -111,86 +123,5 @@ const BarcodeTable = ({rowId, searchQuery}: Props) => {
     )
 }
 
-type BarcodeTableDataProps = {
-    barcodes: Barcode[];
-
-}
-
-const BarcodeTableData = ({ barcodes }: BarcodeTableDataProps) => {
-    return (
-        <div className="rounded-md border glass-card overflow-hidden">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead className="w-20">No.</TableHead>
-                        <TableHead>Barcode</TableHead>
-                        <TableHead className="w-40">Timestamp</TableHead>
-                        <TableHead className="w-28">Actions</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {barcodes.map((barcode, index) => (
-                        <React.Fragment key={barcode.id}>
-                            <TableRow>
-                                <TableCell className="font-medium">{index + 1}</TableCell>
-                                <TableCell>
-                                    {editingBarcode && editingBarcode.id === barcode.id ? (
-                                        <div className="flex items-center space-x-2">
-                                            <Input
-                                                value={editingBarcode.code}
-                                                onChange={(e) => setEditingBarcode({
-                                                    ...editingBarcode,
-                                                    code: e.target.value
-                                                })}
-                                                className="w-full"
-                                                autoFocus
-                                            />
-                                            <Button variant="ghost" size="icon" onClick={handleSaveEditedBarcode}
-                                                    className="text-inventory-secondary">
-                                                <Check className="h-4 w-4"/>
-                                            </Button>
-                                            <Button variant="ghost" size="icon" onClick={handleSaveEditedBarcode}
-                                                    className="text-red-500">
-                                                <X className="h-4 w-4"/>
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        barcode.code
-                                    )}
-                                </TableCell>
-                                <TableCell className="text-muted-foreground">
-                                    {new Date(barcode.timestamp).toLocaleString()}
-                                </TableCell>
-                                <TableCell>
-                                    <div className="flex items-center space-x-1">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => toggleEditingBarcode(barcode)}
-                                            className="h-8 w-8 text-inventory-secondary"
-                                        >
-                                            <Edit className="h-4 w-4"/>
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => {
-                                                setInsertAfterIndex(index);
-                                                setIsInsertDialogOpen(true);
-                                            }}
-                                            className="h-8 w-8 text-inventory-primary"
-                                        >
-                                            <ArrowDown className="h-4 w-4"/>
-                                        </Button>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        </React.Fragment>
-                    ))}
-                </TableBody>
-            </Table>
-        </div>
-    )
-}
 
 export default BarcodeTable;

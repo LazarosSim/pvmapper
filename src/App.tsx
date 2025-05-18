@@ -2,7 +2,8 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {ReactQueryDevtools} from '@tanstack/react-query-devtools';
+import { QueryClient, QueryClientProvider} from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SupabaseProvider } from "@/lib/supabase-provider";
 import { DBProvider } from "@/lib/db-provider";
@@ -84,6 +85,7 @@ const App = () => {
           </SupabaseProvider>
         </BrowserRouter>
       </TooltipProvider>
+      <ReactQueryDevtools/>
     </QueryClientProvider>
   );
 };

@@ -54,15 +54,8 @@ const RowDetail = () => {
     return <Navigate to="/" replace />;
   }
 
-  const row = getRowById(rowId);
-  const barcodes = getBarcodesByRowId(rowId);
-  const park = row ? getParkById(row.parkId) : undefined;
-  
-  const filteredBarcodes = barcodes.filter(barcode => 
-    barcode.code.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  
-  const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
+  const {data: barcodes} = useRowBarcodes(rowId, { code: searchQuery });
+
 
   const handleReset = async () => {
     setIsResetting(true);
@@ -87,7 +80,7 @@ const RowDetail = () => {
   const handleEditBarcode = (id: string, code: string) => {
     setEditingBarcode({id, code});
   };
-  
+
   const saveEditedBarcode = async () => {
     if (editingBarcode) {
       const result = await updateBarcode(editingBarcode.id, editingBarcode.code);
@@ -97,7 +90,7 @@ const RowDetail = () => {
       setEditingBarcode(null);
     }
   };
-  
+
   const cancelEditBarcode = () => {
     setEditingBarcode(null);
   };
@@ -164,24 +157,23 @@ const RowDetail = () => {
           />
         </div>
 
-        {filteredBarcodes.length > 0 ? (
-          <div className="rounded-md border glass-card overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-20">No.</TableHead>
-                  <TableHead>Barcode</TableHead>
-                  <TableHead className="w-40">Timestamp</TableHead>
-                  <TableHead className="w-28">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredBarcodes.map((barcode, index) => (
-                  <React.Fragment key={barcode.id}>
-                    <TableRow>
-                      <TableCell className="font-medium">{index + 1}</TableCell>
-                      <TableCell>
-                        {editingBarcode && editingBarcode.id === barcode.id ? (
+        {barcodes && barcodes.length > 0 ? (
+        <div className="rounded-md border glass-card overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-20">No.</TableHead>
+                <TableHead>Barcode</TableHead>
+                <TableHead className="w-40">Timestamp</TableHead>
+                <TableHead className="w-28">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {barcodes.map((barcode, index) => (
+                  <TableRow key={barcode.id}>
+                    <TableCell className="font-medium">{index + 1}</TableCell>
+                    <TableCell>
+                      {editingBarcode && editingBarcode.id === barcode.id ? (
                           <div className="flex items-center space-x-2">
                             <Input 
                               value={editingBarcode.code}
