@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useDB } from '@/lib/db-provider';
 import Layout from '@/components/layout/layout';
 import { Button } from '@/components/ui/button';
-import { Plus, RotateCcw, Edit, Check, X, ArrowDown, Loader2 } from 'lucide-react';
+import { Plus, RotateCcw, Edit, Check, X, ArrowDown, Loader2, RefreshCw } from 'lucide-react';
 import AddBarcodeDialog from '@/components/dialog/add-barcode-dialog';
 import { Input } from '@/components/ui/input';
 import {
@@ -31,12 +32,31 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { toast } from "sonner";
 import { Label } from '@/components/ui/label';
+import type { Barcode } from '@/lib/types/db-types';
 
 const RowDetail = () => {
   const { rowId } = useParams<{ rowId: string }>();
-  const { rows, getRowById, getBarcodesByRowId, getParkById, resetRow, updateRow, updateBarcode, addBarcode } = useDB();
+  const { 
+    rows, 
+    getRowById, 
+    getParkById, 
+    resetRow, 
+    updateRow, 
+    updateBarcode, 
+    addBarcode, 
+    fetchBarcodesForRow 
+  } = useDB();
+  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isInsertDialogOpen, setIsInsertDialogOpen] = useState(false);
   const [insertAfterIndex, setInsertAfterIndex] = useState<number | null>(null);
@@ -49,20 +69,64 @@ const RowDetail = () => {
   const [isInserting, setIsInserting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [captureLocation, setCaptureLocation] = useState(false);
+  
+  // New state for direct database fetch
+  const [barcodes, setBarcodes] = useState<Barcode[]>([]);
+  const [isLoadingBarcodes, setIsLoadingBarcodes] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50);
 
   if (!rowId || !rows.some(r => r.id === rowId)) {
     return <Navigate to="/" replace />;
   }
 
   const row = getRowById(rowId);
-  const barcodes = getBarcodesByRowId(rowId);
   const park = row ? getParkById(row.parkId) : undefined;
   
+  // Filter barcodes based on search query
   const filteredBarcodes = barcodes.filter(barcode => 
     barcode.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
   
   const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
+  
+  // Calculate pagination info
+  const totalPages = Math.ceil(filteredBarcodes.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentBarcodes = filteredBarcodes.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Function to fetch barcodes from the database
+  const loadBarcodes = async () => {
+    if (!rowId) return;
+    
+    setIsLoadingBarcodes(true);
+    try {
+      const fetchedBarcodes = await fetchBarcodesForRow(rowId);
+      setBarcodes(fetchedBarcodes);
+    } catch (error) {
+      console.error('Failed to fetch barcodes:', error);
+      toast.error('Failed to load barcodes');
+    } finally {
+      setIsLoadingBarcodes(false);
+    }
+  };
+  
+  // Initial load of barcodes
+  useEffect(() => {
+    loadBarcodes();
+  }, [rowId]);
+  
+  // Function to refresh barcodes
+  const handleRefreshBarcodes = async () => {
+    setRefreshing(true);
+    await loadBarcodes();
+    setRefreshing(false);
+    toast.success('Barcodes refreshed');
+  };
 
   const handleReset = async () => {
     setIsResetting(true);
@@ -70,6 +134,8 @@ const RowDetail = () => {
       await resetRow(rowId);
       setIsResetDialogOpen(false);
       toast.success("Row reset successfully");
+      // Refresh barcodes after reset
+      await loadBarcodes();
     } finally {
       setIsResetting(false);
     }
@@ -84,6 +150,10 @@ const RowDetail = () => {
       const result = await updateBarcode(editingBarcode.id, editingBarcode.code);
       if (result !== undefined && result !== null) {
         toast.success("Barcode updated successfully");
+        // Update local state
+        setBarcodes(prev => prev.map(b => 
+          b.id === editingBarcode.id ? { ...b, code: editingBarcode.code } : b
+        ));
       }
       setEditingBarcode(null);
     }
@@ -123,6 +193,9 @@ const RowDetail = () => {
           toast.success("Barcode inserted successfully");
           setInsertCode('');
           setIsInsertDialogOpen(false);
+          
+          // Refresh barcodes after insert
+          await loadBarcodes();
         }
       } catch (error) {
         console.error("Error inserting barcode:", error);
@@ -153,24 +226,37 @@ const RowDetail = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 mr-2 bg-white/80 backdrop-blur-sm border border-inventory-secondary/30"
           />
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={handleRefreshBarcodes}
+            disabled={refreshing}
+            className="ml-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
-
-        {filteredBarcodes.length > 0 ? (
-          <div className="rounded-md border glass-card overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-20">No.</TableHead>
-                  <TableHead>Barcode</TableHead>
-                  <TableHead className="w-40">Timestamp</TableHead>
-                  <TableHead className="w-28">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredBarcodes.map((barcode, index) => (
-                  <React.Fragment key={barcode.id}>
-                    <TableRow>
-                      <TableCell className="font-medium">{index + 1}</TableCell>
+        
+        {isLoadingBarcodes ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-inventory-primary" />
+          </div>
+        ) : filteredBarcodes.length > 0 ? (
+          <>
+            <div className="rounded-md border glass-card overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-20">No.</TableHead>
+                    <TableHead>Barcode</TableHead>
+                    <TableHead className="w-40">Timestamp</TableHead>
+                    <TableHead className="w-28">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {currentBarcodes.map((barcode, index) => (
+                    <TableRow key={barcode.id}>
+                      <TableCell className="font-medium">{indexOfFirstItem + index + 1}</TableCell>
                       <TableCell>
                         {editingBarcode && editingBarcode.id === barcode.id ? (
                           <div className="flex items-center space-x-2">
@@ -208,7 +294,7 @@ const RowDetail = () => {
                             variant="ghost" 
                             size="icon" 
                             onClick={() => {
-                              setInsertAfterIndex(index);
+                              setInsertAfterIndex(indexOfFirstItem + index);
                               setIsInsertDialogOpen(true);
                             }}
                             className="h-8 w-8 text-inventory-primary"
@@ -218,11 +304,61 @@ const RowDetail = () => {
                         </div>
                       </TableCell>
                     </TableRow>
-                  </React.Fragment>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <Pagination className="mt-4">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+                  
+                  {/* Display limited page numbers for better UI */}
+                  {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                    // Calculate page number to show
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    if (pageNum > 0 && pageNum <= totalPages) {
+                      return (
+                        <PaginationItem key={pageNum}>
+                          <PaginationLink 
+                            onClick={() => setCurrentPage(pageNum)}
+                            isActive={currentPage === pageNum}
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    }
+                    return null;
+                  })}
+                  
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
+          </>
         ) : (
           <div className="text-center py-8">
             <p className="text-muted-foreground mb-4">
@@ -240,7 +376,13 @@ const RowDetail = () => {
         
         <AddBarcodeDialog 
           open={isDialogOpen} 
-          onOpenChange={setIsDialogOpen} 
+          onOpenChange={(isOpen) => {
+            setIsDialogOpen(isOpen);
+            if (!isOpen) {
+              // Refresh barcodes when dialog is closed to show newly added barcode
+              loadBarcodes();
+            }
+          }} 
           rowId={rowId}
           captureLocation={captureLocation}
           setCaptureLocation={setCaptureLocation}

@@ -62,7 +62,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   } = useParks(rows, countBarcodesInPark);
   
   // Initialize data management module
-  const { importData, exportData } = useDataManagement(parks, rows, barcodes);
+  const { importData, exportData, fetchBarcodesForRow } = useDataManagement(parks, rows, barcodes);
 
   // Load data when user changes
   useEffect(() => {
@@ -154,6 +154,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     getBarcodesByRowId,
     searchBarcodes,
     countBarcodesInPark,
+    fetchBarcodesForRow, // Expose the new function here
     
     // User management
     users,
