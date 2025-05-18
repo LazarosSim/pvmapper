@@ -1,4 +1,3 @@
-
 // Type definitions for the database provider
 
 // User type
@@ -68,7 +67,7 @@ export type UserStat = {
 };
 
 // Database context type definition
-export type DBContextType = {
+export interface DBContextType {
   currentUser: User | null | undefined;
   isDBLoading: boolean;
   refetchUser: () => Promise<void>;
@@ -88,7 +87,7 @@ export type DBContextType = {
   deleteRow: (rowId: string) => Promise<void>;
   updateRow: (rowId: string, name: string, expectedBarcodes?: number) => Promise<void>;
   getRowById: (rowId: string) => Row | undefined;
-  resetRow: (rowId: string) => Promise<void>;
+  resetRow: (rowId: string) => Promise<boolean | void>;
   countBarcodesInRow: (rowId: string) => number;
   addSubRow: (rowId: string, expectedBarcodes?: number) => Promise<Row | null>;
   
