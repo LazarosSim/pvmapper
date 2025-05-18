@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Loader2, X } from 'lucide-react';
 import { useDB } from '@/lib/db-provider';
@@ -23,6 +23,8 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
 
 interface BulkRowsDialogProps {
   open: boolean;
@@ -47,7 +49,7 @@ const BulkRowsDialog = ({ open, onOpenChange, parkId }: BulkRowsDialogProps) => 
   const [individualBarcodeCount, setIndividualBarcodeCount] = useState<{[key: string]: string}>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Process row names from text area
+  // Process row names from text area (with new comma parsing)
   const getRowPreviews = (): RowPreview[] => {
     if (activeTab === "single") {
       return rowName ? [{ 
@@ -56,15 +58,32 @@ const BulkRowsDialog = ({ open, onOpenChange, parkId }: BulkRowsDialogProps) => 
       }] : [];
     }
 
-    const names = rowNamesText
+    // Process bulk entries
+    const entries = rowNamesText
       .split('\n')
-      .map(name => name.trim())
-      .filter(name => name !== '');
+      .map(line => line.trim())
+      .filter(line => line !== '');
     
-    return names.map(name => {
-      const barcodeCount = applyToAll 
-        ? (expectedBarcodes ? parseInt(expectedBarcodes) : undefined)
-        : (individualBarcodeCount[name] ? parseInt(individualBarcodeCount[name]) : undefined);
+    return entries.map(entry => {
+      // Split by comma to extract name and expected barcode count
+      const parts = entry.split(',');
+      const name = parts[0].trim();
+      
+      let barcodeCount: number | undefined = undefined;
+      
+      // If comma exists and there's a value after it, parse that as barcode count
+      if (parts.length > 1 && parts[1].trim() !== '') {
+        const parsedCount = parseInt(parts[1].trim());
+        if (!isNaN(parsedCount)) {
+          barcodeCount = parsedCount;
+        }
+      } else if (applyToAll && expectedBarcodes) {
+        // If applying to all and we have a global count
+        barcodeCount = parseInt(expectedBarcodes);
+      } else if (individualBarcodeCount[name]) {
+        // Fallback to individually set counts (from UI)
+        barcodeCount = parseInt(individualBarcodeCount[name]);
+      }
       
       return {
         name,
@@ -103,11 +122,14 @@ const BulkRowsDialog = ({ open, onOpenChange, parkId }: BulkRowsDialogProps) => 
         // Bulk row creation
         // Use sequential creation to maintain proper row ordering
         for (const preview of previews) {
-          const expectedBarcodesValue = preview.expectedBarcodes;
+          // Use the custom name from the preview
+          const result = await addRow(
+            parkId, 
+            preview.expectedBarcodes,
+            false, // Don't navigate
+            preview.name // Pass custom row name
+          );
           
-          // For bulk creation, set navigate to false to avoid redirecting
-          // We'll only navigate after all rows are created
-          const result = await addRow(parkId, expectedBarcodesValue, false);
           if (result) {
             successCount++;
           }
@@ -135,6 +157,13 @@ const BulkRowsDialog = ({ open, onOpenChange, parkId }: BulkRowsDialogProps) => 
   };
 
   const rowPreviews = getRowPreviews();
+
+  // Example text for the textarea placeholder
+  const placeholderText = `Enter each row name on a new line.
+Add a comma and a number for expected barcodes:
+Row A, 10
+Row B, 20
+Row C`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -177,12 +206,12 @@ const BulkRowsDialog = ({ open, onOpenChange, parkId }: BulkRowsDialogProps) => 
                 id="row-names"
                 value={rowNamesText}
                 onChange={(e) => setRowNamesText(e.target.value)}
-                placeholder="Enter each row name on a new line, e.g.:
-Row A
-Row B
-Row C"
+                placeholder={placeholderText}
                 className="min-h-[120px]"
               />
+              <p className="text-xs text-muted-foreground">
+                For each row, you can specify expected barcodes by adding a comma and a number.
+              </p>
             </div>
 
             <div className="flex items-center space-x-2">
@@ -191,12 +220,14 @@ Row C"
                 checked={applyToAll}
                 onCheckedChange={setApplyToAll}
               />
-              <Label htmlFor="apply-to-all">Apply same barcode count to all rows</Label>
+              <Label htmlFor="apply-to-all">
+                Apply same barcode count to rows without specified counts
+              </Label>
             </div>
 
             {applyToAll && (
               <div className="space-y-2">
-                <Label htmlFor="bulk-expected-barcodes">Expected Barcodes (all rows)</Label>
+                <Label htmlFor="bulk-expected-barcodes">Default Expected Barcodes</Label>
                 <Input
                   id="bulk-expected-barcodes"
                   type="number"
@@ -206,6 +237,9 @@ Row C"
                   placeholder="Leave empty for unlimited"
                   className="w-full"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Applied to rows that don't have a specific count after the comma.
+                </p>
               </div>
             )}
 
@@ -216,19 +250,11 @@ Row C"
                   {rowPreviews.map((preview, index) => (
                     <div key={index} className="flex items-center justify-between py-1 border-b last:border-b-0">
                       <span className="text-sm">{preview.name}</span>
-                      {!applyToAll && (
-                        <Input
-                          type="number"
-                          min="0"
-                          value={individualBarcodeCount[preview.name] || ''}
-                          onChange={(e) => handleRowNameChange(preview.name, e.target.value)}
-                          placeholder="Barcodes"
-                          className="w-24 text-xs h-8"
-                        />
-                      )}
-                      {applyToAll && expectedBarcodes && (
-                        <span className="text-xs text-muted-foreground">{expectedBarcodes} barcodes</span>
-                      )}
+                      <span className="text-xs text-muted-foreground">
+                        {preview.expectedBarcodes !== undefined 
+                          ? `${preview.expectedBarcodes} barcodes`
+                          : 'Unlimited'}
+                      </span>
                     </div>
                   ))}
                 </div>

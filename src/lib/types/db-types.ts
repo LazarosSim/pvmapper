@@ -84,7 +84,7 @@ export interface DBContextType {
   // Rows
   rows: Row[];
   getRowsByParkId: (parkId: string) => Row[];
-  addRow: (parkId: string, expectedBarcodes?: number, navigate?: boolean) => Promise<Row | null>;
+  addRow: (parkId: string, expectedBarcodes?: number, navigate?: boolean, customName?: string) => Promise<Row | null>;
   deleteRow: (rowId: string) => Promise<void>;
   updateRow: (rowId: string, name: string, expectedBarcodes?: number) => Promise<void>;
   getRowById: (rowId: string) => Row | undefined;

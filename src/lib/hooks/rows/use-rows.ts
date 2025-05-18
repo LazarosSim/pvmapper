@@ -16,8 +16,8 @@ export const useRows = (barcodes: Barcode[], setBarcodes: React.Dispatch<React.S
     setRows,
     fetchRows: (userId?: string) => fetchRows(userId, setRows),
     getRowsByParkId: (parkId: string) => getRowsByParkId(rows, parkId),
-    addRow: (parkId: string, expectedBarcodes?: number, navigate: boolean = true) => 
-      addRow(rows, setRows, parkId, expectedBarcodes, navigate),
+    addRow: (parkId: string, expectedBarcodes?: number, navigate: boolean = true, customName?: string) => 
+      addRow(rows, setRows, parkId, expectedBarcodes, navigate, customName),
     addSubRow: (parentRowId: string, expectedBarcodes?: number) => 
       addSubRow(rows, setRows, parentRowId, expectedBarcodes),
     updateRow: (rowId: string, name: string, expectedBarcodes?: number) => 
