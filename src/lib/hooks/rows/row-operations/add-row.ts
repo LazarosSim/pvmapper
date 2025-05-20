@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Row } from '../../../types/db-types';
@@ -12,12 +11,14 @@ export const addRow = async (
   setRows: React.Dispatch<React.SetStateAction<Row[]>>,
   parkId: string,
   expectedBarcodes?: number,
-  navigate: boolean = true
+  navigate: boolean = true,
+  customName?: string  // New parameter for custom row naming
 ): Promise<Row | null> => {
   // Get rows count for this park to create a sequential name
   const parkRows = rows.filter(row => row.parkId === parkId);
-  const rowNumber = parkRows.length + 1;
-  const rowName = `Row ${rowNumber}`;
+  
+  // Use custom name if provided, otherwise generate a sequential name
+  const rowName = customName || `Row ${parkRows.length + 1}`;
   
   try {
     const { data, error } = await supabase

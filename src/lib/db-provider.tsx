@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useSupabase } from './supabase-provider';
 import { toast } from 'sonner';
@@ -62,7 +61,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   } = useParks(rows, countBarcodesInPark);
   
   // Initialize data management module
-  const { importData, exportData } = useDataManagement(parks, rows, barcodes);
+  const { importData, exportData, fetchBarcodesForRow } = useDataManagement(parks, rows, barcodes);
 
   // Load data when user changes
   useEffect(() => {
@@ -127,8 +126,8 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     // Rows
     rows,
     getRowsByParkId,
-    addRow: (parkId, expectedBarcodes, navigate) => 
-      addRow(parkId, expectedBarcodes, navigate),
+    addRow: (parkId, expectedBarcodes, navigate, customName) => 
+      addRow(parkId, expectedBarcodes, navigate, customName),
     deleteRow,
     updateRow,
     getRowById,
@@ -154,6 +153,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     getBarcodesByRowId,
     searchBarcodes,
     countBarcodesInPark,
+    fetchBarcodesForRow, // Expose the new function here
     
     // User management
     users,

@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { Checkbox } from '@/components/ui/checkbox';
+import { supabase } from '@/integrations/supabase/client';
+import { Barcode } from '@/lib/types/db-types';
 
 interface ParkCardProps {
   park: Park;
@@ -30,7 +32,6 @@ const ParkCard: React.FC<ParkCardProps> = ({
     updatePark,
     getParkProgress,
     currentUser,
-    getBarcodesByRowId
   } = useDB();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
@@ -59,27 +60,93 @@ const ParkCard: React.FC<ParkCardProps> = ({
     return name.replace(/[\\/:*?"<>|]/g, '_');
   };
 
-  const handleExportExcel = () => {
+  // New function to fetch barcodes directly from the database for a specific row
+  const fetchBarcodesForRow = async (rowId: string): Promise<Barcode[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('barcodes')
+        .select('*')
+        .eq('row_id', rowId)
+        .order('display_order', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching barcodes for row:', error);
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      return data.map(barcode => ({
+        id: barcode.id,
+        code: barcode.code,
+        rowId: barcode.row_id,
+        userId: barcode.user_id,
+        timestamp: barcode.timestamp,
+        displayOrder: barcode.display_order || 0,
+        latitude: barcode.latitude,
+        longitude: barcode.longitude
+      }));
+    } catch (error) {
+      console.error('Error in fetchBarcodesForRow:', error);
+      return [];
+    }
+  };
+
+  const handleExportExcel = async () => {
     if (isExporting) return;
     try {
       setIsExporting(true);
+      toast.info('Starting export, please wait...');
+      
       const rows = getRowsByParkId(park.id);
-
       const wb = XLSX.utils.book_new();
 
-      const summaryData = [["Park Name", park.name], ["Created", new Date(park.createdAt).toLocaleString()], ["Total Rows", rows.length.toString()], ["Total Barcodes", barcodeCount.toString()], ["Expected Barcodes", park.expectedBarcodes.toString()], ["Completion", `${progress.percentage}%`]];
+      // Create a summary sheet first
+      const summaryData = [
+        ["Park Name", park.name], 
+        ["Created", new Date(park.createdAt).toLocaleString()], 
+        ["Total Rows", rows.length.toString()], 
+        ["Total Barcodes", barcodeCount.toString()],
+        ["Expected Barcodes", park.expectedBarcodes.toString()], 
+        ["Completion", `${progress.percentage}%`]
+      ];
+
+      // Add row information to summary
+      rows.forEach((row, index) => {
+        summaryData.push([
+          `Row ${index + 1}`, row.name, 
+          `Expected: ${row.expectedBarcodes || "N/A"}`, 
+          `Current: ${row.currentBarcodes || 0}`
+        ]);
+      });
+      
       const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
       XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
 
-      rows.forEach(row => {
-        const barcodes = getBarcodesByRowId(row.id);
+      // Create a separate worksheet for each row, regardless of whether it has barcodes
+      for (const row of rows) {
+        // Get barcodes for this row directly from the database
+        const barcodes = await fetchBarcodesForRow(row.id);
+        
+        // Create worksheet data with header
+        const rowData = [["Barcode"]]; // Start with header row
+
+        // Add barcode data if available
         if (barcodes.length > 0) {
-          const rowData = barcodes.map(barcode => [barcode.code, new Date(barcode.timestamp).toLocaleString()]);
-          const ws = XLSX.utils.aoa_to_sheet(rowData);
-          const safeSheetName = row.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 31);
-          XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
+          barcodes.forEach(barcode => {
+            rowData.push([barcode.code]);
+          });
         }
-      });
+        
+        // Create the worksheet (even if empty, it will just have the header)
+        const ws = XLSX.utils.aoa_to_sheet(rowData);
+        
+        // Create a safe sheet name (max 31 chars for Excel)
+        const safeSheetName = row.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
+      }
 
       const safeFileName = sanitizeFileName(`${park.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
 

@@ -1,11 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useDB } from '@/lib/db-provider';
 import Layout from '@/components/layout/layout';
 import RowCard from '@/components/rows/row-card';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, List } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import BulkRowsDialog from '@/components/dialog/bulk-rows-dialog';
 import type { Row } from '@/lib/types/db-types';
 import {
   Dialog,
@@ -15,13 +17,20 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const ParkDetail = () => {
   const { parkId } = useParams<{ parkId: string }>();
-  const { parks, getRowsByParkId, getParkById, addRow } = useDB();
+  const { parks, getRowsByParkId, getParkById, addRow, isManager } = useDB();
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddRowDialogOpen, setIsAddRowDialogOpen] = useState(false);
   const [expectedBarcodes, setExpectedBarcodes] = useState<string>('');
+  const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
 
   // Save selected park to localStorage and clear row selection
   // This ensures consistency between HomePage and ScanPage navigation
@@ -146,12 +155,34 @@ const ParkDetail = () => {
           </div>
         )}
         
-        <Button 
-          onClick={handleOpenAddDialog}
-          className="fixed bottom-20 right-4 rounded-full w-14 h-14 shadow-lg bg-inventory-primary hover:bg-inventory-primary/90"
-        >
-          <Plus className="h-6 w-6" />
-        </Button>
+        {isManager() ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                className="fixed bottom-20 right-4 rounded-full w-14 h-14 shadow-lg bg-inventory-primary hover:bg-inventory-primary/90"
+              >
+                <Plus className="h-6 w-6" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={handleOpenAddDialog}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Single Row
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsBulkDialogOpen(true)}>
+                <List className="h-4 w-4 mr-2" />
+                Bulk Add Rows
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Button 
+            onClick={handleOpenAddDialog}
+            className="fixed bottom-20 right-4 rounded-full w-14 h-14 shadow-lg bg-inventory-primary hover:bg-inventory-primary/90"
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        )}
 
         {/* Dialog for adding a new row with expected barcodes */}
         <Dialog open={isAddRowDialogOpen} onOpenChange={setIsAddRowDialogOpen}>
@@ -187,6 +218,13 @@ const ParkDetail = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        
+        {/* Bulk row creation dialog */}
+        <BulkRowsDialog
+          open={isBulkDialogOpen}
+          onOpenChange={setIsBulkDialogOpen}
+          parkId={parkId}
+        />
       </div>
     </Layout>
   );
