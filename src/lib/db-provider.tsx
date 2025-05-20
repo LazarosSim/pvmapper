@@ -50,7 +50,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   
   // Initialize barcodes module with rows and daily scan update function
   const {
-    fetchBarcodes, addBarcode, updateBarcode, deleteBarcode,
+    fetchBarcodes, updateBarcode, deleteBarcode,
     getBarcodesByRowId, searchBarcodes, countBarcodesInPark
   } = useBarcodes(rows, () => updateDailyScans(user?.id), decreaseDailyScans);
   
@@ -126,7 +126,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     // Rows
     rows,
     getRowsByParkId,
-    addRow: (parkId, expectedBarcodes, navigate, customName) => 
+    addRow: (parkId, expectedBarcodes, navigate, customName) =>
       addRow(parkId, expectedBarcodes, navigate, customName),
     deleteRow,
     updateRow,
@@ -146,15 +146,11 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     
     // Barcodes
     barcodes,
-    addBarcode: (code, rowId, afterBarcodeIndex, location) => 
-      addBarcode(code, rowId, afterBarcodeIndex, location, user?.id),
     deleteBarcode,
     updateBarcode,
     getBarcodesByRowId,
     searchBarcodes,
     countBarcodesInPark,
-    fetchBarcodesForRow, // Expose the new function here
-    
     // User management
     users,
     register,

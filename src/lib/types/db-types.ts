@@ -68,7 +68,7 @@ export type UserStat = {
 };
 
 // Database context type definition
-export interface DBContextType {
+export type DBContextType = {
   currentUser: User | null | undefined;
   isDBLoading: boolean;
   refetchUser: () => Promise<void>;
@@ -94,13 +94,11 @@ export interface DBContextType {
   
   // Barcodes
   barcodes: Barcode[];
-  addBarcode: (code: string, rowId: string, afterBarcodeIndex?: number, location?: { latitude: number, longitude: number } | null) => Promise<Barcode | null>;
   deleteBarcode: (barcodeId: string) => Promise<void>;
   updateBarcode: (barcodeId: string, code: string) => Promise<void>;
   getBarcodesByRowId: (rowId: string) => Barcode[];
   searchBarcodes: (query: string) => Barcode[];
   countBarcodesInPark: (parkId: string) => number;
-  fetchBarcodesForRow: (rowId: string) => Promise<Barcode[]>; // Added the missing function
   
   // User management
   users: User[];

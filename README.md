@@ -1,73 +1,115 @@
-# Welcome to your Lovable project
+# PV Mapper - Solar Park Management Application
 
-## Project info
+## Project Overview
 
-**URL**: https://lovable.dev/projects/72d1b4e5-834d-476c-8cb7-831a0cf3013c
+PV Mapper is a web application for managing and monitoring photovoltaic (solar) parks. It allows users to:
 
-## How can I edit this code?
+- Track and manage multiple solar parks
+- Organize and monitor rows of solar panels within parks
+- Perform scanning and inspection of parks and rows
+- View detailed information about parks and rows
+- Access a management dashboard (for manager users)
 
-There are several ways of editing your application.
+**Project URL**: https://lovable.dev/projects/72d1b4e5-834d-476c-8cb7-831a0cf3013c
 
-**Use Lovable**
+## Setup Instructions
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/72d1b4e5-834d-476c-8cb7-831a0cf3013c) and start prompting.
+### Prerequisites
 
-Changes made via Lovable will be committed automatically to this repo.
+- Node.js (v16 or higher) & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- Supabase account (for backend services)
 
-**Use your preferred IDE**
+### Installation
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+1. Clone the repository:
+   ```sh
+   git clone <YOUR_GIT_URL>
+   ```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+2. Navigate to the project directory:
+   ```sh
+   cd pvmapper
+   ```
 
-Follow these steps:
+3. Install dependencies:
+   ```sh
+   npm install
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+4. Set up environment variables:
+   Create a `.env` file in the root directory with the following variables:
+   ```
+   VITE_SUPABASE_URL=your_supabase_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+5. Start the development server:
+   ```sh
+   npm run dev
+   ```
 
-# Step 3: Install the necessary dependencies.
-npm i
+6. Open your browser and navigate to `http://localhost:5173`
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+## Usage Guide
 
-**Edit a file directly in GitHub**
+### Authentication
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- Access the application at `http://localhost:5173`
+- If not logged in, you'll be redirected to the login page
+- Log in with your credentials
 
-**Use GitHub Codespaces**
+### Main Features
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+1. **Home Page** - View a list of all solar parks
+2. **Park Detail** - View detailed information about a specific park and its rows
+3. **Row Detail** - View detailed information about a specific row
+4. **Scan** - Access scanning functionality for parks and rows
+5. **Profile** - View and edit your user profile
+6. **Dashboard** - Manager-only view for overall system management
 
-## What technologies are used for this project?
+### User Roles
+
+- **Regular Users**: Can view parks, rows, and perform scans
+- **Managers**: Have additional access to the dashboard and management features
+
+## Project Structure
+
+- `/src` - Main source code
+  - `/components` - Reusable UI components
+  - `/hooks` - Custom React hooks
+  - `/integrations` - External service integrations
+  - `/lib` - Utility functions and providers
+  - `/pages` - Application pages/routes
+- `/public` - Static assets
+- `/supabase` - Supabase configuration
+
+## Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run build:dev` - Build for development
+- `npm run lint` - Run ESLint
+- `npm run preview` - Preview production build
+
+## Technologies Used
 
 This project is built with:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- Vite - Build tool and development server
+- TypeScript - Type-safe JavaScript
+- React - UI library
+- React Router - For navigation
+- shadcn-ui - UI component library
+- Tailwind CSS - Utility-first CSS framework
+- Supabase - Backend services (auth, database)
+- React Query - Data fetching and state management
 
-## How can I deploy this project?
+## Deployment
 
 Simply open [Lovable](https://lovable.dev/projects/72d1b4e5-834d-476c-8cb7-831a0cf3013c) and click on Share -> Publish.
 
-## Can I connect a custom domain to my Lovable project?
+## Custom Domain
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+To connect a custom domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)

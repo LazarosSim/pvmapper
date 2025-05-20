@@ -6,26 +6,29 @@ import { Input } from '@/components/ui/input';
 import { Loader2, ArrowRight, X } from 'lucide-react';
 import useSoundEffects from '@/hooks/use-sound-effects';
 import { useDB } from '@/lib/db-provider';
+import {useRow} from "@/hooks/use-row-queries.tsx";
+import {
+  useAddBarcodeToRow,
+  useDeleteRowBarcode,
+  useResetRowBarcodes, useRowBarcodes,
+  useUpdateRowBarcode
+} from "@/hooks/use-barcodes-queries.tsx";
 
 interface BarcodeScanInputProps {
   rowId: string;
-  onBarcodeAdded: (barcode: any) => void;
   focusInput: () => void;
 }
 
 const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   rowId,
-  onBarcodeAdded,
   focusInput
 }) => {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const {
-    addBarcode,
     getRowById,
     getParkById,
     getBarcodesByRowId,
-    countBarcodesInRow
   } = useDB();
   const {
     playSuccessSound,
@@ -34,9 +37,15 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Get the row and check if this is the first barcode
-  const row = getRowById(rowId);
+  const {data: row, isLoading, isError } = useRow(rowId);
+
+  const {mutateAsync: addBarcode} = useAddBarcodeToRow(rowId);
+  const {mutate: resetRow, data:affectedRows} = useResetRowBarcodes(rowId);
+  const {data: barcodes} = useRowBarcodes(rowId);
+
   const isFirstBarcode = row?.currentBarcodes === 0;
-  
+
+
   const captureGPSLocation = async (): Promise<{
     latitude: number;
     longitude: number;
@@ -71,11 +80,10 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
     }
   };
   
-  const registerBarcode = async () => {
-    if (!barcodeInput.trim() || isProcessing) return;
+  const registerBarcode = async (barcodeCode:string) => {
+    if (!barcodeCode || isProcessing) return;
     try {
       setIsProcessing(true);
-      const row = getRowById(rowId);
       const park = row ? getParkById(row.parkId) : undefined;
 
       // Get the captureLocation state from the parent component through the row
@@ -88,18 +96,6 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
         if (!location) {
           // Allow the user to continue even if location capture fails
           toast.warning("GPS location capture failed, but proceeding with barcode registration");
-        }
-      }
-
-      // Check if the row has reached its expected barcode limit
-      if (row?.expectedBarcodes !== undefined && row.expectedBarcodes !== null) {
-        const currentCount = row.currentBarcodes || 0;
-        if (currentCount >= row.expectedBarcodes) {
-          playErrorSound();
-          toast.error(`Maximum barcode limit reached (${row.expectedBarcodes}). Cannot add more barcodes to this row.`);
-          setBarcodeInput('');
-          focusInput();
-          return;
         }
       }
       
@@ -116,7 +112,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       }
       
       // Check for duplicates
-      const duplicates = getBarcodesByRowId(rowId).filter(b => b.code.toLowerCase() === barcodeInput.trim().toLowerCase());
+      const duplicates = barcodes.filter(b => b.code.toLowerCase() === barcodeInput.toLowerCase());
       if (duplicates.length > 0) {
         playErrorSound();
         toast.error('Duplicate barcode detected');
@@ -126,23 +122,14 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       }
 
       // Pass the location data to the addBarcode function
-      const result = await addBarcode(barcodeInput.trim(), rowId, undefined, location);
-      if (result !== undefined && result !== null) {
-        setBarcodeInput('');
-        playSuccessSound();
-        
-        // Show success message with location info if captured
-        if (location && isFirstBarcode) {
-          toast.success(`Barcode added with GPS location: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`);
-        } else {
-          toast.success('Barcode added successfully');
-        }
-
-        // Call onBarcodeAdded with the result to update the UI immediately
-        onBarcodeAdded(result);
+      const displayOrder = barcodes[barcodes.length - 1]?.displayOrder + 1000 || 1000;
+      await addBarcode({code:barcodeCode, displayOrder});
+      setBarcodeInput('');
+      playSuccessSound();
+      if (location && isFirstBarcode) {
+        toast.success(`Barcode added with GPS location: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`);
       } else {
-        playErrorSound();
-        toast.error('Failed to add barcode');
+        toast.success('Barcode added successfully');
       }
     } catch (error) {
       console.error("Error registering barcode:", error);
@@ -155,8 +142,8 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log('handleSubmit running');
     e.preventDefault();
-    await registerBarcode();
   };
   
   const registerPlaceholder = async () => {
@@ -180,20 +167,17 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
         }
       }
 
+      const displayOrder = barcodes[barcodes.length - 1]?.displayOrder + 1000 || 1000;
       // We bypass validation for this special code
-      const result = await addBarcode(placeholderCode, rowId, undefined, location);
+      const result = addBarcode({code:placeholderCode, displayOrder});
       if (result !== undefined && result !== null) {
         playSuccessSound();
         
-        // Show success message with location info if captured
         if (location && isFirstBarcode) {
           toast.success(`Placeholder added with GPS location: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`);
         } else {
           toast.success('Placeholder added');
         }
-        
-        // Make sure to update parent component
-        onBarcodeAdded(result);
       } else {
         playErrorSound();
         toast.error('Failed to add placeholder');
@@ -213,7 +197,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
         <Input ref={inputRef} value={barcodeInput} onChange={e => setBarcodeInput(e.target.value)} onKeyDown={e => {
         if (e.key === "Enter") {
           e.preventDefault();
-          registerBarcode();
+          registerBarcode(barcodeInput.trim());
         }
       }} placeholder="Scan or enter barcode" className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30 pr-16" autoComplete="off" />
         <Button type="submit" disabled={!barcodeInput.trim() || isProcessing} className="absolute right-0 top-0 bg-inventory-primary hover:bg-inventory-primary/90 h-full px-3 text-sm">

@@ -10,7 +10,7 @@ interface RecentScansProps {
 }
 
 const RecentScans: React.FC<RecentScansProps> = ({ barcodes }) => {
-  if (barcodes.length === 0) {
+  if (!barcodes || barcodes.length === 0) {
     return null;
   }
 

@@ -2,7 +2,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
-import { useDB } from '@/lib/db-provider';
+import {Barcode, useDB} from '@/lib/db-provider';
 import {
   Card,
   CardContent,
@@ -19,29 +19,26 @@ import BarcodeScanInput from '@/components/scan/BarcodeScanInput';
 import RecentScans from '@/components/scan/RecentScans';
 import ResetRowDialog from '@/components/scan/ResetRowDialog';
 import AddBarcodeDialog from '@/components/dialog/add-barcode-dialog';
+import {useRow} from "@/hooks/use-row-queries.tsx";
+import {
+  useAddBarcodeToRow,
+  useResetRowBarcodes, useRowBarcodes,
+} from "@/hooks/use-barcodes-queries.tsx";
 
 // Audio notification for success/error
 const NOTIF_SOUND = "data:audio/wav;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAFAAAGUACFhYWFhYWFhYWFhYWFhYWFhYWFra2tra2tra2tra2tra2tra2traOjo6Ojo6Ojo6Ojo6Ojo6Ojo6P///////////////////////////////////////////wAAADJMQVNNRTMuOTlyAc0AAAAAAAAAABSAJAJAQgAAgAAAA+aieizgAAAAAAAAAAAAAAAAAAAA//uQZAAAApEGUFUGAAArIMoKoMAABZAZnW40AAClAzOtxpgALEwy1AAAAAEVf7kGQRmBmD3QEAgEDhnePhI/JH4iByB+SPxA/IH5gQB+IPzAQA+TAMDhOIPA/IEInjB4P4fn///jHJ+T/ngfgYAgEAgEAgEAgg5nwuZIuZw5QmCvG0Ooy0JtC2CnAp1vdSlLMuOQylYZl0LERgAAAAAAlMy5z3O+n//zTjN/9/+Z//O//9y5/8ud/z//5EHL/D+KDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDEppqampqampqampqampqampqampqampqampqampqamgAAA//tQZAAAAtAeUqsMAARfA7pVYYACCUCXPqggAEAAAP8AAAAATEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkYA/wAAB/gAAACAAAD/AAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=";
 
 const ScanRowPage = () => {
+
   const { rowId } = useParams<{ rowId: string }>();
   const { 
     rows, 
-    getRowById, 
-    getParkById,
-    barcodes,
-    getBarcodesByRowId, 
     currentUser,
-    resetRow,
-    countBarcodesInRow,
     updateRow
   } = useDB();
   
   // State for dialogs and UI
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
-  const [latestBarcodes, setLatestBarcodes] = useState<any[]>([]);
-  const [scanCount, setScanCount] = useState(0);
   const [isAddBarcodeDialogOpen, setIsAddBarcodeDialogOpen] = useState(false);
   
   // State for editing row name
@@ -62,37 +59,18 @@ const ScanRowPage = () => {
     }
   };
 
-  // Update count and save selected row and park to localStorage for consistent navigation
-  useEffect(() => {
-    if (rowId && rows.some(r => r.id === rowId)) {
-      localStorage.setItem('selectedRowId', rowId);
-      const row = getRowById(rowId);
-      if (row) {
-        localStorage.setItem('selectedParkId', row.parkId);
-        setRowName(row.name);
-        // Use the currentBarcodes property from the row
-        setScanCount(row.currentBarcodes);
-      }
-    }
-  }, [rowId, rows, getRowById]);
 
-  // Update barcodes list whenever barcodes array changes
-  useEffect(() => {
-    if (rowId) {
-      // Get the latest 10 barcodes for this row, sorted by timestamp (newest first)
-      const rowBarcodes = getBarcodesByRowId(rowId)
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-        .slice(0, 10);
-      
-      setLatestBarcodes(rowBarcodes);
-      
-      // Get the current row to update scan count directly from row data
-      const row = getRowById(rowId);
-      if (row) {
-        setScanCount(row.currentBarcodes);
-      }
-    }
-  }, [rowId, barcodes, getBarcodesByRowId, getRowById, rows]);
+  const {data: row, isLoading, isError } = useRow(rowId);
+  const {mutate: resetRow, data:affectedBarcodes} = useResetRowBarcodes(rowId);
+
+  const {data: barcodes} = useRowBarcodes(rowId);
+
+  if (isError) {
+    toast.error("Failed to fetch row data");
+  }
+
+  const latestBarcodes = barcodes?.slice(-10).reverse();
+  const scanCount = Math.max(barcodes?.length || 0, 0);
 
   // Focus the input when the component mounts
   useEffect(() => {
@@ -119,44 +97,29 @@ const ScanRowPage = () => {
     return <Navigate to="/scan" replace />;
   }
 
-  // Get the current row
-  const row = getRowById(rowId);
-  // Get the park this row belongs to
-  const park = row ? getParkById(row.parkId) : undefined;
   // Create breadcrumb format
-  const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
+  const breadcrumb = row ? `${row.park.name} / ${row?.name}` : row?.name;
 
   const handleReset = async () => {
-    setIsResetting(true);
-    try {
-      await resetRow(rowId);
-      // Clear the local state of barcodes
-      setLatestBarcodes([]);
-      // Scan count will be updated by the row's currentBarcodes from useEffect
-      
-      setIsResetDialogOpen(false);
-      toast.success('Row reset successfully');
-    } catch (error) {
-      console.error("Error resetting row:", error);
-      toast.error("Failed to reset row");
-    } finally {
-      setIsResetting(false);
-      focusInput();
-    }
+    setIsResetDialogOpen(true);
+    resetRow(rowId, {
+      onSuccess: (affectedBarcodes) => {
+        if (!affectedBarcodes || affectedBarcodes === 0) {
+          toast.info("Row is already empty");
+        }else{
+          toast.success("Successfully reset " + affectedBarcodes + " barcode" +(affectedBarcodes > 1 ? "s" : ""));
+        }
+      },
+      onError: (error) => {
+        console.error("Error resetting row:", error);
+        toast.error("Failed to reset row");
+      },
+      onSettled: () => {
+        setIsResetDialogOpen(false);
+      }
+    });
   };
 
-  const handleBarcodeAdded = (barcode: any) => {
-    // Update the list of recent barcodes (newest first)
-    const updatedBarcodes = [
-      { ...barcode, timestamp: new Date().toISOString() },
-      ...latestBarcodes.slice(0, 9)
-    ];
-    setLatestBarcodes(updatedBarcodes);
-    
-    // Increment scan count immediately for better UI feedback
-    // The real count will be updated by the useEffect using currentBarcodes
-    setScanCount(prevCount => prevCount + 1);
-  };
 
   const startEditingName = () => {
     if (row) {
@@ -222,7 +185,7 @@ const ScanRowPage = () => {
               <div className="flex items-center">
                 <span>
                   Scanned: <span className="font-bold">{scanCount}</span> 
-                  {row?.expectedBarcodes ? ` / ${row.expectedBarcodes}` : ''}
+                  {row?.expectedBarcodes ? ` / ${row.expectedBarcodes}` : '/∞'}
                 </span>
               </div>
             </CardTitle>
@@ -234,7 +197,6 @@ const ScanRowPage = () => {
             <div className="pr-12 relative">
               <BarcodeScanInput
                 rowId={rowId}
-                onBarcodeAdded={handleBarcodeAdded}
                 focusInput={focusInput}
               />
             </div>
@@ -248,15 +210,6 @@ const ScanRowPage = () => {
           onOpenChange={setIsResetDialogOpen}
           onReset={handleReset}
           onCancel={() => focusInput()}
-        />
-
-        <AddBarcodeDialog
-          open={isAddBarcodeDialogOpen}
-          onOpenChange={setIsAddBarcodeDialogOpen}
-          rowId={rowId}
-          onBarcodeAdded={handleBarcodeAdded}
-          captureLocation={captureLocation}
-          setCaptureLocation={setCaptureLocation}
         />
       </Layout>
     </AuthGuard>
