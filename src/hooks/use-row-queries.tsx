@@ -16,7 +16,7 @@ const loadRows = async () => {
 const loadRowById = async (rowId: string) => {
     const {data, error} = await supabase
         .from('rows')
-        .select('*, park:parks(name)')
+        .select('id, name, createdAt:created_at, currentBarcodes:current_barcodes, expectedBarcodes:expected_barcodes, parkId:park_id, park:parks(name)')
         .eq('id', rowId)
         .single()
 

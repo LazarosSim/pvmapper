@@ -43,6 +43,7 @@ const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({
   const {data: barcodes} = useRowBarcodes(rowId);
   
   const handleSubmit = async () => {
+    console.log('add-barcode-dialog: handleSubmit');
     try {
       addBarcode({
         code: code,

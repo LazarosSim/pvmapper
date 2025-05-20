@@ -3,7 +3,7 @@ import { useParams, Navigate } from 'react-router-dom';
 import {Barcode, useDB} from '@/lib/db-provider';
 import Layout from '@/components/layout/layout';
 import { Button } from '@/components/ui/button';
-import { Plus, RotateCcw, Edit, Check, X, ArrowDown, Loader2 } from 'lucide-react';
+import {Plus, RotateCcw, Edit, Check, X, ArrowDown, Loader2, Smile, Axe, Trash2} from 'lucide-react';
 import AddBarcodeDialog from '@/components/dialog/add-barcode-dialog';
 import { Input } from '@/components/ui/input';
 import {
@@ -37,7 +37,8 @@ import {
   useAddBarcodeToRow,
   useResetRowBarcodes,
   useRowBarcodes,
-  useUpdateRowBarcode
+  useUpdateRowBarcode,
+  useDeleteRowBarcode
 } from "@/hooks/use-barcodes-queries.tsx";
 import {useRow} from "@/hooks/use-row-queries.tsx";
 import {
@@ -49,9 +50,11 @@ import {
   PaginationPrevious
 } from "@/components/ui/pagination.tsx";
 
+
 const RowDetail = () => {
+
   const { rowId } = useParams<{ rowId: string }>();
-  const { rows, getRowById, getBarcodesByRowId, getParkById, updateRow } = useDB();
+  const {updateRow } = useDB();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isInsertDialogOpen, setIsInsertDialogOpen] = useState(false);
   const [insertAfterBarcode, setInsertAfterBarcode] = useState<Barcode | null>(null);
@@ -65,14 +68,15 @@ const RowDetail = () => {
   const [isResetting, setIsResetting] = useState(false);
   const [captureLocation, setCaptureLocation] = useState(false);
 
-// Pagination state
-const [currentPage, setCurrentPage] = useState(1);
-const [itemsPerPage] = useState(50);
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50);
 
   const {data: row, isLoading, isError } = useRow(rowId);
   const {mutate: addBarcode} = useAddBarcodeToRow(rowId);
   const {mutate: resetRow, data:affectedRows} = useResetRowBarcodes(rowId);
   const {mutate: updateBarcode} = useUpdateRowBarcode(rowId);
+  const {mutate: deleteBarcode} = useDeleteRowBarcode(rowId);
 
   const {data: barcodes} = useRowBarcodes(rowId);
 
@@ -82,13 +86,15 @@ const [itemsPerPage] = useState(50);
 
   const park = row ? row.park : undefined;
 
-  const filteredBarcodes = barcodes?.filter(barcode =>
-    barcode.code.toLowerCase().includes(searchQuery.toLowerCase())
+
+  const indexedBarcodes = barcodes?.map((barcode, index) => (
+      {barcode, index:index+1}));
+  const filteredBarcodes = indexedBarcodes?.filter(barcode =>
+    barcode.barcode.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
 
-  // Calculate pagination info
   const totalPages = Math.ceil(filteredBarcodes?.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -114,7 +120,22 @@ const [itemsPerPage] = useState(50);
       }
     });
   };
-  
+
+  const handleDeleteBarcode = async(id:string, code:string) => {
+    if(confirm("Are you sure you want to delete barcode \"" + code + "\"?")){
+      deleteBarcode(id, {
+        onSuccess: (barcode) => {
+          toast.success("Successfully deleted barcode " + barcode.code);
+        },
+        onError: (error) => {
+          console.error("Unable to delete barcode", error);
+          toast.error("Unable to delete barcode");
+        }
+      });
+    }
+  }
+
+
   const handleEditBarcode = (id: string, code: string) => {
     setEditingBarcode({id, code});
   };
@@ -210,9 +231,9 @@ const [itemsPerPage] = useState(50);
               </TableRow>
             </TableHeader>
             <TableBody>
-              {currentBarcodes.map((barcode, index) => (
+              {currentBarcodes.map(({barcode, index}) => (
                   <TableRow key={barcode.id}>
-                    <TableCell className="font-medium">{index + 1}</TableCell>
+                    <TableCell className="font-medium">{index}</TableCell>
                     <TableCell>
                       {editingBarcode && editingBarcode.id === barcode.id ? (
                           <div className="flex items-center space-x-2">
@@ -256,6 +277,16 @@ const [itemsPerPage] = useState(50);
                             className="h-8 w-8 text-inventory-primary"
                           >
                             <ArrowDown className="h-4 w-4" />
+                          </Button>
+                          <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                handleDeleteBarcode(barcode.id, barcode.code);
+                              }}
+                              className="h-8 w-8 text-red-500 hover:text-red-800"
+                          >
+                            <Trash2 className="h-4 w-4"/>
                           </Button>
                         </div>
                       </TableCell>

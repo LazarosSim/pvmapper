@@ -11,22 +11,18 @@ const toDb = (code:string, rowId:string, displayOrder?:number, userId?:string) =
         code: code,
         row_id: rowId,
         user_id: userId,
-        display_order: displayOrder || 0,
+        display_order: displayOrder || 1000,
         timestamp: new Date(now).toISOString()
     }
 }
 
-
-
-export type BarcodeSearchQuery = {
-    code?: string;
-}
 
 const addBarcode = async (
     code: string,
     rowId: string,
     displayOrder?: number,
     userId?: string) => {
+    console.log("use-barcodes-queries: addBarcode called with code " + code + " and rowId " + rowId + " and displayOrder " + displayOrder + " and userId " + userId + "");
 
     if(!code.trim())
         throw new Error("Barcode is required");
@@ -75,6 +71,22 @@ const updateBarcode = async ({id, code}:{id:string, code:string}) => {
     return updatedRow;
 }
 
+const deleteBarcode = async (id:string) => {
+    console.log("about to delete barcode with id " + id);
+
+    const {data: deletedBarcode, error} = await supabase
+        .from('barcodes')
+        .delete()
+        .eq('id', id)
+        .select('*')
+        .single()
+
+    if (error) {
+        console.error("Error deleting barcode:", error);
+        throw error;
+    }
+    return deletedBarcode;
+}
 
 
 const loadBarcodesByRow = async (rowId: string) => {
@@ -91,7 +103,6 @@ const loadBarcodesByRow = async (rowId: string) => {
         throw error;
     }
 
-    console.log("barcodes after query are " + barcodes);
     return barcodes;
 }
 
@@ -121,7 +132,8 @@ export const useAddBarcodeToRow = (rowId: string) => {
                 queryClient.invalidateQueries({
                     queryKey: ['barcodes', rowId],
                 })
-            }
+            },
+            onError: (error) => {throw error}
         }
     );
 }
@@ -145,6 +157,28 @@ export const useUpdateRowBarcode = (rowId: string) => {
     })
 }
 
+export const useDeleteRowBarcode = (rowId: string) => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: deleteBarcode,
+        mutationKey: ['barcodes', rowId],
+        onSuccess: (barcode) => {
+            queryClient.setQueryData(['barcodes', rowId],
+                (oldData:{ id:string, code:string} []) => {
+                    if (oldData) {
+                        const index = oldData.findIndex(b => b.id === barcode.id);
+                        if (index >= 0) {
+                            oldData.splice(index, 1);
+                        }
+                    }
+                    return oldData;
+                })
+        }
+    })
+}
+
+
+
 export const useResetRowBarcodes = (rowId: string) => {
     const queryClient = useQueryClient();
     return useMutation({
@@ -158,3 +192,6 @@ export const useResetRowBarcodes = (rowId: string) => {
         }
     })
 }
+
+
+

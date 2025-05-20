@@ -84,17 +84,16 @@ export type DBContextType = {
   // Rows
   rows: Row[];
   getRowsByParkId: (parkId: string) => Row[];
-  addRow: (parkId: string, expectedBarcodes?: number, navigate?: boolean) => Promise<Row | null>;
+  addRow: (parkId: string, expectedBarcodes?: number, navigate?: boolean, customName?: string) => Promise<Row | null>;
   deleteRow: (rowId: string) => Promise<void>;
   updateRow: (rowId: string, name: string, expectedBarcodes?: number) => Promise<void>;
   getRowById: (rowId: string) => Row | undefined;
-  resetRow: (rowId: string) => Promise<number>;
+  resetRow: (rowId: string) => Promise<boolean | void>;
   countBarcodesInRow: (rowId: string) => number;
   addSubRow: (rowId: string, expectedBarcodes?: number) => Promise<Row | null>;
   
   // Barcodes
   barcodes: Barcode[];
-  addBarcode: (code: string, rowId: string, afterBarcodeIndex?: number, location?: { latitude: number, longitude: number } | null) => Promise<Barcode | null>;
   deleteBarcode: (barcodeId: string) => Promise<void>;
   updateBarcode: (barcodeId: string, code: string) => Promise<void>;
   getBarcodesByRowId: (rowId: string) => Barcode[];
