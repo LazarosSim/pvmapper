@@ -44,49 +44,65 @@ const addBarcode = async (
 }
 
 const resetRow = async (rowId: string)=> {
-
     if(!rowId.trim())
         throw new Error("Row ID is required");
 
-    const {error, count} = await supabase
+    const {count , error} = await supabase
         .from('barcodes')
-        .delete()
+        .delete({count:"exact"})
         .eq('row_id', rowId)
-        .select();
     if (error) {
         console.error("Error resetting row:", error);
         throw error;
     }
+    console.log("about to return " + count)
     return count;
+}
+
+const updateBarcode = async ({id, code}:{id:string, code:string}) => {
+    console.log("about to update barcode with id " + id + " and code " + code);
+
+    const {data: updatedRow, error} = await supabase
+        .from('barcodes')
+        .update({ code: code})
+        .eq('id', id)
+        .select('*')
+        .single()
+    if (error) {
+        console.error("Error updating barcode:", error);
+        throw error;
     }
+    return updatedRow;
+}
 
 
 
-const loadBarcodesByRow = async (rowId: string, searchQuery?: BarcodeSearchQuery) => {
-    const { code } = searchQuery
+const loadBarcodesByRow = async (rowId: string) => {
     const query = supabase
         .from('barcodes')
         .select('id, code, rowId:row_id, userId:user_id, timestamp, displayOrder:display_order, latitude, longitude')
         .eq("row_id", rowId)
         .order('display_order', { ascending: true });
 
-    if (code) query.like("code", `%${code}%`);
     const {data: barcodes, error} = await query;
 
     if (error) {
         console.error("Error loading barcodes:", error);
         throw error;
     }
+
+    console.log("barcodes after query are " + barcodes);
     return barcodes;
 }
 
-export const useRowBarcodes = (rowId: string, searchQuery?: BarcodeSearchQuery) => {
+export const useRowBarcodes = (rowId: string) => {
     return useQuery({
         queryKey: ['barcodes', rowId],
-        queryFn: () => loadBarcodesByRow(rowId, searchQuery),
+        queryFn: () => loadBarcodesByRow(rowId),
         enabled: Boolean(rowId)
     });
 }
+
 
 
 
@@ -104,19 +120,35 @@ export const useAddBarcodeToRow = (rowId: string) => {
             onSuccess: () => {
                 queryClient.invalidateQueries({
                     queryKey: ['barcodes', rowId],
-                    exact: true,    // only that one
                 })
             }
         }
     );
 }
 
-
+export const useUpdateRowBarcode = (rowId: string) => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: updateBarcode,
+        onSuccess: (barcode) => {
+            queryClient.setQueryData(['barcodes', rowId],
+                (oldData:{ id:string, code:string} []) => {
+                    if (oldData) {
+                        const index = oldData.findIndex(b => b.id === barcode.id);
+                        if (index >= 0) {
+                            oldData[index] = barcode;
+                        }
+                    }
+                    return oldData;
+                })
+        }
+    })
+}
 
 export const useResetRowBarcodes = (rowId: string) => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: () => resetRow(rowId),
+        mutationFn: resetRow,
         mutationKey: ['barcodes', rowId],
         onSuccess: () => {
             queryClient.invalidateQueries({

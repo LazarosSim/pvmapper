@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
-import { useDB } from '@/lib/db-provider';
+import {Barcode, useDB} from '@/lib/db-provider';
 import Layout from '@/components/layout/layout';
 import { Button } from '@/components/ui/button';
 import { Plus, RotateCcw, Edit, Check, X, ArrowDown, Loader2 } from 'lucide-react';
@@ -36,10 +36,10 @@ import { Label } from '@/components/ui/label';
 
 const RowDetail = () => {
   const { rowId } = useParams<{ rowId: string }>();
-  const { rows, getRowById, getBarcodesByRowId, getParkById, updateRow, updateBarcode } = useDB();
+  const { rows, getRowById, getBarcodesByRowId, getParkById, updateRow } = useDB();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isInsertDialogOpen, setIsInsertDialogOpen] = useState(false);
-  const [insertAfterIndex, setInsertAfterIndex] = useState<number | null>(null);
+  const [insertAfterBarcode, setInsertAfterBarcode] = useState<Barcode | null>(null);
   const [insertCode, setInsertCode] = useState('');
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,32 +50,40 @@ const RowDetail = () => {
   const [isResetting, setIsResetting] = useState(false);
   const [captureLocation, setCaptureLocation] = useState(false);
 
-  if (!rowId || !rows.some(r => r.id === rowId)) {
-    return <Navigate to="/" replace />;
+  const {data: row, isLoading, isError } = useRow(rowId);
+  const {mutate: addBarcode} = useAddBarcodeToRow(rowId);
+  const {mutate: resetRow, data:affectedRows} = useResetRowBarcodes(rowId);
+  const {mutate: updateBarcode} = useUpdateRowBarcode(rowId);
+
+  const {data: barcodes} = useRowBarcodes(rowId);
+
+  if (isError) {
+    toast.error("Failed to fetch row data");
   }
 
-  const {data: barcodes} = useRowBarcodes(rowId, { code: searchQuery });
+  const filteredBarcodes = barcodes?.filter(b =>
+      b.code.toLowerCase().includes(searchQuery.toLowerCase()));
 
 
   const handleReset = async () => {
     setIsResetting(true);
-
-    try {
-      const affectedRows = await resetRow(rowId);
-      if (affectedRows === 0) {
-        toast.info("Row is already empty");
+    resetRow(rowId, {
+      onSuccess: (affectedRows) => {
+        if (!affectedRows || affectedRows === 0) {
+          toast.info("Row is already empty");
+        }else{
+          toast.success("Successfully reset " + affectedRows + " row" +(affectedRows > 1 ? "s" : ""));
+        }
+      },
+      onError: (error) => {
+        console.error("Error resetting row:", error);
+        toast.error("Failed to reset row");
+      },
+      onSettled: () => {
+        setIsResetDialogOpen(false);
+        setIsResetting(false);
       }
-      else{
-        toast.success("Successfully reset " + affectedRows + " row" +(affectedRows > 1 ? "s" : ""));
-      }
-      setIsResetDialogOpen(false);
-    }
-    catch (error) {
-      console.error("Error resetting row:", error);
-      toast.error("Failed to reset row");
-    } finally {
-      setIsResetting(false);
-    }
+    });
   };
   
   const handleEditBarcode = (id: string, code: string) => {
@@ -84,7 +92,7 @@ const RowDetail = () => {
 
   const saveEditedBarcode = async () => {
     if (editingBarcode) {
-      const result = await updateBarcode(editingBarcode.id, editingBarcode.code);
+      const result = updateBarcode({id:editingBarcode.id, code:editingBarcode.code});
       if (result !== undefined && result !== null) {
         toast.success("Barcode updated successfully");
       }
@@ -115,12 +123,13 @@ const RowDetail = () => {
     }
   };
   
-  const handleInsertBarcode = async () => {
+  const handleInsertBarcode = async (barcode:Barcode) => {
     setIsInserting(true);
 
-    const displayOrder = (insertAfterIndex === barcodes.length - 1) ?
-        barcodes[insertAfterIndex].displayOrder + 1000 :
-        (barcodes[insertAfterIndex].displayOrder + barcodes[insertAfterIndex+1].displayOrder) / 2;
+    const index = barcodes.findIndex((item) => barcode.id === item.id);
+    const displayOrder = (index === barcodes.length - 1) ?
+        barcodes[index].displayOrder + 1000 :
+        (barcodes[index].displayOrder + barcodes[index+1].displayOrder) / 2;
 
     try {
       addBarcode({
@@ -171,7 +180,7 @@ const RowDetail = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {barcodes.map((barcode, index) => (
+              {filteredBarcodes.map((barcode, index) => (
                   <TableRow key={barcode.id}>
                     <TableCell className="font-medium">{index + 1}</TableCell>
                     <TableCell>
@@ -211,7 +220,7 @@ const RowDetail = () => {
                             variant="ghost" 
                             size="icon" 
                             onClick={() => {
-                              setInsertAfterIndex(index);
+                              setInsertAfterBarcode(barcode);
                               setIsInsertDialogOpen(true);
                             }}
                             className="h-8 w-8 text-inventory-primary"
@@ -290,9 +299,9 @@ const RowDetail = () => {
                   autoFocus
                 />
               </div>
-              {insertAfterIndex !== null && (
+              {insertAfterBarcode !== null && (
                 <p className="text-sm text-muted-foreground mt-2">
-                  This barcode will be inserted after item #{insertAfterIndex + 1}
+                  This barcode will be inserted after {insertAfterBarcode.code}
                 </p>
               )}
             </div>
@@ -301,7 +310,7 @@ const RowDetail = () => {
                 Cancel
               </Button>
               <Button 
-                onClick={handleInsertBarcode}
+                onClick={() => handleInsertBarcode(insertAfterBarcode)}
                 disabled={!insertCode.trim() || isInserting}
                 className="bg-inventory-primary hover:bg-inventory-primary/90"
               >
