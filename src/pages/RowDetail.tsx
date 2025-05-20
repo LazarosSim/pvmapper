@@ -33,6 +33,13 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Label } from '@/components/ui/label';
+import {
+  useAddBarcodeToRow,
+  useResetRowBarcodes,
+  useRowBarcodes,
+  useUpdateRowBarcode
+} from "@/hooks/use-barcodes-queries.tsx";
+import {useRow} from "@/hooks/use-row-queries.tsx";
 
 const RowDetail = () => {
   const { rowId } = useParams<{ rowId: string }>();
@@ -61,9 +68,13 @@ const RowDetail = () => {
     toast.error("Failed to fetch row data");
   }
 
-  const filteredBarcodes = barcodes?.filter(b =>
-      b.code.toLowerCase().includes(searchQuery.toLowerCase()));
+  const park = row ? row.park : undefined;
 
+  const filteredBarcodes = barcodes?.filter(barcode =>
+    barcode.code.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
 
   const handleReset = async () => {
     setIsResetting(true);
@@ -230,7 +241,6 @@ const RowDetail = () => {
                         </div>
                       </TableCell>
                     </TableRow>
-                  </React.Fragment>
                 ))}
               </TableBody>
             </Table>
