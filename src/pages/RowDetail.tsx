@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
-import { useDB } from '@/lib/db-provider';
+import {Barcode, useDB} from '@/lib/db-provider';
 import Layout from '@/components/layout/layout';
 import { Button } from '@/components/ui/button';
 import { Plus, RotateCcw, Edit, Check, X, ArrowDown, Loader2 } from 'lucide-react';
@@ -40,6 +40,14 @@ import {
   useUpdateRowBarcode
 } from "@/hooks/use-barcodes-queries.tsx";
 import {useRow} from "@/hooks/use-row-queries.tsx";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious
+} from "@/components/ui/pagination.tsx";
 
 const RowDetail = () => {
   const { rowId } = useParams<{ rowId: string }>();
@@ -80,11 +88,11 @@ const [itemsPerPage] = useState(50);
 
   const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
 
-    // Calculate pagination info
-    const totalPages = Math.ceil(filteredBarcodes.length / itemsPerPage);
-    const indexOfLastItem = currentPage * itemsPerPage;
-    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentBarcodes = filteredBarcodes.slice(indexOfFirstItem, indexOfLastItem);
+  // Calculate pagination info
+  const totalPages = Math.ceil(filteredBarcodes?.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentBarcodes = filteredBarcodes?.slice(indexOfFirstItem, indexOfLastItem);
 
   const handleReset = async () => {
     setIsResetting(true);
@@ -257,54 +265,53 @@ const [itemsPerPage] = useState(50);
             </Table>
           </div>
             {/* Pagination */}
-        {totalPages > 1 && (
-            <Pagination className="mt-4">
-            <PaginationContent>
-            <PaginationItem>
-            <PaginationPrevious
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-          className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
-      />
-    </PaginationItem>
+          {totalPages > 1 && (
+              <Pagination className="mt-4">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}/>
+                  </PaginationItem>
 
-{/* Display limited page numbers for better UI */}
-{[...Array(Math.min(5, totalPages))].map((_, i) => {
-        // Calculate page number to show
-        let pageNum;
-        if (totalPages <= 5) {
-            pageNum = i + 1;
-        } else if (currentPage <= 3) {
-            pageNum = i + 1;
-        } else if (currentPage >= totalPages - 2) {
-            pageNum = totalPages - 4 + i;
-        } else {
-            pageNum = currentPage - 2 + i;
-        }
+                  {/* Display limited page numbers for better UI */}
+                  {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                        // Calculate page number to show
+                        let pageNum;
+                        if (totalPages <= 5) {
+                            pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                            pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i;
+                        } else {
+                            pageNum = currentPage - 2 + i;
+                        }
 
-        if (pageNum > 0 && pageNum <= totalPages) {
-            return (
-                <PaginationItem key={pageNum}>
-                    <PaginationLink
-                        onClick={() => setCurrentPage(pageNum)}
-                        isActive={currentPage === pageNum}
-                    >
-                        {pageNum}
-                    </PaginationLink>
-                </PaginationItem>
-            );
-        }
-        return null;
-    })}
+                        if (pageNum > 0 && pageNum <= totalPages) {
+                            return (
+                                <PaginationItem key={pageNum}>
+                                    <PaginationLink
+                                        onClick={() => setCurrentPage(pageNum)}
+                                        isActive={currentPage === pageNum}
+                                    >
+                                        {pageNum}
+                                    </PaginationLink>
+                                </PaginationItem>
+                            );
+                        }
+                        return null;
+                    })}
 
-    <PaginationItem>
-        <PaginationNext
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
-        />
-    </PaginationItem>
-</PaginationContent>
-</Pagination>
-)}
+                    <PaginationItem>
+                        <PaginationNext
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                        />
+                    </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+        )}
 </>
         ) : (
           <div className="text-center py-8">
@@ -370,9 +377,9 @@ const [itemsPerPage] = useState(50);
                   autoFocus
                 />
               </div>
-              {insertAfterIndex !== null && (
+              {insertAfterBarcode !== null && (
                 <p className="text-sm text-muted-foreground mt-2">
-                  This barcode will be inserted after item #{insertAfterIndex + 1}
+                  This barcode will be inserted after {insertAfterBarcode.code}
                 </p>
               )}
             </div>
@@ -381,7 +388,7 @@ const [itemsPerPage] = useState(50);
                 Cancel
               </Button>
               <Button 
-                onClick={handleInsertBarcode} 
+                onClick={() => handleInsertBarcode(insertAfterBarcode)}
                 disabled={!insertCode.trim() || isInserting}
                 className="bg-inventory-primary hover:bg-inventory-primary/90"
               >
