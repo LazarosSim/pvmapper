@@ -15,7 +15,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import {
   Tooltip,
   TooltipContent,
@@ -33,27 +33,26 @@ import {
   Bar,
   Legend
 } from 'recharts';
+import {ParkProgress} from "@/components/parks/ParkProgress.tsx";
+import {useParkStats} from "@/hooks/use-park-stats.tsx";
+import {useUserStats} from "@/hooks/use-user-stats.tsx";
 
 const DashboardPage = () => {
   const { 
     currentUser, 
-    parks, 
-    rows,
-    getAllUserStats, 
-    getParkProgress, 
-    getDailyScans, 
-    getScansForDateRange, 
-    barcodes 
+    getScansForDateRange,
   } = useDB();
   const navigate = useNavigate();
   const [selectedTab, setSelectedTab] = useState('overview');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [dailyScanStats, setDailyScanStats] = useState<any[]>([]);
-  const [userStats, setUserStats] = useState<any[]>([]);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [isLoadingCalendar, setIsLoadingCalendar] = useState(false);
   const [calendarData, setCalendarData] = useState<{[key: string]: number}>({});
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
+
+  const {data: parks} = useParkStats();
+  const {data: userStats} = useUserStats();
+
 
   // Redirect if not authenticated or not a manager
   React.useEffect(() => {
@@ -64,13 +63,6 @@ const DashboardPage = () => {
     }
   }, [currentUser, navigate]);
 
-  // Load user statistics
-  useEffect(() => {
-    if (currentUser?.role === 'manager') {
-      const stats = getAllUserStats();
-      setUserStats(stats);
-    }
-  }, [currentUser, getAllUserStats]);
 
   // Load calendar data when month changes
   useEffect(() => {
@@ -106,25 +98,6 @@ const DashboardPage = () => {
     loadCalendarData();
   }, [selectedDate, currentUser, getScansForDateRange]);
 
-  // Load daily scan data when a date is selected
-  useEffect(() => {
-    const loadDailyStats = async () => {
-      if (!selectedDate || currentUser?.role !== 'manager') return;
-      
-      setIsLoadingStats(true);
-      
-      try {
-        const stats = await getDailyScans(selectedDate);
-        setDailyScanStats(stats);
-      } catch (error) {
-        console.error("Error loading daily stats:", error);
-      } finally {
-        setIsLoadingStats(false);
-      }
-    };
-    
-    loadDailyStats();
-  }, [selectedDate, currentUser, getDailyScans]);
 
   if (!currentUser || currentUser.role !== 'manager') {
     return null;
@@ -147,24 +120,16 @@ const DashboardPage = () => {
     return result;
   };
 
-  // Calculate total scans (sum of all barcodes from all users)
-  const totalScans = barcodes.length;
+  // Calculate total scans (sum of scans for all parks)
+  const totalScans = parks?.map(park => park.currentBarcodes).reduce((a, b) => a + b, 0) ?? 0;
   
   // Calculate today's scans
-  const totalDailyScans = userStats.reduce((total, user) => total + user.dailyScans, 0);
-  const prevDayScans = userStats.reduce((total, user) => total + (user.prevDayScans || 0), 0);
-  const scanChange = totalDailyScans > 0 && prevDayScans > 0 
-    ? ((totalDailyScans - prevDayScans) / prevDayScans) * 100 
-    : 0;
+  const totalDailyScans = userStats?.map(user => user.dailyScans).reduce((a, b) => a + b, 0) ?? 0;
 
-  // Park completion percentages for the overview
-  const parkProgress = parks.map(park => ({
-    ...park,
-    ...getParkProgress(park.id)
-  }));
+  //TODO
+  const scanChange = 0;
 
-  // Sort parks by completion percentage
-  const sortedParks = [...parkProgress].sort((a, b) => b.percentage - a.percentage);
+
 
   // Calendar day render function
   const renderDay = (day: Date) => {
@@ -194,11 +159,6 @@ const DashboardPage = () => {
         </Tooltip>
       </TooltipProvider>
     );
-  };
-  
-  // Sum daily scan stats by user
-  const getDailyScanTotal = () => {
-    return dailyScanStats.reduce((sum, stat) => sum + stat.count, 0);
   };
 
   return (
@@ -236,8 +196,8 @@ const DashboardPage = () => {
                     ) : null}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {scanChange !== 0 ? 
-                      `${scanChange > 0 ? '+' : ''}${Math.abs(scanChange).toFixed(1)}% vs previous day` : 
+                    {scanChange !== 0 ?
+                      `${scanChange > 0 ? '+' : ''}${Math.abs(scanChange).toFixed(1)}% vs previous day` :
                       'No comparison data available'}
                   </div>
                 </CardContent>
@@ -252,26 +212,12 @@ const DashboardPage = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {sortedParks.length > 0 ? (
-                  sortedParks.map(park => (
-                    <div key={park.id} className="space-y-2">
-                      <div className="flex justify-between">
-                        <span>{park.name}</span>
-                        <span className="font-medium">{park.percentage}%</span>
-                      </div>
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{park.completed} scanned</span>
-                        <span>{park.total} expected</span>
-                      </div>
-                      <Progress 
-                        value={park.percentage} 
-                        className={`h-2 ${park.percentage >= 100 ? 'bg-green-200' : ''}`}
-                      />
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-muted-foreground text-center py-2">No parks found</p>
-                )}
+                {parks?.map((park, index) => (
+                    <ParkProgress key={index} name={park.name}
+                                  expected={park.expectedBarcodes}
+                                  current={park.currentBarcodes}
+                                  percentage={(park.currentBarcodes / park.expectedBarcodes * 100).toFixed(2)} />
+                ))}
               </CardContent>
             </Card>
           </TabsContent>
@@ -285,21 +231,21 @@ const DashboardPage = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {userStats.length > 0 ? (
+                {userStats?.length > 0 ? (
                   <div className="space-y-4">
                     {userStats.map(user => (
-                      <div key={user.userId} className="space-y-2">
+                      <div key={user.username} className="space-y-2">
                         <div className="flex justify-between">
                           <span className="font-medium">{user.username}</span>
                           <span>{user.totalScans} total scans</span>
                         </div>
                         <div className="flex justify-between text-xs text-muted-foreground">
                           <span>Today: {user.dailyScans} scans</span>
-                          <span>{user.daysActive} days active | Avg: {user.averageScansPerDay}/day</span>
+                          <span>{user.daysActive} days active | Avg: {user.averageDailyScans}/day</span>
                         </div>
                         <Progress 
-                          value={Math.min(100, (user.dailyScans / 50) * 100)} 
-                          className="h-2" 
+                          value={Math.min(100, (user.dailyScans / totalDailyScans) * 100)}
+                          className="h-2"
                         />
                       </div>
                     ))}
@@ -412,22 +358,22 @@ const DashboardPage = () => {
                       <div className="flex justify-center py-4">
                         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                       </div>
-                    ) : dailyScanStats.length > 0 ? (
+                    ) : userStats?.length > 0 ? (
                       <>
                         <div className="text-2xl font-bold mb-4">
-                          {getDailyScanTotal()} total scans
+                          {totalDailyScans} total scans page here
                         </div>
                         
                         <h5 className="text-sm font-medium mb-2">Breakdown by User</h5>
                         <div className="space-y-2">
-                          {dailyScanStats.map((stat, index) => (
+                          {userStats.map((user, index) => (
                             <div key={index} className="flex justify-between items-center">
-                              <span>{stat.username || `User ${stat.userId.slice(0, 6)}`}</span>
+                              <span>{user.username}</span>
                               <div className="flex items-center">
-                                <span className="font-medium">{stat.count} scans</span>
+                                <span className="font-medium">{user.totalScans} scans</span>
                                 <div 
                                   className="ml-2 h-3 bg-blue-500 rounded"
-                                  style={{ width: `${Math.max(8, stat.count / 2)}px` }}
+                                  style={{ width: `${Math.max(8, (user.totalScans / totalScans)*1500)}px` }}
                                 ></div>
                               </div>
                             </div>

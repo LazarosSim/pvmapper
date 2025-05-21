@@ -155,13 +155,6 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     users,
     register,
     logout,
-    
-    // User stats - ensure we're passing the barcodes array to functions that need it
-    getUserDailyScans: () => getUserDailyScans(user?.id),
-    getUserTotalScans: () => getUserTotalScans(user?.id || '', barcodes),
-    getUserBarcodesScanned: () => getUserBarcodesScanned(user?.id || '', barcodes),
-    getAllUserStats: () => getAllUserStats(barcodes, users, user?.id, currentUser?.username),
-    getDailyScans,
     getScansForDateRange,
     
     // Data management

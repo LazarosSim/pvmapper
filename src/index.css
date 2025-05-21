@@ -95,6 +95,21 @@
   }
 }
 
+@keyframes rainbow {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.rainbow {
+  background: linear-gradient(
+          270deg,
+          #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00
+  );
+  background-size: 1400% 1400%;
+  animation: rainbow 5s ease infinite;
+}
+
 @layer utilities {
   .glass-card {
     @apply bg-white/80 backdrop-blur-sm border border-white/20 shadow-lg;
