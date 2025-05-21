@@ -16,7 +16,7 @@ const RecentScans: React.FC<RecentScansProps> = ({ barcodes }) => {
 
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-medium">Recent Scans ({barcodes.length})</h3>
+      <h3 className="text-xl font-bold">last 10 scans</h3>
       <div className="space-y-1">
         {barcodes.map((barcode, index) => (
           <div 

@@ -102,9 +102,34 @@ const loadBarcodesByRow = async (rowId: string) => {
         console.error("Error loading barcodes:", error);
         throw error;
     }
-
     return barcodes;
 }
+
+const loadBarcodesByPark = async (parkId: string) => {
+    const query = supabase
+        .from('barcodes')
+        .select('id, code, park:rows (park_id, parks(name)) ,userId:user_id, timestamp, displayOrder:display_order')
+        .eq("rows.park_id", parkId)
+        .order('display_order', { ascending: true });
+
+    const {data: barcodes, error} = await query;
+    if (error) {
+        console.error("Error loading barcodes:", error);
+        throw error;
+    }
+
+    const flattenedBarcodes = barcodes.map(({ id, code, userId, timestamp, displayOrder, park: {park_id, parks: {name}}}) => (
+        {   id,
+            code,
+            userId,
+            timestamp,
+            displayOrder,
+            parkId: park_id,
+            parkName: name,
+        }));
+    return flattenedBarcodes;
+}
+
 
 export const useRowBarcodes = (rowId: string) => {
     return useQuery({
@@ -114,6 +139,13 @@ export const useRowBarcodes = (rowId: string) => {
     });
 }
 
+export const useParkBarcodes = (parkId: string) => {
+    return useQuery({
+        queryKey: ['barcodes', parkId],
+        queryFn: () => loadBarcodesByPark(parkId),
+        enabled: Boolean(parkId)
+    });
+}
 
 
 
@@ -133,7 +165,6 @@ export const useAddBarcodeToRow = (rowId: string) => {
                     queryKey: ['barcodes', rowId],
                 })
             },
-            onError: (error) => {throw error}
         }
     );
 }
