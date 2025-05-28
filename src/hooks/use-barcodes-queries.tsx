@@ -1,5 +1,5 @@
 import {supabase} from "@/integrations/supabase/client.ts";
-import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {onlineManager, useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Barcode} from "@/lib/types/db-types.ts";
 import {useSupabase} from "@/lib/supabase-provider.tsx";
 
@@ -22,15 +22,18 @@ const addBarcode = async (
     rowId: string,
     displayOrder?: number,
     userId?: string) => {
-    console.log("use-barcodes-queries: addBarcode called with code " + code + " and rowId " + rowId + " and displayOrder " + displayOrder + " and userId " + userId + "");
+
+    console.log('[addBarcode] START', {code, rowId, displayOrder, userId})
 
     if(!code.trim())
         throw new Error("Barcode is required");
 
+    console.info('[addBarcode] before supabase')
     const {data: insertedRow, error} = await supabase
         .from('barcodes')
         .insert(toDb(code, rowId, displayOrder, userId))
         .select();
+    console.log('[addBarcode] after supabase', {insertedRow, error})
 
     if (error) {
         console.error("Error adding barcode:", error);
@@ -132,10 +135,15 @@ const loadBarcodesByPark = async (parkId: string) => {
 
 
 export const useRowBarcodes = (rowId: string) => {
+    const queryClient = useQueryClient()
     return useQuery({
         queryKey: ['barcodes', rowId],
         queryFn: () => loadBarcodesByRow(rowId),
-        enabled: Boolean(rowId)
+        enabled: Boolean(rowId) && onlineManager.isOnline(),
+        staleTime: Infinity,
+        retry: false,
+        refetchOnWindowFocus: false,
+        initialData: () => queryClient.getQueryData(['barcodes', rowId]),
     });
 }
 
@@ -158,15 +166,36 @@ export const useAddBarcodeToRow = (rowId: string) => {
     const queryClient = useQueryClient();
     const { user } = useSupabase();
     return useMutation({
-            mutationFn: ({ code, displayOrder }: AddBarcodeVariables) => addBarcode(code, rowId, displayOrder, user?.id),
-            mutationKey: ['barcodes', rowId],
-            onSuccess: () => {
-                queryClient.invalidateQueries({
-                    queryKey: ['barcodes', rowId],
-                })
-            },
-        }
-    );
+        mutationFn: ({code, displayOrder}: AddBarcodeVariables) => addBarcode(code, rowId, displayOrder, user?.id),
+        mutationKey: ['barcodes', rowId],
+        onMutate: async ({code, displayOrder}) => {
+            const previous = queryClient.getQueryData<Barcode[]>(['barcodes', rowId]);
+
+            if (previous) {
+                queryClient.setQueryData<Barcode[]>(['barcodes', rowId], [
+                    ...previous,
+                    {
+                        id: `temp-${Date.now()}`,
+                        code,
+                        displayOrder,
+                    } as Barcode,
+                ]);
+            }
+            return {previous};
+        },
+
+        onError: (_err, _vars, context) => {
+            if (context?.previous) {
+                queryClient.setQueryData(['barcodes', rowId], context.previous);
+            }
+        },
+
+        onSettled: () => {
+            if(onlineManager.isOnline()) {
+                queryClient.invalidateQueries({queryKey: ['barcodes', rowId]});
+            }
+        },
+        });
 }
 
 export const useUpdateRowBarcode = (rowId: string) => {

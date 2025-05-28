@@ -39,7 +39,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   // Get the row and check if this is the first barcode
   const {data: row, isLoading, isError } = useRow(rowId);
 
-  const {mutateAsync: addBarcode} = useAddBarcodeToRow(rowId);
+  const {mutate: addBarcode} = useAddBarcodeToRow(rowId);
   const {mutate: resetRow, data:affectedRows} = useResetRowBarcodes(rowId);
   const {data: barcodes} = useRowBarcodes(rowId);
 
@@ -123,7 +123,9 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
 
       // Pass the location data to the addBarcode function
       const displayOrder = barcodes[barcodes.length - 1]?.displayOrder + 1000 || 1000;
-      await addBarcode({code:barcodeCode, displayOrder});
+      console.info("before addBarcode:");
+      addBarcode({code:barcodeCode, displayOrder});
+      console.info("after addBarcode:");
       setBarcodeInput('');
       playSuccessSound();
       if (location && isFirstBarcode) {
