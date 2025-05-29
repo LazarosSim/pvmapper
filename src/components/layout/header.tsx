@@ -95,7 +95,7 @@ const Header: React.FC<HeaderProps> = ({
         )}
         <div className="flex items-center">
           <img 
-            src="https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/xplogo.png"
+            src="/xplogo.png"
             alt="XP Energy Logo" 
             className="h-10 mr-3"
             onError={(e) => {

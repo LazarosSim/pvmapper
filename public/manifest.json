@@ -1,0 +1,17 @@
+{
+  "name": "XP Energy Scanner",
+  "short_name": "Scanner",
+  "description": "Scan and store barcodes, even offline",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#bde3ff",
+  "theme_color": "#fa842d",
+  "icons": [ {
+    "src": "/icons/scanning.png",
+    "sizes": "192x192",
+    "type": "image/png",
+    "purpose": "any maskable"
+  }]
+}

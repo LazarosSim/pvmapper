@@ -1,14 +1,31 @@
-// public/sw.js
-// bring in Workbox in classic form
+
+
 importScripts(
     'https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox-sw.js'
 );
 
 
-const { routing, strategies, backgroundSync } = workbox;
+// shorthand
+const { precaching, routing, strategies, expiration, backgroundSync } = workbox;
 const { registerRoute } = routing;
-const { NetworkOnly }   = strategies;
+const { NetworkFirst, StaleWhileRevalidate, CacheFirst } = strategies;
+const { ExpirationPlugin } = expiration;
 const { BackgroundSyncPlugin } = backgroundSync;
+
+const precacheManifest = [
+    { url: '/',        revision: '1' },
+    { url: '/login', revision: '1' },
+    { url: '/profile',    revision: '1' },
+    { url: '/dashboard', revision: '1' },
+    { url: '/scan', revision: '1' },
+    { url: '/App.css', revision: '1' },
+    { url: '/index.css', revision: '1' },
+    { url: '/xplogo.png', revision: '1' },
+    { url: '/XP-Energy_Logo-White-Horizontal.svg', revision: '1'},
+    { url: '/favicon.ico', revision: '1' },
+    // …and any other static assets you ship…
+];
+workbox.precaching.precacheAndRoute(precacheManifest);
 
 const isSupabase = url => url.hostname.endsWith('.supabase.co');
 
@@ -32,6 +49,14 @@ const queuePlugin = new workbox.backgroundSync.BackgroundSyncPlugin('supabaseQue
         new BroadcastChannel('sw-messages').postMessage({type: 'SUPA_QUEUE_SYNCED'});
     }
 });
+
+routing.registerRoute(
+    ({ request }) => request.mode === 'navigate',
+    new strategies.NetworkFirst({
+        cacheName: 'app-shell',
+        plugins: [ new expiration.ExpirationPlugin({ maxEntries: 1 }) ],
+    })
+);
 
 // 2) Intercept preflight OPTIONS so the POST can fire
 registerRoute(
