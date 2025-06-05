@@ -1,24 +1,27 @@
-
-import React, { useState } from 'react';
-import { useDB } from '@/lib/db-provider';
+import React, {useState} from 'react';
 import Layout from '@/components/layout/layout';
 import ParkCard from '@/components/parks/park-card';
-import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import {Button} from '@/components/ui/button';
+import {Plus} from 'lucide-react';
 import CreateParkDialog from '@/components/dialog/create-park-dialog';
-import { Input } from '@/components/ui/input';
+import {Input} from '@/components/ui/input';
+import {useParkStats} from '@/hooks/use-park-queries';
+import {useCurrentUser} from "@/hooks/use-user.tsx";
 
 const Index = () => {
-  const { parks, currentUser, isManager } = useDB();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredParks = parks ? parks.filter(park => 
+  const {data: parks} = useParkStats();
+
+  console.log('parks: ', parks);
+  const filteredParks = parks ? parks.filter(park =>
     park.name.toLowerCase().includes(searchQuery.toLowerCase())
   ) : [];
 
-  // Check if the user is a manager
-  const isUserManager = isManager();
+  const {data: currentUser} = useCurrentUser()
+  const isUserManager = currentUser?.role === 'manager';
+
 
   return (
     <Layout title={
@@ -56,17 +59,17 @@ const Index = () => {
             </div>
           )}
         </div>
-        
+
         {/* Only show the add park button to managers */}
         {isUserManager && (
-          <Button 
+            <Button
             onClick={() => setIsDialogOpen(true)}
             className="fixed bottom-20 right-4 rounded-full w-14 h-14 shadow-lg bg-gradient-to-r from-xpenergy-primary to-xpenergy-secondary hover:from-xpenergy-primary/90 hover:to-xpenergy-secondary/90 transition-all duration-300"
           >
             <Plus className="h-6 w-6" />
           </Button>
         )}
-        
+
         <CreateParkDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
       </div>
     </Layout>
