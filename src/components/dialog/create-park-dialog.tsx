@@ -1,20 +1,13 @@
-
-import React, { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { useDB } from '@/lib/db-provider';
-import { Label } from '@/components/ui/label';
-import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from '@/components/ui/form';
-import { useForm } from 'react-hook-form';
+import React from 'react';
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,} from "@/components/ui/dialog";
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {Form, FormControl, FormDescription, FormField, FormItem, FormLabel} from '@/components/ui/form';
+import {useForm} from 'react-hook-form';
 import * as z from 'zod';
-import { zodResolver } from "@hookform/resolvers/zod";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {useAddPark} from "@/hooks/use-park-queries.tsx";
+import {useCurrentUser} from "@/hooks/use-user.tsx";
 
 interface CreateParkDialogProps {
   open: boolean;
@@ -27,8 +20,10 @@ const formSchema = z.object({
 });
 
 const CreateParkDialog: React.FC<CreateParkDialogProps> = ({ open, onOpenChange }) => {
-  const { addPark } = useDB();
-  
+  const {mutateAsync: addPark} = useAddPark();
+  const {data: currentUser} = useCurrentUser();
+
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -38,7 +33,13 @@ const CreateParkDialog: React.FC<CreateParkDialogProps> = ({ open, onOpenChange 
   });
   
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
-    const result = await addPark(values.name, values.expectedBarcodes);
+    console.log('create-park-dialog: handleSubmit', values);
+    const result = await addPark({
+      name: values.name,
+      expectedBarcodes: values.expectedBarcodes,
+      userId: currentUser.id,
+      validateBarcodeLength: true,
+    });
     if (result) {
       form.reset();
       onOpenChange(false);

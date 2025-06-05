@@ -7,7 +7,6 @@ export type User = {
   username: string;
   role: string;
   createdAt: string;
-  totalScans?: number;
 };
 
 // Park type

@@ -1,27 +1,16 @@
-import React, { useState } from 'react';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import React, {useState} from 'react';
+import {Navigate, useNavigate, useParams} from 'react-router-dom';
 import Layout from '@/components/layout/layout';
-import { useDB } from '@/lib/db-provider';
-import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { FolderOpen, Plus, Search, ArrowDown } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import type { Row } from '@/lib/types/db-types';
-import { toast } from 'sonner';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Label } from '@/components/ui/label';
+import {useDB} from '@/lib/db-provider';
+import {Button} from '@/components/ui/button';
+import {Card, CardContent, CardDescription, CardHeader, CardTitle,} from "@/components/ui/card";
+import {ArrowDown, FolderOpen, Plus, Search} from 'lucide-react';
+import {Input} from '@/components/ui/input';
+import type {Row} from '@/lib/types/db-types';
+import {toast} from 'sonner';
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,} from "@/components/ui/dialog";
+import {Label} from '@/components/ui/label';
+import {useParkBarcodes} from "@/hooks/use-barcodes-queries.tsx";
 
 const ScanParkPage = () => {
   const { parkId } = useParams<{ parkId: string }>();
@@ -31,6 +20,10 @@ const ScanParkPage = () => {
   const [isAddSubRowDialogOpen, setIsAddSubRowDialogOpen] = useState(false);
   const [selectedParentRowId, setSelectedParentRowId] = useState<string | null>(null);
   const [expectedBarcodes, setExpectedBarcodes] = useState<string>('');
+
+  const {data: barcodes} = useParkBarcodes(parkId);
+
+
 
   if (!parkId || !parks.some(p => p.id === parkId)) {
     return <Navigate to="/scan" replace />;

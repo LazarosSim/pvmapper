@@ -1,45 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, {useEffect, useState} from 'react';
+import {useNavigate} from 'react-router-dom';
 import Layout from '@/components/layout/layout';
-import { useDB } from '@/lib/db-provider';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Calendar } from '@/components/ui/calendar';
-import { 
-  BarChart3, 
-  Users, 
-  Layers,
-  ArrowUpRight,
-  ArrowDownRight,
-  CalendarIcon,
-  Loader2
-} from 'lucide-react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Legend
-} from 'recharts';
+import {useDB} from '@/lib/db-provider';
+import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
+import {Progress} from '@/components/ui/progress';
+import {Calendar} from '@/components/ui/calendar';
+import {ArrowDownRight, ArrowUpRight, BarChart3, CalendarIcon, Layers, Loader2, Users} from 'lucide-react';
+import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
+import {endOfMonth, format, startOfMonth} from 'date-fns';
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,} from "@/components/ui/tooltip";
+import {Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis} from 'recharts';
 import {ParkProgress} from "@/components/parks/ParkProgress.tsx";
-import {useParkStats} from "@/hooks/use-park-stats.tsx";
+import {useParkStats} from "@/hooks/use-park-queries.tsx";
 import {useUserStats} from "@/hooks/use-user-stats.tsx";
+import {useCurrentUser} from "@/hooks/use-user.tsx";
 
 const DashboardPage = () => {
-  const { 
-    currentUser, 
+  const {
     getScansForDateRange,
   } = useDB();
   const navigate = useNavigate();
@@ -52,6 +29,7 @@ const DashboardPage = () => {
 
   const {data: parks} = useParkStats();
   const {data: userStats} = useUserStats();
+  const {data: currentUser} = useCurrentUser();
 
 
   // Redirect if not authenticated or not a manager

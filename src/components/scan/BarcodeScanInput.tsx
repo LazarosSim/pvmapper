@@ -1,18 +1,12 @@
-
-import React, { useRef, useState } from 'react';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Loader2, ArrowRight, X } from 'lucide-react';
+import React, {useRef, useState} from 'react';
+import {toast} from 'sonner';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {ArrowRight, Loader2, X} from 'lucide-react';
 import useSoundEffects from '@/hooks/use-sound-effects';
-import { useDB } from '@/lib/db-provider';
+import {useDB} from '@/lib/db-provider';
 import {useRow} from "@/hooks/use-row-queries.tsx";
-import {
-  useAddBarcodeToRow,
-  useDeleteRowBarcode,
-  useResetRowBarcodes, useRowBarcodes,
-  useUpdateRowBarcode
-} from "@/hooks/use-barcodes-queries.tsx";
+import {useAddBarcodeToRow, useResetRowBarcodes, useRowBarcodes,} from "@/hooks/use-barcodes-queries.tsx";
 
 interface BarcodeScanInputProps {
   rowId: string;
@@ -37,7 +31,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Get the row and check if this is the first barcode
-  const {data: row, isLoading, isError } = useRow(rowId);
+  const {data: row} = useRow(rowId);
 
   const {mutate: addBarcode} = useAddBarcodeToRow(rowId);
   const {mutate: resetRow, data:affectedRows} = useResetRowBarcodes(rowId);
@@ -112,7 +106,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       }
       
       // Check for duplicates
-      const duplicates = barcodes.filter(b => b.code.toLowerCase() === barcodeInput.toLowerCase());
+      const duplicates = barcodes?.filter(b => b.code.toLowerCase() === barcodeInput.toLowerCase());
       if (duplicates.length > 0) {
         playErrorSound();
         toast.error('Duplicate barcode detected');
@@ -122,9 +116,10 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       }
 
       // Pass the location data to the addBarcode function
-      const displayOrder = barcodes[barcodes.length - 1]?.displayOrder + 1000 || 1000;
+      const displayOrder = barcodes[barcodes?.length - 1]?.displayOrder + 1000 || 1000;
+      const timestamp = new Date(Date.now()).toISOString();
       console.info("before addBarcode:");
-      addBarcode({code:barcodeCode, displayOrder});
+      addBarcode({code: barcodeCode, displayOrder, timestamp});
       console.info("after addBarcode:");
       setBarcodeInput('');
       playSuccessSound();
@@ -169,7 +164,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
         }
       }
 
-      const displayOrder = barcodes[barcodes.length - 1]?.displayOrder + 1000 || 1000;
+      const displayOrder = barcodes[barcodes?.length - 1]?.displayOrder + 1000 || 1000;
       // We bypass validation for this special code
       const result = addBarcode({code:placeholderCode, displayOrder});
       if (result !== undefined && result !== null) {

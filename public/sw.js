@@ -23,8 +23,12 @@ const precacheManifest = [
     { url: '/xplogo.png', revision: '1' },
     { url: '/XP-Energy_Logo-White-Horizontal.svg', revision: '1'},
     { url: '/favicon.ico', revision: '1' },
-    // …and any other static assets you ship…
+    {url: '/manifest.json', revision: '1'},
+    {url: '/icons/scanning.png', revision: '1'},
+    {url: '/assets/index-DdgRdGgO.css', revision: '1'},
+    {url: '/assets/index-blvhFMFW.js', revision: '1'},
 ];
+
 workbox.precaching.precacheAndRoute(precacheManifest);
 
 const isSupabase = url => url.hostname.endsWith('.supabase.co');
@@ -55,6 +59,43 @@ routing.registerRoute(
     new strategies.NetworkFirst({
         cacheName: 'app-shell',
         plugins: [ new expiration.ExpirationPlugin({ maxEntries: 1 }) ],
+    })
+);
+
+// cache Google Fonts stylesheets
+registerRoute(
+    /^https:\/\/fonts\.googleapis\.com\/.*/i,
+    new workbox.strategies.CacheFirst({
+        cacheName: 'google-fonts-stylesheets',
+        plugins: [
+            new workbox.expiration.ExpirationPlugin({
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+            }),
+        ],
+    })
+);
+
+// cache Google Fonts font-files
+registerRoute(
+    /^https:\/\/fonts\.gstatic\.com\/.*/i,
+    new workbox.strategies.CacheFirst({
+        cacheName: 'google-fonts-webfonts',
+        plugins: [
+            new workbox.expiration.ExpirationPlugin({
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 60 * 24 * 365,
+            }),
+        ],
+    })
+);
+
+
+// cache external GPT engineer script
+registerRoute(
+    /^https:\/\/cdn\.gpteng\.co\/gptengineer\.js$/i,
+    new workbox.strategies.NetworkFirst({
+        cacheName: 'external-scripts',
     })
 );
 
@@ -99,4 +140,20 @@ registerRoute(
         }
     },
     'POST'
+);
+
+// cache GETs to Supabase REST endpoints
+routing.registerRoute(
+    ({request, url}) =>
+        request.method === 'GET' && isSupabase(url),
+    new strategies.NetworkFirst({
+        cacheName: 'supabase-get-cache',
+        networkTimeoutSeconds: 3,            // fall back to cache if network is slow
+        plugins: [
+            new expiration.ExpirationPlugin({
+                maxEntries: 50,
+                maxAgeSeconds: 24 * 60 * 60,    // keep for 1 day
+            }),
+        ],
+    })
 );

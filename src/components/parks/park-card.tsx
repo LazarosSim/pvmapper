@@ -1,21 +1,40 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Edit, Trash2, MoreVertical, FolderOpen, FileDown, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useDB, Park } from '@/lib/db-provider';
-import { formatDistanceToNow } from 'date-fns';
-import { Progress } from '@/components/ui/progress';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
+import React, {useState} from 'react';
+import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
+import {Button} from '@/components/ui/button';
+import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
+import {Edit, FileDown, FolderOpen, Loader2, MoreVertical, Trash2} from 'lucide-react';
+import {useNavigate} from 'react-router-dom';
+import {formatDistanceToNow} from 'date-fns';
+import {Progress} from '@/components/ui/progress';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
+import {Input} from '@/components/ui/input';
+import {Label} from '@/components/ui/label';
+import {toast} from 'sonner';
 import * as XLSX from 'xlsx';
-import { Checkbox } from '@/components/ui/checkbox';
-import { supabase } from '@/integrations/supabase/client';
-import { Barcode } from '@/lib/types/db-types';
+import {Checkbox} from '@/components/ui/checkbox';
+import {Barcode} from '@/lib/types/db-types';
+import {Park} from "@/types/types.ts";
+import {useDeletePark, useUpdatePark} from "@/hooks/use-park-queries.tsx";
+import {useCurrentUser} from "@/hooks/use-user.tsx";
+import {useRowsByParkId} from "@/hooks/use-row-queries.tsx";
+import {useParkBarcodes} from "@/hooks/use-barcodes-queries.tsx";
 
 interface ParkCardProps {
   park: Park;
@@ -25,29 +44,32 @@ const ParkCard: React.FC<ParkCardProps> = ({
   park
 }) => {
   const navigate = useNavigate();
-  const {
-    countBarcodesInPark,
-    getRowsByParkId,
-    deletePark,
-    updatePark,
-    getParkProgress,
-    currentUser,
-  } = useDB();
+
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
+
   const [editName, setEditName] = React.useState(park.name);
   const [editExpectedBarcodes, setEditExpectedBarcodes] = React.useState(park.expectedBarcodes);
   const [validateBarcodeLength, setValidateBarcodeLength] = React.useState(park.validateBarcodeLength || false);
+
   const [isExporting, setIsExporting] = useState(false);
-  const rowCount = getRowsByParkId(park.id).length;
-  const barcodeCount = countBarcodesInPark(park.id);
-  const progress = getParkProgress(park.id);
-  const createdAt = formatDistanceToNow(new Date(park.createdAt), {
+
+  const progress = ((park.currentBarcodes / park.expectedBarcodes) * 100).toFixed(2);
+
+  const {data: currentUser} = useCurrentUser()
+  const {data: rows} = useRowsByParkId(park.id);
+  const {data: barcodes} = useParkBarcodes(park.id);
+  const {mutate: updatePark} = useUpdatePark();
+  const {mutate: deletePark} = useDeletePark();
+
+  const rowCount = rows?.length;
+
+  const createdAt = formatDistanceToNow(new Date(park?.createdAt), {
     addSuffix: true
   });
 
   const handleEdit = () => {
-    updatePark(park.id, editName, editExpectedBarcodes, validateBarcodeLength);
+    updatePark({id: park.id, name: editName, expectedBarcodes: editExpectedBarcodes, validateBarcodeLength});
     setIsEditDialogOpen(false);
   };
 
@@ -60,39 +82,6 @@ const ParkCard: React.FC<ParkCardProps> = ({
     return name.replace(/[\\/:*?"<>|]/g, '_');
   };
 
-  // New function to fetch barcodes directly from the database for a specific row
-  const fetchBarcodesForRow = async (rowId: string): Promise<Barcode[]> => {
-    try {
-      const { data, error } = await supabase
-        .from('barcodes')
-        .select('*')
-        .eq('row_id', rowId)
-        .order('display_order', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching barcodes for row:', error);
-        throw error;
-      }
-
-      if (!data || data.length === 0) {
-        return [];
-      }
-
-      return data.map(barcode => ({
-        id: barcode.id,
-        code: barcode.code,
-        rowId: barcode.row_id,
-        userId: barcode.user_id,
-        timestamp: barcode.timestamp,
-        displayOrder: barcode.display_order || 0,
-        latitude: barcode.latitude,
-        longitude: barcode.longitude
-      }));
-    } catch (error) {
-      console.error('Error in fetchBarcodesForRow:', error);
-      return [];
-    }
-  };
 
   const handleExportExcel = async () => {
     if (isExporting) return;
@@ -100,17 +89,16 @@ const ParkCard: React.FC<ParkCardProps> = ({
       setIsExporting(true);
       toast.info('Starting export, please wait...');
       
-      const rows = getRowsByParkId(park.id);
       const wb = XLSX.utils.book_new();
 
       // Create a summary sheet first
       const summaryData = [
         ["Park Name", park.name], 
         ["Created", new Date(park.createdAt).toLocaleString()], 
-        ["Total Rows", rows.length.toString()], 
-        ["Total Barcodes", barcodeCount.toString()],
-        ["Expected Barcodes", park.expectedBarcodes.toString()], 
-        ["Completion", `${progress.percentage}%`]
+        ["Total Rows", rows.length.toString()],
+        ["Total Barcodes", park.currentBarcodes.toString()],
+        ["Expected Barcodes", park.expectedBarcodes.toString()],
+        ["Completion", `${progress}%`]
       ];
 
       // Add row information to summary
@@ -125,17 +113,27 @@ const ParkCard: React.FC<ParkCardProps> = ({
       const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
       XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
 
+      const groupedByRow: Record<string, Barcode[]> = barcodes.reduce(
+          (acc, barcode) => {
+            const rowId = barcode.rowId;
+            if (!acc[rowId]) {
+              acc[rowId] = [];
+            }
+            acc[rowId].push(barcode);
+            return acc;
+          },
+          {} as Record<string, Barcode[]>
+      )
+
       // Create a separate worksheet for each row, regardless of whether it has barcodes
       for (const row of rows) {
-        // Get barcodes for this row directly from the database
-        const barcodes = await fetchBarcodesForRow(row.id);
-        
         // Create worksheet data with header
         const rowData = [["Barcode"]]; // Start with header row
 
+        const rowBarcodes = groupedByRow[row.id] || [];
         // Add barcode data if available
-        if (barcodes.length > 0) {
-          barcodes.forEach(barcode => {
+        if (rowBarcodes.length > 0) {
+          rowBarcodes.forEach(barcode => {
             rowData.push([barcode.code]);
           });
         }
@@ -234,16 +232,16 @@ const ParkCard: React.FC<ParkCardProps> = ({
         {park.expectedBarcodes > 0 && <div className="mb-4 space-y-2">
             <div className="flex justify-between items-center text-sm">
               <span>Progress</span>
-              <span className="font-medium">{progress.percentage}%</span>
+              <span className="font-medium">{progress}%</span>
             </div>
-            <Progress value={progress.percentage} className="h-2 bg-gray-200">
+          <Progress value={Number(progress)} className="h-2 bg-gray-200">
               <div className="h-full bg-gradient-to-r from-inventory-primary to-inventory-secondary rounded-full" style={{
-            width: `${progress.percentage}%`
+                width: `${progress}%`
           }} />
             </Progress>
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{progress.completed} scanned</span>
-              <span>{progress.total} expected</span>
+              <span>{park.currentBarcodes} scanned</span>
+              <span>{park.expectedBarcodes} expected</span>
             </div>
           </div>}
         
@@ -251,7 +249,7 @@ const ParkCard: React.FC<ParkCardProps> = ({
           <div>
             <span className="text-sm font-medium">{rowCount} Rows</span>
             <span className="mx-2 text-muted-foreground">•</span>
-            <span className="text-sm font-medium">{barcodeCount} Barcodes</span>
+            <span className="text-sm font-medium">{park.currentBarcodes} Barcodes</span>
           </div>
           <Button variant="outline" size="sm" onClick={handleOpenPark} className="bg-inventory-secondary/10 text-inventory-secondary hover:bg-inventory-secondary/20 border-inventory-secondary/30">
             <FolderOpen className="mr-2 h-4 w-4" />
@@ -283,6 +281,9 @@ const ParkCard: React.FC<ParkCardProps> = ({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit Park</DialogTitle>
+          <DialogDescription>
+            Fill out the form below to edit the park.
+          </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
           <div className="space-y-2">

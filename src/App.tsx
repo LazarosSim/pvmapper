@@ -1,14 +1,13 @@
-
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import {Toaster} from "@/components/ui/toaster";
+import {Toaster as Sonner} from "@/components/ui/sonner";
+import {TooltipProvider} from "@/components/ui/tooltip";
 import {ReactQueryDevtools} from '@tanstack/react-query-devtools';
-import { QueryClient, QueryClientProvider} from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { SupabaseProvider } from "@/lib/supabase-provider";
-import { DBProvider } from "@/lib/db-provider";
+import {QueryClient, QueryClientProvider} from "@tanstack/react-query";
+import {BrowserRouter, Route, Routes} from "react-router-dom";
+import {SupabaseProvider} from "@/lib/supabase-provider";
+import {DBProvider} from "@/lib/db-provider";
 import AuthGuard from "@/components/auth/auth-guard";
-import { useState, useEffect } from "react";
+import {useEffect, useState} from "react";
 import Index from "./pages/Index";
 import ParkDetail from "./pages/ParkDetail";
 import RowDetail from "./pages/RowDetail";
@@ -19,7 +18,8 @@ import ProfilePage from "./pages/ProfilePage";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import NotFound from "./pages/NotFound";
-import {Workbox} from 'workbox-window';
+import {persistQueryClient,} from '@tanstack/react-query-persist-client'
+import {createSyncStoragePersister} from '@tanstack/query-sync-storage-persister'
 
 
 const queryClient = new QueryClient({
@@ -27,9 +27,19 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      staleTime: Infinity,
     },
   },
 });
+
+const persister = createSyncStoragePersister({storage: window.localStorage})
+
+persistQueryClient({
+  queryClient,
+  persister,
+  maxAge: Infinity
+})
+
 
 const _origFetch = window.fetch;
 window.fetch = (...args) => {
@@ -45,7 +55,7 @@ XMLHttpRequest.prototype.open = function (method, url) {
 };
 
 
-if ('serviceWorker' in navigator) {
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   navigator.serviceWorker
       .register('/sw.js')
       .then(() => console.log('SW registered'))

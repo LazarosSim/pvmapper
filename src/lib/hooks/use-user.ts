@@ -1,8 +1,7 @@
-
-import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import type { User } from '../types/db-types';
+import {useState} from 'react';
+import {supabase} from '@/integrations/supabase/client';
+import {toast} from 'sonner';
+import type {User} from '../types/db-types';
 
 export const useUser = () => {
   const [currentUser, setCurrentUser] = useState<User | null | undefined>(undefined);
@@ -10,12 +9,12 @@ export const useUser = () => {
   const [users, setUsers] = useState<User[]>([]);
 
   // Fetch user profile data from the database
-  const fetchUserProfile = async (userId: string) => {
+  const fetchUserProfile = async (userId: string): Promise<User> => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, role, created_at, user_total_scans')
+          .select('id, username, role, created_at')
         .eq('id', userId)
         .single();
 
@@ -32,7 +31,6 @@ export const useUser = () => {
           username: data.username,
           role: data.role,
           createdAt: data.created_at,
-          totalScans: data.user_total_scans || 0
         };
         setCurrentUser(user);
         return user;
@@ -59,11 +57,6 @@ export const useUser = () => {
     }
   };
 
-  // User management
-  const register = async (username: string, password: string, role: string) => {
-    // Implementation would be added here
-  };
-  
   const logout = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -93,7 +86,6 @@ export const useUser = () => {
     setUsers,
     fetchUserProfile,
     refetchUser,
-    register,
     logout,
     isManager,
   };
