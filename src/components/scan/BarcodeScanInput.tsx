@@ -148,7 +148,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       setIsProcessing(true);
 
       // Generate unique placeholder barcode with timestamp to avoid duplicates
-      const timestamp = new Date().getTime();
+      const timestamp = new Date(Date.now()).toISOString();
       const placeholderCode = `X_PLACEHOLDER_${timestamp}`;
 
       // Get the captureLocation state from the parent component through the row
@@ -166,7 +166,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
 
       const displayOrder = barcodes[barcodes?.length - 1]?.displayOrder + 1000 || 1000;
       // We bypass validation for this special code
-      const result = addBarcode({code:placeholderCode, displayOrder});
+      const result = addBarcode({code: placeholderCode, displayOrder, timestamp});
       if (result !== undefined && result !== null) {
         playSuccessSound();
         
