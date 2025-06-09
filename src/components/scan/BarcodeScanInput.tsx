@@ -166,20 +166,15 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
         }
       }
 
-      const orderInRow = barcodes?.length - 1;
+      const orderInRow = barcodes?.length;
       // We bypass validation for this special code
-      const result = addBarcode({code: placeholderCode, orderInRow, isLast: true, timestamp});
-      if (result !== undefined && result !== null) {
-        playSuccessSound();
-        
-        if (location && isFirstBarcode) {
-          toast.success(`Placeholder added with GPS location: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`);
-        } else {
-          toast.success('Placeholder added');
-        }
+      addBarcode({code: placeholderCode, orderInRow, isLast: true, timestamp});
+      playSuccessSound();
+
+      if (location && isFirstBarcode) {
+        toast.success(`Placeholder added with GPS location: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`);
       } else {
-        playErrorSound();
-        toast.error('Failed to add placeholder');
+        toast.success('Placeholder added');
       }
     } catch (error) {
       console.error("Error adding placeholder:", error);

@@ -3,49 +3,7 @@ import {onlineManager, useMutation, useQuery, useQueryClient} from "@tanstack/re
 import {Barcode} from "@/lib/types/db-types.ts";
 import {useSupabase} from "@/lib/supabase-provider.tsx";
 import {useEffect} from "react";
-
-
-const toDb = (code: string, rowId: string, givenTimestamp: string, order_in_row: number, userId?: string) => {
-    return {
-        code: code,
-        row_id: rowId,
-        user_id: userId,
-        order_in_row: order_in_row,
-        timestamp: givenTimestamp
-    }
-}
-
-
-const addBarcode = async (
-    code: string,
-    rowId: string,
-    orderInRow: number,
-    isLast: boolean,
-    userId?: string,
-    timestamp?: string) => {
-
-    console.log('[addBarcode] START', {code, rowId, orderInRow, userId})
-
-    if (!timestamp) {
-        timestamp = new Date(Date.now()).toISOString()
-    }
-
-    if (!isLast) {
-        console.info('Shifting barcodes...')
-        await supabase.rpc('shift_order', {p_row_id: rowId, p_index: orderInRow});
-    }
-
-    const {data: insertedRow, error} = await supabase
-        .from('barcodes')
-        .insert(toDb(code, rowId, timestamp, orderInRow, userId))
-        .select();
-
-    if (error) {
-        console.error("Error adding barcode:", error);
-        throw error;
-    }
-    return insertedRow;
-}
+import {addBarcode, deleteBarcode, updateBarcode} from "@/services/barcode-service.ts";
 
 const resetRow = async (rowId: string)=> {
     if(!rowId.trim())
@@ -61,39 +19,6 @@ const resetRow = async (rowId: string)=> {
     }
     console.log("about to return " + count)
     return count;
-}
-
-const updateBarcode = async ({id, code}:{id:string, code:string}) => {
-    console.log("about to update barcode with id " + id + " and code " + code);
-
-    const {data: updatedRow, error} = await supabase
-        .from('barcodes')
-        .update({ code: code})
-        .eq('id', id)
-        .select('*')
-        .single()
-    if (error) {
-        console.error("Error updating barcode:", error);
-        throw error;
-    }
-    return updatedRow;
-}
-
-const deleteBarcode = async (id:string) => {
-    console.log("about to delete barcode with id " + id);
-
-    const {data: deletedBarcode, error} = await supabase
-        .from('barcodes')
-        .delete()
-        .eq('id', id)
-        .select('*')
-        .single()
-
-    if (error) {
-        console.error("Error deleting barcode:", error);
-        throw error;
-    }
-    return deletedBarcode;
 }
 
 
@@ -239,6 +164,8 @@ export const useAddBarcodeToRow = (rowId: string) => {
                 queryClient.invalidateQueries({queryKey: ['barcodes', rowId]});
             }
         },
+
+        retry: false
         });
 }
 
