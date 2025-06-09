@@ -1,9 +1,8 @@
-
-import { useEffect, useState } from 'react';
-import { useDB } from '@/lib/db-provider';
+import {useEffect, useState} from 'react';
+import {useDB} from '@/lib/db-provider';
 
 export function useInitialSetup() {
-  const { users, register } = useDB();
+  const {users} = useDB();
   const [isSetup, setIsSetup] = useState(false);
   
   useEffect(() => {

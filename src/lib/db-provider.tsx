@@ -1,20 +1,17 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { useSupabase } from './supabase-provider';
-import { toast } from 'sonner';
+import {createContext, useContext, useEffect, useState} from 'react';
+import {useSupabase} from './supabase-provider';
+import {toast} from 'sonner';
 
 // Import types
-import type { 
-  User, Park, Row, Barcode, Progress, DailyScanStat, 
-  UserStat, DBContextType 
-} from './types/db-types';
+import type {Barcode, DBContextType, Park, Row, User} from './types/db-types';
 
 // Import hooks
-import { useUser } from './hooks/use-user';
-import { useParks } from './hooks/use-parks';
-import { useRows } from './hooks/rows/use-rows';
-import { useBarcodes } from './hooks/use-barcodes';
-import { useStats } from './hooks/use-stats';
-import { useDataManagement } from './hooks/use-data-management';
+import {useUser} from './hooks/use-user';
+import {useParks} from './hooks/use-parks';
+import {useRows} from './hooks/rows/use-rows';
+import {useBarcodes} from './hooks/use-barcodes';
+import {useStats} from './hooks/use-stats';
+import {useDataManagement} from './hooks/use-data-management';
 
 // Extend the Row type to include captureLocation
 export interface ExtendedRow extends Row {
@@ -29,7 +26,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   // Initialize user state and functions
   const { 
     currentUser, isLoading: isDBLoading, users, setUsers,
-    fetchUserProfile, refetchUser, register, logout, isManager
+    fetchUserProfile, refetchUser, logout, isManager
   } = useUser();
 
   // Initialize stats module (needed by barcodes)
@@ -50,8 +47,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   
   // Initialize barcodes module with rows and daily scan update function
   const {
-    fetchBarcodes, updateBarcode, deleteBarcode,
-    getBarcodesByRowId, searchBarcodes, countBarcodesInPark
+    fetchBarcodes, updateBarcode, deleteBarcode, searchBarcodes, countBarcodesInPark
   } = useBarcodes(rows, () => updateDailyScans(user?.id), decreaseDailyScans);
   
   // Initialize parks module with dependencies
@@ -148,12 +144,10 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     barcodes,
     deleteBarcode,
     updateBarcode,
-    getBarcodesByRowId,
     searchBarcodes,
     countBarcodesInPark,
     // User management
     users,
-    register,
     logout,
     getScansForDateRange,
     

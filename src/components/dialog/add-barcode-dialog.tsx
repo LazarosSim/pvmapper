@@ -1,18 +1,11 @@
-
-import React, { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { useDB } from '@/lib/db-provider';
-import { MapPin, Check } from 'lucide-react';
-import { toast } from 'sonner';
-import { Checkbox } from '@/components/ui/checkbox';
+import React, {useState} from 'react';
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,} from "@/components/ui/dialog";
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {useDB} from '@/lib/db-provider';
+import {MapPin} from 'lucide-react';
+import {toast} from 'sonner';
+import {Checkbox} from '@/components/ui/checkbox';
 import {useAddBarcodeToRow, useRowBarcodes} from "@/hooks/use-barcodes-queries.tsx";
 
 interface AddBarcodeDialogProps {
@@ -47,7 +40,8 @@ const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({
     try {
       addBarcode({
         code: code,
-        displayOrder: barcodes[barcodes.length - 1]?.displayOrder + 1000 || 0,
+        orderInRow: barcodes.length,
+        isLast: true
       });
       setCode('');
       onOpenChange(false);
