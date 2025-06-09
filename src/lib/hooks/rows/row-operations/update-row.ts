@@ -1,6 +1,6 @@
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import type { Row, Barcode } from '../../../types/db-types';
+import {supabase} from '@/integrations/supabase/client';
+import {toast} from 'sonner';
+import type {Barcode, Row} from '../../../types/db-types';
 
 /**
  * Update a row's properties
@@ -85,7 +85,7 @@ export const resetRow = async (
       rowId: barcode.row_id,
       userId: barcode.user_id,
       timestamp: barcode.timestamp,
-      displayOrder: barcode.display_order || 0
+      orderInRow: barcode.order_in_row
     }));
     
     // Group barcodes by user and date for adjustment

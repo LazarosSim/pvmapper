@@ -36,7 +36,7 @@ export type Barcode = {
   rowId: string;
   userId: string;
   timestamp: string;
-  displayOrder: number;
+  orderInRow: number;
   latitude?: number;
   longitude?: number;
 };
@@ -95,21 +95,14 @@ export type DBContextType = {
   barcodes: Barcode[];
   deleteBarcode: (barcodeId: string) => Promise<void>;
   updateBarcode: (barcodeId: string, code: string) => Promise<void>;
-  getBarcodesByRowId: (rowId: string) => Barcode[];
   searchBarcodes: (query: string) => Barcode[];
   countBarcodesInPark: (parkId: string) => number;
   
   // User management
   users: User[];
-  register: (username: string, password: string, role: string) => Promise<void>;
   logout: () => Promise<void>;
   
   // User stats
-  getUserDailyScans: () => number;
-  getUserTotalScans: () => number;
-  getUserBarcodesScanned: () => Barcode[];
-  getAllUserStats: () => UserStat[];
-  getDailyScans: (date?: Date) => Promise<DailyScanStat[]>;
   getScansForDateRange: (startDate: Date, endDate: Date) => Promise<{date: string, count: number}[]>;
   
   // Data management

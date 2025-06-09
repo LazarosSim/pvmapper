@@ -1,19 +1,12 @@
-
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import Layout from '@/components/layout/layout';
-import { useDB } from '@/lib/db-provider';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
-import { toast } from 'sonner';
-import { utils as XLSXUtils, writeFile as writeXLSXFile } from 'xlsx';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import {useDB} from '@/lib/db-provider';
+import {Button} from '@/components/ui/button';
+import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
+import {Textarea} from '@/components/ui/textarea';
+import {toast} from 'sonner';
+import {utils as XLSXUtils, writeFile as writeXLSXFile} from 'xlsx';
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,9 +17,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Save, FileUp, AlertTriangle, FileText, RefreshCw, Mail } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import type { Barcode } from '@/lib/types/db-types';
+import {AlertTriangle, Download, FileText, FileUp, Mail, Save} from 'lucide-react';
+import {supabase} from '@/integrations/supabase/client';
+import type {Barcode} from '@/lib/types/db-types';
 
 const BackupPage = () => {
   const { parks, rows, barcodes, importData, exportData } = useDB();
@@ -42,7 +35,7 @@ const BackupPage = () => {
         .from('barcodes')
         .select('*')
         .eq('row_id', rowId)
-        .order('display_order', { ascending: true });
+          .order('order_in_row', {ascending: true});
 
       if (error) {
         console.error('Error fetching barcodes for row:', error);
@@ -59,7 +52,7 @@ const BackupPage = () => {
         rowId: barcode.row_id,
         userId: barcode.user_id,
         timestamp: barcode.timestamp,
-        displayOrder: barcode.display_order || 0,
+        orderInRow: barcode.order_in_row,
         latitude: barcode.latitude,
         longitude: barcode.longitude
       }));

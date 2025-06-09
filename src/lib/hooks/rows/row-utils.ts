@@ -1,5 +1,4 @@
-
-import type { Row, Barcode } from '../../types/db-types';
+import type {Barcode, Row} from '../../types/db-types';
 
 /**
  * Get rows for a specific park
@@ -23,10 +22,3 @@ export const countBarcodesInRow = (barcodes: Barcode[], rowId: string): number =
   return barcodes.filter(barcode => barcode.rowId === rowId).length;
 };
 
-/**
- * Get all barcodes for a specific row
- */
-export const getBarcodesByRowId = (barcodes: Barcode[], rowId: string): Barcode[] => {
-  if (!barcodes || !rowId) return [];
-  return barcodes.filter(barcode => barcode.rowId === rowId);
-};

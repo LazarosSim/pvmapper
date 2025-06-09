@@ -1,7 +1,6 @@
-
-import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-import type { Park, Row, Barcode } from '../types/db-types';
+import {toast} from 'sonner';
+import {supabase} from '@/integrations/supabase/client';
+import type {Barcode, Park, Row} from '../types/db-types';
 
 export const useDataManagement = (
   parks: Park[],
@@ -54,7 +53,7 @@ export const useDataManagement = (
         .from('barcodes')
         .select('*')
         .eq('row_id', rowId)
-        .order('display_order', { ascending: true });
+          .order('order_in_row', {ascending: true});
 
       if (error) {
         console.error('Error fetching barcodes for row:', error);
@@ -71,7 +70,7 @@ export const useDataManagement = (
         rowId: barcode.row_id,
         userId: barcode.user_id,
         timestamp: barcode.timestamp,
-        displayOrder: barcode.display_order || 0,
+        orderInRow: barcode.order_in_row,
         latitude: barcode.latitude,
         longitude: barcode.longitude
       }));

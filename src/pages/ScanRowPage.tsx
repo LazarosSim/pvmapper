@@ -1,29 +1,18 @@
-
-import React, { useRef, useState, useEffect } from 'react';
-import { Navigate, useParams } from 'react-router-dom';
+import React, {useEffect, useRef, useState} from 'react';
+import {Navigate, useParams} from 'react-router-dom';
 import Layout from '@/components/layout/layout';
-import {Barcode, useDB} from '@/lib/db-provider';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Check, X } from "lucide-react";
-import { toast } from 'sonner';
+import {useDB} from '@/lib/db-provider';
+import {Card, CardContent, CardDescription, CardHeader, CardTitle,} from "@/components/ui/card";
+import {Input} from "@/components/ui/input";
+import {Button} from "@/components/ui/button";
+import {Check, X} from "lucide-react";
+import {toast} from 'sonner';
 import AuthGuard from '@/components/auth/auth-guard';
 import BarcodeScanInput from '@/components/scan/BarcodeScanInput';
 import RecentScans from '@/components/scan/RecentScans';
 import ResetRowDialog from '@/components/scan/ResetRowDialog';
-import AddBarcodeDialog from '@/components/dialog/add-barcode-dialog';
 import {useRow} from "@/hooks/use-row-queries.tsx";
-import {
-  useAddBarcodeToRow,
-  useResetRowBarcodes, useRowBarcodes,
-} from "@/hooks/use-barcodes-queries.tsx";
+import {useResetRowBarcodes, useRowBarcodes,} from "@/hooks/use-barcodes-queries.tsx";
 
 // Audio notification for success/error
 const NOTIF_SOUND = "data:audio/wav;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAFAAAGUACFhYWFhYWFhYWFhYWFhYWFhYWFra2tra2tra2tra2tra2tra2traOjo6Ojo6Ojo6Ojo6Ojo6Ojo6P///////////////////////////////////////////wAAADJMQVNNRTMuOTlyAc0AAAAAAAAAABSAJAJAQgAAgAAAA+aieizgAAAAAAAAAAAAAAAAAAAA//uQZAAAApEGUFUGAAArIMoKoMAABZAZnW40AAClAzOtxpgALEwy1AAAAAEVf7kGQRmBmD3QEAgEDhnePhI/JH4iByB+SPxA/IH5gQB+IPzAQA+TAMDhOIPA/IEInjB4P4fn///jHJ+T/ngfgYAgEAgEAgEAgg5nwuZIuZw5QmCvG0Ooy0JtC2CnAp1vdSlLMuOQylYZl0LERgAAAAAAlMy5z3O+n//zTjN/9/+Z//O//9y5/8ud/z//5EHL/D+KDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDEppqampqampqampqampqampqampqampqampqampqamgAAA//tQZAAAAtAeUqsMAARfA7pVYYACCUCXPqggAEAAAP8AAAAATEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkYA/wAAB/gAAACAAAD/AAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=";
@@ -39,8 +28,7 @@ const ScanRowPage = () => {
   
   // State for dialogs and UI
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
-  const [isAddBarcodeDialogOpen, setIsAddBarcodeDialogOpen] = useState(false);
-  
+
   // State for editing row name
   const [isEditingRowName, setIsEditingRowName] = useState(false);
   const [rowName, setRowName] = useState('');
@@ -61,7 +49,7 @@ const ScanRowPage = () => {
 
 
   const {data: row, isLoading, isError } = useRow(rowId);
-  const {mutate: resetRow, data:affectedBarcodes} = useResetRowBarcodes(rowId);
+  const {mutate: resetRow} = useResetRowBarcodes(rowId);
 
   const {data: barcodes} = useRowBarcodes(rowId);
 

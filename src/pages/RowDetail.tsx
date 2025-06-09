@@ -1,19 +1,12 @@
-import React, { useState } from 'react';
-import { useParams, Navigate } from 'react-router-dom';
+import React, {useState} from 'react';
+import {useParams} from 'react-router-dom';
 import {Barcode, useDB} from '@/lib/db-provider';
 import Layout from '@/components/layout/layout';
-import { Button } from '@/components/ui/button';
-import {Plus, RotateCcw, Edit, Check, X, ArrowDown, Loader2, Smile, Axe, Trash2} from 'lucide-react';
+import {Button} from '@/components/ui/button';
+import {ArrowDown, Check, Edit, Loader2, Plus, Trash2, X} from 'lucide-react';
 import AddBarcodeDialog from '@/components/dialog/add-barcode-dialog';
-import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import {Input} from '@/components/ui/input';
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,21 +17,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { toast } from "sonner";
-import { Label } from '@/components/ui/label';
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,} from "@/components/ui/dialog";
+import {toast} from "sonner";
+import {Label} from '@/components/ui/label';
 import {
   useAddBarcodeToRow,
+  useDeleteRowBarcode,
   useResetRowBarcodes,
   useRowBarcodes,
-  useUpdateRowBarcode,
-  useDeleteRowBarcode
+  useUpdateRowBarcode
 } from "@/hooks/use-barcodes-queries.tsx";
 import {useRow} from "@/hooks/use-row-queries.tsx";
 import {
@@ -177,14 +164,14 @@ const RowDetail = () => {
     setIsInserting(true);
 
     const index = barcodes.findIndex((item) => barcode.id === item.id);
-    const displayOrder = (index === barcodes.length - 1) ?
-        barcodes[index].displayOrder + 1000 :
-        (barcodes[index].displayOrder + barcodes[index+1].displayOrder) / 2;
+    const orderInRow = index + 1;
 
     try {
       addBarcode({
         code: insertCode.trim(),
-        displayOrder: displayOrder});
+        orderInRow,
+        isLast: false
+      });
       toast.success("Barcode inserted successfully");
     } catch (error) {
       console.error("Error inserting barcode:", error);

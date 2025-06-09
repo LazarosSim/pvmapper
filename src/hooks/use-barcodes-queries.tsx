@@ -5,12 +5,12 @@ import {useSupabase} from "@/lib/supabase-provider.tsx";
 import {useEffect} from "react";
 
 
-const toDb = (code: string, rowId: string, givenTimestamp: string, displayOrder?: number, userId?: string) => {
+const toDb = (code: string, rowId: string, givenTimestamp: string, order_in_row: number, userId?: string) => {
     return {
         code: code,
         row_id: rowId,
         user_id: userId,
-        display_order: displayOrder || 1000,
+        order_in_row: order_in_row,
         timestamp: givenTimestamp
     }
 }
@@ -19,24 +19,26 @@ const toDb = (code: string, rowId: string, givenTimestamp: string, displayOrder?
 const addBarcode = async (
     code: string,
     rowId: string,
-    displayOrder?: number,
+    orderInRow: number,
+    isLast: boolean,
     userId?: string,
     timestamp?: string) => {
 
-    console.log('[addBarcode] START', {code, rowId, displayOrder, userId})
+    console.log('[addBarcode] START', {code, rowId, orderInRow, userId})
 
     if (!timestamp) {
         timestamp = new Date(Date.now()).toISOString()
     }
-    if(!code.trim())
-        throw new Error("Barcode is required");
 
-    console.info('[addBarcode] before supabase')
+    if (!isLast) {
+        console.info('Shifting barcodes...')
+        await supabase.rpc('shift_order', {p_row_id: rowId, p_index: orderInRow});
+    }
+
     const {data: insertedRow, error} = await supabase
         .from('barcodes')
-        .insert(toDb(code, rowId, timestamp, displayOrder, userId))
+        .insert(toDb(code, rowId, timestamp, orderInRow, userId))
         .select();
-    console.log('[addBarcode] after supabase', {insertedRow, error})
 
     if (error) {
         console.error("Error adding barcode:", error);
@@ -95,12 +97,12 @@ const deleteBarcode = async (id:string) => {
 }
 
 
-const loadBarcodesByRow = async (rowId: string) => {
+const loadBarcodesByRow = async (rowId: string): Promise<Barcode[]> => {
     const query = supabase
         .from('barcodes')
-        .select('id, code, rowId:row_id, userId:user_id, timestamp, displayOrder:display_order, latitude, longitude')
+        .select('id, code, rowId:row_id, userId:user_id, timestamp, orderInRow:order_in_row, latitude, longitude')
         .eq("row_id", rowId)
-        .order('display_order', { ascending: true });
+        .order('order_in_row', {ascending: true});
 
     const {data: barcodes, error} = await query;
 
@@ -116,9 +118,9 @@ const loadBarcodesByPark = async (parkId: string) => {
     console.info('about to load those juicy barcodes for my park')
     const query = supabase
         .from('barcodes')
-        .select('id, code, park:rows (park_id, parks(name)) ,userId:user_id, timestamp, displayOrder:display_order, rowId:row_id')
+        .select('id, code, park:rows (park_id, parks(name)) ,userId:user_id, timestamp, orderInRow:order_in_row, rowId:row_id')
         .eq("rows.park_id", parkId)
-        .order('display_order', { ascending: true });
+        .order('order_in_row', {ascending: true});
 
     const {data: barcodes, error} = await query;
     if (error) {
@@ -131,7 +133,7 @@ const loadBarcodesByPark = async (parkId: string) => {
                                                 code,
                                                 userId,
                                                 timestamp,
-                                                displayOrder,
+                                                orderInRow,
                                                 rowId,
                                                 park: {park_id, parks: {name}}
                                             }) => (
@@ -139,7 +141,7 @@ const loadBarcodesByPark = async (parkId: string) => {
             code,
             userId,
             timestamp,
-            displayOrder,
+            orderInRow,
             rowId,
             parkId: park_id,
             parkName: name,
@@ -157,7 +159,7 @@ export const useRowBarcodes = (rowId: string) => {
         enabled: Boolean(rowId) && onlineManager.isOnline(),
         retry: false,
         refetchOnWindowFocus: false,
-        initialData: () => queryClient.getQueryData(['barcodes', rowId]),
+        initialData: () => queryClient.getQueryData<Barcode[]>(['barcodes', rowId]),
     });
 }
 
@@ -194,7 +196,8 @@ export const useParkBarcodes = (parkId: string) => {
 
 class AddBarcodeVariables {
     code: string;
-    displayOrder?: number;
+    orderInRow: number;
+    isLast: boolean;
     timestamp?: string;
 }
 
@@ -204,11 +207,12 @@ export const useAddBarcodeToRow = (rowId: string) => {
     return useMutation({
         mutationFn: ({
                          code,
-                         displayOrder,
+                         orderInRow,
+                         isLast,
                          timestamp
-                     }: AddBarcodeVariables) => addBarcode(code, rowId, displayOrder, user?.id, timestamp),
+                     }: AddBarcodeVariables) => addBarcode(code, rowId, orderInRow, isLast, user?.id, timestamp),
         mutationKey: ['barcodes', rowId],
-        onMutate: async ({code, displayOrder}) => {
+        onMutate: async ({code, orderInRow}) => {
             const previous = queryClient.getQueryData<Barcode[]>(['barcodes', rowId]);
 
             if (previous) {
@@ -217,7 +221,7 @@ export const useAddBarcodeToRow = (rowId: string) => {
                     {
                         id: `temp-${Date.now()}`,
                         code,
-                        displayOrder,
+                        orderInRow,
                     } as Barcode,
                 ]);
             }

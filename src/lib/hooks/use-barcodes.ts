@@ -1,8 +1,7 @@
-
-import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import type { Barcode, Row } from '../types/db-types';
+import {useState} from 'react';
+import {supabase} from '@/integrations/supabase/client';
+import {toast} from 'sonner';
+import type {Barcode, Row} from '../types/db-types';
 
 export const useBarcodes = (
   rows: Row[],
@@ -19,7 +18,7 @@ export const useBarcodes = (
       const { data, error } = await supabase
         .from('barcodes')
         .select('*')
-        .order('display_order', { ascending: true });
+          .order('order_in_row', {ascending: true});
         
       if (error) {
         console.error('Error fetching barcodes:', error);
@@ -34,7 +33,7 @@ export const useBarcodes = (
           rowId: barcode.row_id,
           userId: barcode.user_id,
           timestamp: barcode.timestamp,
-          displayOrder: barcode.display_order || 0,
+          orderInRow: barcode.order_in_row,
           latitude: barcode.latitude,
           longitude: barcode.longitude
         }));
@@ -136,13 +135,8 @@ export const useBarcodes = (
       toast.error(`Failed to delete barcode: ${error.message}`);
     }
   };
-  
-  const getBarcodesByRowId = (rowId: string): Barcode[] => {
-    return barcodes
-      .filter(barcode => barcode.rowId === rowId)
-      .sort((a, b) => a.displayOrder - b.displayOrder);
-  };
-  
+
+
   const searchBarcodes = (query: string): Barcode[] => {
     if (!query.trim()) return [];
     
@@ -164,7 +158,6 @@ export const useBarcodes = (
     fetchBarcodes,
     updateBarcode,
     deleteBarcode,
-    getBarcodesByRowId,
     searchBarcodes,
     countBarcodesInPark
   };

@@ -22,7 +22,6 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   const {
     getRowById,
     getParkById,
-    getBarcodesByRowId,
   } = useDB();
   const {
     playSuccessSound,
@@ -35,6 +34,8 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
 
   const {mutate: addBarcode} = useAddBarcodeToRow(rowId);
   const {mutate: resetRow, data:affectedRows} = useResetRowBarcodes(rowId);
+
+  //barcodes for the current row
   const {data: barcodes} = useRowBarcodes(rowId);
 
   const isFirstBarcode = row?.currentBarcodes === 0;
@@ -115,12 +116,13 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
         return;
       }
 
-      // Pass the location data to the addBarcode function
-      const displayOrder = barcodes[barcodes?.length - 1]?.displayOrder + 1000 || 1000;
-      const timestamp = new Date(Date.now()).toISOString();
-      console.info("before addBarcode:");
-      addBarcode({code: barcodeCode, displayOrder, timestamp});
-      console.info("after addBarcode:");
+      const orderInRow = barcodes?.length;
+      addBarcode({
+        code: barcodeCode,
+        orderInRow,
+        isLast: true,
+        timestamp: new Date(Date.now()).toISOString()
+      });
       setBarcodeInput('');
       playSuccessSound();
       if (location && isFirstBarcode) {
@@ -164,9 +166,9 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
         }
       }
 
-      const displayOrder = barcodes[barcodes?.length - 1]?.displayOrder + 1000 || 1000;
+      const orderInRow = barcodes?.length - 1;
       // We bypass validation for this special code
-      const result = addBarcode({code: placeholderCode, displayOrder, timestamp});
+      const result = addBarcode({code: placeholderCode, orderInRow, isLast: true, timestamp});
       if (result !== undefined && result !== null) {
         playSuccessSound();
         
