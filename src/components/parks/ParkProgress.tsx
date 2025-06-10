@@ -1,10 +1,10 @@
+
 import {Progress} from "@/components/ui/progress.tsx";
 import React from "react";
 
-
 interface ParkProgressProps {
     name: string
-    percentage: string
+    percentage: number
     current: number
     expected: number
 }
@@ -26,7 +26,7 @@ export const ParkProgress: React.FC<ParkProgressProps> = ({
                 <span>{expected} expected</span>
             </div>
             <Progress
-                value={Number(percentage)}
+                value={percentage}
                 className={`h-2 ${percentage === 100 ? 'bg-green-200' : ''}`}
             />
         </div>

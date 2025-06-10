@@ -1,3 +1,4 @@
+
 import {useEffect, useState} from 'react';
 import {useDB} from '@/lib/db-provider';
 
@@ -6,12 +7,9 @@ export function useInitialSetup() {
   const [isSetup, setIsSetup] = useState(false);
   
   useEffect(() => {
-    // If no users exist, create an initial manager account
-    if (users.length === 0) {
-      register('manager', 'manager123', 'manager');
-    }
-    setIsSetup(true);
-  }, [users, register]);
+    // Check if setup is complete (users exist)
+    setIsSetup(users.length > 0);
+  }, [users]);
   
   return { isSetup };
 }
