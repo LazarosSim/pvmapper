@@ -1,3 +1,4 @@
+
 import React, {useState} from 'react';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
@@ -133,8 +134,8 @@ const ParkCard: React.FC<ParkCardProps> = ({
       
       const wb = XLSX.utils.book_new();
 
-      // Collect all worksheets with their names for sorting
-      const worksheets: Array<{name: string, worksheet: any}> = [];
+      // Collect row worksheets separately for sorting
+      const rowWorksheets: Array<{name: string, worksheet: any}> = [];
 
       // Create a summary sheet first
       const summaryData = [
@@ -156,7 +157,6 @@ const ParkCard: React.FC<ParkCardProps> = ({
       });
       
       const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
-      worksheets.push({ name: "Summary", worksheet: summaryWs });
 
       // Create a separate worksheet for each row, regardless of whether it has barcodes
       for (const row of rows) {
@@ -179,22 +179,25 @@ const ParkCard: React.FC<ParkCardProps> = ({
           
           // Create a safe sheet name (max 31 chars for Excel)
           const safeSheetName = row.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 31);
-          worksheets.push({ name: safeSheetName, worksheet: ws });
+          rowWorksheets.push({ name: safeSheetName, worksheet: ws });
         } catch (rowError) {
           console.error(`Error processing row ${row.name}:`, rowError);
           // Create empty sheet for this row
           const emptyRowData = [["Barcode"]];
           const ws = XLSX.utils.aoa_to_sheet(emptyRowData);
           const safeSheetName = row.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 31);
-          worksheets.push({ name: safeSheetName, worksheet: ws });
+          rowWorksheets.push({ name: safeSheetName, worksheet: ws });
         }
       }
 
-      // Sort worksheets alphabetically by name
-      worksheets.sort((a, b) => a.name.localeCompare(b.name));
+      // Sort row worksheets alphabetically by name
+      rowWorksheets.sort((a, b) => a.name.localeCompare(b.name));
 
-      // Add sorted worksheets to workbook
-      worksheets.forEach(({ name, worksheet }) => {
+      // Add Summary sheet first
+      XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
+
+      // Add sorted row worksheets to workbook
+      rowWorksheets.forEach(({ name, worksheet }) => {
         XLSX.utils.book_append_sheet(wb, worksheet, name);
       });
 
