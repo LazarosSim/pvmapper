@@ -64,70 +64,106 @@ const BackupPage = () => {
 
   const handleExportExcel = async () => {
     if (isExporting) return;
+    
     try {
       setIsExporting(true);
       toast.info('Starting export, please wait...');
+      
+      // Validate data availability
+      if (!parks || parks.length === 0) {
+        toast.error('No parks data available for export.');
+        setIsExporting(false);
+        return;
+      }
+
+      if (!rows || rows.length === 0) {
+        toast.error('No rows data available for export.');
+        setIsExporting(false);
+        return;
+      }
       
       const workbook = XLSXUtils.book_new();
       const parksToExport = selectedParkId === 'all' 
         ? parks 
         : parks.filter(park => park.id === selectedParkId);
 
+      if (parksToExport.length === 0) {
+        toast.error('No parks selected for export.');
+        setIsExporting(false);
+        return;
+      }
+
       for (const park of parksToExport) {
-        const parkRows = rows.filter(row => row.parkId === park.id);
-        
-        // First create a summary sheet for the park
-        const parkSummaryData = [
-          ['Park Name', park.name],
-          ['Created', new Date(park.createdAt).toLocaleString()],
-          ['Expected Barcodes', park.expectedBarcodes.toString()],
-          ['Total Rows', parkRows.length.toString()],
-          ['Total Barcodes', parkRows.reduce((sum, row) => sum + (row.currentBarcodes || 0), 0).toString()],
-        ];
-        
-        // Add row information to the summary
-        parkRows.forEach(row => {
-          parkSummaryData.push([
-            `Row: ${row.name}`,
-            `Expected: ${row.expectedBarcodes || "N/A"}`,
-            `Current: ${row.currentBarcodes || 0} barcodes`
-          ]);
-        });
-        
-        const summarySheet = XLSXUtils.aoa_to_sheet(parkSummaryData);
-        const summarySheetName = `${park.name.slice(0, 28)}_Summary`.replace(/[^a-zA-Z0-9]/g, '_');
-        XLSXUtils.book_append_sheet(workbook, summarySheet, summarySheetName);
-        
-        // Create a worksheet for each row, regardless of whether it has barcodes or not
-        for (const row of parkRows) {
-          // Fetch barcodes for this row directly from the database
-          const rowBarcodes = await fetchBarcodesForRow(row.id);
+        try {
+          const parkRows = rows.filter(row => row.parkId === park.id) || [];
           
-          // Create worksheet data with header
-          const rowData = [["Barcode"]]; // Start with header row
+          // First create a summary sheet for the park
+          const parkSummaryData = [
+            ['Park Name', park.name],
+            ['Created', new Date(park.createdAt).toLocaleString()],
+            ['Expected Barcodes', park.expectedBarcodes.toString()],
+            ['Total Rows', parkRows.length.toString()],
+            ['Total Barcodes', parkRows.reduce((sum, row) => sum + (row.currentBarcodes || 0), 0).toString()],
+          ];
           
-          // Add all barcodes if available
-          if (rowBarcodes.length > 0) {
-            rowBarcodes.forEach(barcode => {
-              rowData.push([barcode.code]);
-            });
+          // Add row information to the summary
+          parkRows.forEach(row => {
+            parkSummaryData.push([
+              `Row: ${row.name}`,
+              `Expected: ${row.expectedBarcodes || "N/A"}`,
+              `Current: ${row.currentBarcodes || 0} barcodes`
+            ]);
+          });
+          
+          const summarySheet = XLSXUtils.aoa_to_sheet(parkSummaryData);
+          const summarySheetName = `${park.name.slice(0, 28)}_Summary`.replace(/[^a-zA-Z0-9]/g, '_');
+          XLSXUtils.book_append_sheet(workbook, summarySheet, summarySheetName);
+          
+          // Create a worksheet for each row, regardless of whether it has barcodes or not
+          for (const row of parkRows) {
+            try {
+              // Fetch barcodes for this row directly from the database
+              const rowBarcodes = await fetchBarcodesForRow(row.id);
+              
+              // Create worksheet data with header
+              const rowData = [["Barcode"]]; // Start with header row
+              
+              // Add all barcodes if available
+              if (rowBarcodes && rowBarcodes.length > 0) {
+                rowBarcodes.forEach(barcode => {
+                  rowData.push([barcode.code || '']);
+                });
+              }
+              
+              // Create the worksheet (even if empty, it will just have the header)
+              const worksheet = XLSXUtils.aoa_to_sheet(rowData);
+              
+              // Limit sheet name to 31 characters (Excel limitation)
+              const sheetName = `${park.name.slice(0, 15)}_${row.name.slice(0, 15)}`
+                .replace(/[^a-zA-Z0-9]/g, '_')
+                .slice(0, 31);
+              
+              XLSXUtils.book_append_sheet(workbook, worksheet, sheetName);
+            } catch (rowError) {
+              console.error(`Error processing row ${row.name}:`, rowError);
+              // Create empty sheet for this row if there's an error
+              const emptyRowData = [["Barcode"]];
+              const worksheet = XLSXUtils.aoa_to_sheet(emptyRowData);
+              const sheetName = `${park.name.slice(0, 15)}_${row.name.slice(0, 15)}`
+                .replace(/[^a-zA-Z0-9]/g, '_')
+                .slice(0, 31);
+              XLSXUtils.book_append_sheet(workbook, worksheet, sheetName);
+            }
           }
-          
-          // Create the worksheet (even if empty, it will just have the header)
-          const worksheet = XLSXUtils.aoa_to_sheet(rowData);
-          
-          // Limit sheet name to 31 characters (Excel limitation)
-          const sheetName = `${park.name.slice(0, 15)}_${row.name.slice(0, 15)}`
-            .replace(/[^a-zA-Z0-9]/g, '_')
-            .slice(0, 31);
-          
-          XLSXUtils.book_append_sheet(workbook, worksheet, sheetName);
+        } catch (parkError) {
+          console.error(`Error processing park ${park.name}:`, parkError);
+          toast.error(`Error processing park ${park.name}: ${parkError instanceof Error ? parkError.message : 'Unknown error'}`);
         }
       }
 
       const fileName = selectedParkId === 'all' 
         ? `inventory-export-${new Date().toISOString().split('T')[0]}.xlsx`
-        : `${parks.find(p => p.id === selectedParkId)?.name}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+        : `${parks.find(p => p.id === selectedParkId)?.name || 'unknown'}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
 
       writeXLSXFile(workbook, fileName);
       setIsExporting(false);
@@ -135,7 +171,7 @@ const BackupPage = () => {
       return fileName;
     } catch (error) {
       console.error("Export failed:", error);
-      toast.error("Failed to export Excel file");
+      toast.error(`Failed to export Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsExporting(false);
       return null;
     }
@@ -186,10 +222,12 @@ const BackupPage = () => {
   };
 
   const stats = {
-    parks: parks.length,
-    rows: rows.length,
-    barcodes: barcodes.length
+    parks: parks?.length || 0,
+    rows: rows?.length || 0,
+    barcodes: barcodes?.length || 0
   };
+
+  const hasData = parks && parks.length > 0 && rows && rows.length > 0;
 
   return (
     <Layout title="Backup & Restore">
@@ -237,27 +275,44 @@ const BackupPage = () => {
               <Select
                 value={selectedParkId}
                 onValueChange={setSelectedParkId}
+                disabled={!hasData}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a park to export" />
+                  <SelectValue placeholder={hasData ? "Select a park to export" : "No data available"} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Parks</SelectItem>
-                  {parks.map((park) => (
+                  {parks?.map((park) => (
                     <SelectItem key={park.id} value={park.id}>
                       {park.name}
                     </SelectItem>
-                  ))}
+                  )) || []}
                 </SelectContent>
               </Select>
-              <Button onClick={handleExportExcel} className="w-full" disabled={isExporting}>
+              <Button 
+                onClick={handleExportExcel} 
+                className="w-full" 
+                disabled={isExporting || !hasData}
+                title={!hasData ? "Export disabled: No data available" : "Export to Excel"}
+              >
                 <FileText className="mr-2 h-4 w-4" />
                 {isExporting ? 'Exporting...' : 'Export to Excel'}
               </Button>
-              <Button onClick={handleExportAndEmail} className="w-full" variant="secondary" disabled={isExporting}>
+              <Button 
+                onClick={handleExportAndEmail} 
+                className="w-full" 
+                variant="secondary" 
+                disabled={isExporting || !hasData}
+                title={!hasData ? "Export disabled: No data available" : "Export & Email"}
+              >
                 <Mail className="mr-2 h-4 w-4" />
                 Export & Email (Instructions)
               </Button>
+              {!hasData && (
+                <p className="text-sm text-muted-foreground text-center">
+                  No parks or rows available for export
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

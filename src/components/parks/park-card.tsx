@@ -35,6 +35,7 @@ import {useDeletePark, useUpdatePark} from "@/hooks/use-park-queries.tsx";
 import {useCurrentUser} from "@/hooks/use-user.tsx";
 import {useRowsByParkId} from "@/hooks/use-row-queries.tsx";
 import {useParkBarcodes} from "@/hooks/use-barcodes-queries.tsx";
+import {supabase} from '@/integrations/supabase/client';
 
 interface ParkCardProps {
   park: Park;
@@ -57,16 +58,50 @@ const ParkCard: React.FC<ParkCardProps> = ({
   const progress = ((park.currentBarcodes / park.expectedBarcodes) * 100).toFixed(2);
 
   const {data: currentUser} = useCurrentUser()
-  const {data: rows} = useRowsByParkId(park.id);
-  const {data: barcodes} = useParkBarcodes(park.id);
+  const {data: rows, isLoading: rowsLoading} = useRowsByParkId(park.id);
+  const {data: barcodes, isLoading: barcodesLoading} = useParkBarcodes(park.id);
   const {mutate: updatePark} = useUpdatePark();
   const {mutate: deletePark} = useDeletePark();
 
-  const rowCount = rows?.length;
+  const rowCount = rows?.length || 0;
 
   const createdAt = formatDistanceToNow(new Date(park?.createdAt), {
     addSuffix: true
   });
+
+  // Function to fetch barcodes for a specific row directly from the database
+  const fetchBarcodesForRow = async (rowId: string): Promise<Barcode[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('barcodes')
+        .select('*')
+        .eq('row_id', rowId)
+        .order('order_in_row', {ascending: true});
+
+      if (error) {
+        console.error('Error fetching barcodes for row:', error);
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      return data.map(barcode => ({
+        id: barcode.id,
+        code: barcode.code,
+        rowId: barcode.row_id,
+        userId: barcode.user_id,
+        timestamp: barcode.timestamp,
+        orderInRow: barcode.order_in_row,
+        latitude: barcode.latitude,
+        longitude: barcode.longitude
+      }));
+    } catch (error) {
+      console.error('Error in fetchBarcodesForRow:', error);
+      return [];
+    }
+  };
 
   const handleEdit = () => {
     updatePark({id: park.id, name: editName, expectedBarcodes: editExpectedBarcodes, validateBarcodeLength});
@@ -82,12 +117,19 @@ const ParkCard: React.FC<ParkCardProps> = ({
     return name.replace(/[\\/:*?"<>|]/g, '_');
   };
 
-
   const handleExportExcel = async () => {
     if (isExporting) return;
+    
     try {
       setIsExporting(true);
       toast.info('Starting export, please wait...');
+      
+      // Check if rows data is available
+      if (!rows || rows.length === 0) {
+        toast.error('No rows data available for export. Please try again later.');
+        setIsExporting(false);
+        return;
+      }
       
       const wb = XLSX.utils.book_new();
 
@@ -113,37 +155,36 @@ const ParkCard: React.FC<ParkCardProps> = ({
       const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
       XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
 
-      const groupedByRow: Record<string, Barcode[]> = barcodes.reduce(
-          (acc, barcode) => {
-            const rowId = barcode.rowId;
-            if (!acc[rowId]) {
-              acc[rowId] = [];
-            }
-            acc[rowId].push(barcode);
-            return acc;
-          },
-          {} as Record<string, Barcode[]>
-      )
-
       // Create a separate worksheet for each row, regardless of whether it has barcodes
       for (const row of rows) {
-        // Create worksheet data with header
-        const rowData = [["Barcode"]]; // Start with header row
+        try {
+          // Fetch fresh barcode data directly from the database for each row
+          const rowBarcodes = await fetchBarcodesForRow(row.id);
+          
+          // Create worksheet data with header
+          const rowData = [["Barcode"]]; // Start with header row
 
-        const rowBarcodes = groupedByRow[row.id] || [];
-        // Add barcode data if available
-        if (rowBarcodes.length > 0) {
-          rowBarcodes.forEach(barcode => {
-            rowData.push([barcode.code]);
-          });
+          // Add barcode data if available
+          if (rowBarcodes && rowBarcodes.length > 0) {
+            rowBarcodes.forEach(barcode => {
+              rowData.push([barcode.code || '']);
+            });
+          }
+          
+          // Create the worksheet (even if empty, it will just have the header)
+          const ws = XLSX.utils.aoa_to_sheet(rowData);
+          
+          // Create a safe sheet name (max 31 chars for Excel)
+          const safeSheetName = row.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 31);
+          XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
+        } catch (rowError) {
+          console.error(`Error processing row ${row.name}:`, rowError);
+          // Create empty sheet for this row
+          const emptyRowData = [["Barcode"]];
+          const ws = XLSX.utils.aoa_to_sheet(emptyRowData);
+          const safeSheetName = row.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 31);
+          XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
         }
-        
-        // Create the worksheet (even if empty, it will just have the header)
-        const ws = XLSX.utils.aoa_to_sheet(rowData);
-        
-        // Create a safe sheet name (max 31 chars for Excel)
-        const safeSheetName = row.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 31);
-        XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
       }
 
       const safeFileName = sanitizeFileName(`${park.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -189,6 +230,8 @@ const ParkCard: React.FC<ParkCardProps> = ({
   };
 
   const isManager = currentUser?.role === 'manager';
+  const isDataLoading = rowsLoading || barcodesLoading;
+  const canExport = !isDataLoading && rows && rows.length > 0;
 
   return <>
     <Card className="mb-4 hover:shadow-md transition-shadow glass-card relative overflow-hidden">
@@ -204,7 +247,14 @@ const ParkCard: React.FC<ParkCardProps> = ({
       <CardHeader className="pb-2 flex flex-row items-center justify-between relative z-10">
         <CardTitle className="text-inventory-text text-xl font-semibold text-left">{park.name}</CardTitle>
         <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={handleExportExcel} disabled={isExporting} className="text-inventory-secondary hover:text-inventory-secondary/80">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={handleExportExcel} 
+            disabled={isExporting || !canExport} 
+            className="text-inventory-secondary hover:text-inventory-secondary/80"
+            title={!canExport ? "Export disabled: No data available" : "Export to Excel"}
+          >
             {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
           </Button>
           {isManager && <DropdownMenu>
@@ -250,6 +300,7 @@ const ParkCard: React.FC<ParkCardProps> = ({
             <span className="text-sm font-medium">{rowCount} Rows</span>
             <span className="mx-2 text-muted-foreground">•</span>
             <span className="text-sm font-medium">{park.currentBarcodes} Barcodes</span>
+            {isDataLoading && <span className="mx-2 text-muted-foreground text-xs">(Loading...)</span>}
           </div>
           <Button variant="outline" size="sm" onClick={handleOpenPark} className="bg-inventory-secondary/10 text-inventory-secondary hover:bg-inventory-secondary/20 border-inventory-secondary/30">
             <FolderOpen className="mr-2 h-4 w-4" />
