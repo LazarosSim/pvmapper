@@ -108,7 +108,6 @@ const DashboardPage = () => {
   const scanChange = 0;
 
 
-
   // Calendar day render function
   const renderDay = (day: Date) => {
     const dateStr = format(day, 'yyyy-MM-dd');
@@ -194,7 +193,7 @@ const DashboardPage = () => {
                     <ParkProgress key={index} name={park.name}
                                   expected={park.expectedBarcodes}
                                   current={park.currentBarcodes}
-                                  percentage={(park.currentBarcodes / park.expectedBarcodes * 100).toFixed(2)} />
+                                  percentage={park.currentBarcodes / park.expectedBarcodes * 100} />
                 ))}
               </CardContent>
             </Card>

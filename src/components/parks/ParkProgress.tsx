@@ -19,7 +19,7 @@ export const ParkProgress: React.FC<ParkProgressProps> = ({
         <div className="space-y-2">
             <div className="flex justify-between">
                 <span>{name}</span>
-                <span className={`h-2 ${percentage > 100 ? 'text-red-700 ' : ''}`}>{percentage}%</span>
+                <span className={`h-2 ${percentage > 100 ? 'text-red-700 ' : ''}`}>{percentage.toFixed(2)}%</span>
             </div>
             <div className="flex justify-between text-xs text-muted-foreground">
                 <span>{current} scanned</span>
