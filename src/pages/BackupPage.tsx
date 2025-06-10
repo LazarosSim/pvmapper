@@ -93,6 +93,9 @@ const BackupPage = () => {
         return;
       }
 
+      // Collect all worksheets with their names for sorting
+      const worksheets: Array<{name: string, worksheet: any}> = [];
+
       for (const park of parksToExport) {
         try {
           const parkRows = rows.filter(row => row.parkId === park.id) || [];
@@ -117,7 +120,7 @@ const BackupPage = () => {
           
           const summarySheet = XLSXUtils.aoa_to_sheet(parkSummaryData);
           const summarySheetName = `${park.name.slice(0, 28)}_Summary`.replace(/[^a-zA-Z0-9]/g, '_');
-          XLSXUtils.book_append_sheet(workbook, summarySheet, summarySheetName);
+          worksheets.push({ name: summarySheetName, worksheet: summarySheet });
           
           // Create a worksheet for each row, regardless of whether it has barcodes or not
           for (const row of parkRows) {
@@ -143,7 +146,7 @@ const BackupPage = () => {
                 .replace(/[^a-zA-Z0-9]/g, '_')
                 .slice(0, 31);
               
-              XLSXUtils.book_append_sheet(workbook, worksheet, sheetName);
+              worksheets.push({ name: sheetName, worksheet });
             } catch (rowError) {
               console.error(`Error processing row ${row.name}:`, rowError);
               // Create empty sheet for this row if there's an error
@@ -152,7 +155,7 @@ const BackupPage = () => {
               const sheetName = `${park.name.slice(0, 15)}_${row.name.slice(0, 15)}`
                 .replace(/[^a-zA-Z0-9]/g, '_')
                 .slice(0, 31);
-              XLSXUtils.book_append_sheet(workbook, worksheet, sheetName);
+              worksheets.push({ name: sheetName, worksheet });
             }
           }
         } catch (parkError) {
@@ -160,6 +163,14 @@ const BackupPage = () => {
           toast.error(`Error processing park ${park.name}: ${parkError instanceof Error ? parkError.message : 'Unknown error'}`);
         }
       }
+
+      // Sort worksheets alphabetically by name
+      worksheets.sort((a, b) => a.name.localeCompare(b.name));
+
+      // Add sorted worksheets to workbook
+      worksheets.forEach(({ name, worksheet }) => {
+        XLSXUtils.book_append_sheet(workbook, worksheet, name);
+      });
 
       const fileName = selectedParkId === 'all' 
         ? `inventory-export-${new Date().toISOString().split('T')[0]}.xlsx`
