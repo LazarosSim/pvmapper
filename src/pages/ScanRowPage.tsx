@@ -16,6 +16,7 @@ import {useResetRowBarcodes, useRowBarcodes} from "@/hooks/use-barcodes-queries.
 import {useMergedBarcodes} from "@/hooks/use-offline-barcodes";
 import {SyncButton} from "@/components/offline/SyncButton";
 import {OfflineStatusBanner} from "@/components/offline/OfflineStatusBanner";
+import {useSync} from "@/hooks/use-sync";
 
 // Audio notification for success/error
 const NOTIF_SOUND = "data:audio/wav;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAFAAAGUACFhYWFhYWFhYWFhYWFhYWFhYWFra2tra2tra2tra2tra2tra2traOjo6Ojo6Ojo6Ojo6Ojo6Ojo6P///////////////////////////////////////////wAAADJMQVNNRTMuOTlyAc0AAAAAAAAAABSAJAJAQgAAgAAAA+aieizgAAAAAAAAAAAAAAAAAAAA//uQZAAAApEGUFUGAAArIMoKoMAABZAZnW40AAClAzOtxpgALEwy1AAAAAEVf7kGQRmBmD3QEAgEDhnePhI/JH4iByB+SPxA/IH5gQB+IPzAQA+TAMDhOIPA/IEInjB4P4fn///jHJ+T/ngfgYAgEAgEAgEAgg5nwuZIuZw5QmCvG0Ooy0JtC2CnAp1vdSlLMuOQylYZl0LERgAAAAAAlMy5z3O+n//zTjN/9/+Z//O//9y5/8ud/z//5EHL/D+KDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDEppqampqampqampqampqampqampqampqampqampqamgAAA//tQZAAAAtAeUqsMAARfA7pVYYACCUCXPqggAEAAAP8AAAAATEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkYA/wAAB/gAAACAAAD/AAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=";
@@ -59,6 +60,9 @@ const ScanRowPage = () => {
   
   // Merged barcodes (server + pending offline) - imported from hook
   const {mergedBarcodes: barcodes} = useMergedBarcodes(rowId, serverBarcodes);
+  
+  // Sync state - used to block scanning during sync
+  const { isSyncing } = useSync();
 
   if (isError) {
     toast.error("Failed to fetch row data");
@@ -194,6 +198,7 @@ const ScanRowPage = () => {
               <BarcodeScanInput
                 rowId={rowId}
                 focusInput={focusInput}
+                disabled={isSyncing}
               />
             </div>
             <audio ref={audioRef} src={NOTIF_SOUND} />
