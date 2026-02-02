@@ -12,7 +12,8 @@ import BarcodeScanInput from '@/components/scan/BarcodeScanInput';
 import RecentScans from '@/components/scan/RecentScans';
 import ResetRowDialog from '@/components/scan/ResetRowDialog';
 import {useRow} from "@/hooks/use-row-queries.tsx";
-import {useResetRowBarcodes, useRowBarcodes,} from "@/hooks/use-barcodes-queries.tsx";
+import {useResetRowBarcodes, useRowBarcodes} from "@/hooks/use-barcodes-queries.tsx";
+import {useMergedBarcodes} from "@/hooks/use-offline-barcodes";
 
 // Audio notification for success/error
 const NOTIF_SOUND = "data:audio/wav;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAFAAAGUACFhYWFhYWFhYWFhYWFhYWFhYWFra2tra2tra2tra2tra2tra2traOjo6Ojo6Ojo6Ojo6Ojo6Ojo6P///////////////////////////////////////////wAAADJMQVNNRTMuOTlyAc0AAAAAAAAAABSAJAJAQgAAgAAAA+aieizgAAAAAAAAAAAAAAAAAAAA//uQZAAAApEGUFUGAAArIMoKoMAABZAZnW40AAClAzOtxpgALEwy1AAAAAEVf7kGQRmBmD3QEAgEDhnePhI/JH4iByB+SPxA/IH5gQB+IPzAQA+TAMDhOIPA/IEInjB4P4fn///jHJ+T/ngfgYAgEAgEAgEAgg5nwuZIuZw5QmCvG0Ooy0JtC2CnAp1vdSlLMuOQylYZl0LERgAAAAAAlMy5z3O+n//zTjN/9/+Z//O//9y5/8ud/z//5EHL/D+KDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDEppqampqampqampqampqampqampqampqampqampqamgAAA//tQZAAAAtAeUqsMAARfA7pVYYACCUCXPqggAEAAAP8AAAAATEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkYA/wAAB/gAAACAAAD/AAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=";
@@ -51,7 +52,11 @@ const ScanRowPage = () => {
   const {data: row, isLoading, isError } = useRow(rowId);
   const {mutate: resetRow} = useResetRowBarcodes(rowId);
 
-  const {data: barcodes} = useRowBarcodes(rowId);
+  // Server barcodes
+  const {data: serverBarcodes} = useRowBarcodes(rowId);
+  
+  // Merged barcodes (server + pending offline) - imported from hook
+  const {mergedBarcodes: barcodes} = useMergedBarcodes(rowId, serverBarcodes);
 
   if (isError) {
     toast.error("Failed to fetch row data");

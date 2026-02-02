@@ -3,7 +3,7 @@
  * Ensures data persistence even if browser crashes or refreshes
  */
 
-import { QueuedMutation, QueuedMutationPayload, MutationType } from './types';
+import type { QueuedMutation, QueuedMutationPayload, MutationType } from './types';
 
 const DB_NAME = 'pvmapper-offline';
 const DB_VERSION = 1;

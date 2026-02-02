@@ -1,11 +1,12 @@
-
 import React from 'react';
+import { Cloud, CloudOff } from 'lucide-react';
 
 interface RecentScansProps {
-  barcodes: Array<{
+  barcodes?: Array<{
     id: string;
     code: string;
     timestamp?: string;
+    isPending?: boolean;
   }>;
 }
 
@@ -21,9 +22,14 @@ const RecentScans: React.FC<RecentScansProps> = ({ barcodes }) => {
         {barcodes.map((barcode, index) => (
           <div 
             key={barcode.id} 
-            className={`text-sm ${index === 0 ? 'text-foreground font-medium animate-in fade-in slide-in-from-bottom-2' : 'text-muted-foreground'}`}
+            className={`text-sm flex items-center gap-2 ${index === 0 ? 'text-foreground font-medium animate-in fade-in slide-in-from-bottom-2' : 'text-muted-foreground'}`}
           >
-            {barcode.code}
+            {barcode.isPending ? (
+              <CloudOff className="h-3 w-3 text-amber-500 flex-shrink-0" aria-label="Pending sync" />
+            ) : (
+              <Cloud className="h-3 w-3 text-green-500 flex-shrink-0" aria-label="Synced" />
+            )}
+            <span className="truncate">{barcode.code}</span>
           </div>
         ))}
       </div>

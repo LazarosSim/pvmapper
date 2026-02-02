@@ -6,7 +6,9 @@ import {ArrowRight, Loader2, X} from 'lucide-react';
 import useSoundEffects from '@/hooks/use-sound-effects';
 import {useDB} from '@/lib/db-provider';
 import {useRow} from "@/hooks/use-row-queries.tsx";
-import {useAddBarcodeToRow, useResetRowBarcodes, useRowBarcodes,} from "@/hooks/use-barcodes-queries.tsx";
+import {useRowBarcodes} from "@/hooks/use-barcodes-queries.tsx";
+import {useOfflineAddBarcode, useMergedBarcodes} from "@/hooks/use-offline-barcodes";
+import {useSupabase} from "@/lib/supabase-provider";
 
 interface BarcodeScanInputProps {
   rowId: string;
@@ -20,7 +22,6 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   const [barcodeInput, setBarcodeInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const {
-    getRowById,
     getParkById,
   } = useDB();
   const {
@@ -28,17 +29,21 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
     playErrorSound
   } = useSoundEffects();
   const inputRef = useRef<HTMLInputElement>(null);
+  const { user } = useSupabase();
 
   // Get the row and check if this is the first barcode
   const {data: row} = useRow(rowId);
 
-  const {mutate: addBarcode} = useAddBarcodeToRow(rowId);
-  const {mutate: resetRow, data:affectedRows} = useResetRowBarcodes(rowId);
+  // Server barcodes
+  const {data: serverBarcodes} = useRowBarcodes(rowId);
+  
+  // Merged barcodes (server + pending offline)
+  const {mergedBarcodes: barcodes} = useMergedBarcodes(rowId, serverBarcodes);
 
-  //barcodes for the current row
-  const {data: barcodes} = useRowBarcodes(rowId);
+  // Offline-first add barcode
+  const {addBarcode, isAdding} = useOfflineAddBarcode({rowId, userId: user?.id});
 
-  const isFirstBarcode = row?.currentBarcodes === 0;
+  const isFirstBarcode = !barcodes || barcodes.length === 0;
 
 
   const captureGPSLocation = async (): Promise<{
@@ -108,7 +113,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       
       // Check for duplicates
       const duplicates = barcodes?.filter(b => b.code.toLowerCase() === barcodeInput.toLowerCase());
-      if (duplicates.length > 0) {
+      if (duplicates && duplicates.length > 0) {
         playErrorSound();
         toast.error('Duplicate barcode detected');
         setBarcodeInput('');
@@ -116,13 +121,18 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
         return;
       }
 
-      const orderInRow = barcodes?.length;
-      addBarcode({
-        code: barcodeCode,
+      const orderInRow = barcodes?.length || 0;
+      const timestamp = new Date(Date.now()).toISOString();
+      
+      // Use offline-first addBarcode
+      await addBarcode(
+        barcodeCode,
         orderInRow,
-        isLast: true,
-        timestamp: new Date(Date.now()).toISOString()
-      });
+        timestamp,
+        location?.latitude,
+        location?.longitude
+      );
+      
       setBarcodeInput('');
       playSuccessSound();
       if (location && isFirstBarcode) {
@@ -154,7 +164,6 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       const placeholderCode = `X_PLACEHOLDER_${timestamp}`;
 
       // Get the captureLocation state from the parent component through the row
-      const row = getRowById(rowId);
       const captureLocation = row ? (row as any).captureLocation || false : false;
 
       // Capture GPS location if this is the first barcode in the row and location capture is enabled
@@ -166,9 +175,17 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
         }
       }
 
-      const orderInRow = barcodes?.length;
-      // We bypass validation for this special code
-      addBarcode({code: placeholderCode, orderInRow, isLast: true, timestamp});
+      const orderInRow = barcodes?.length || 0;
+      
+      // Use offline-first addBarcode
+      await addBarcode(
+        placeholderCode,
+        orderInRow,
+        timestamp,
+        location?.latitude,
+        location?.longitude
+      );
+      
       playSuccessSound();
 
       if (location && isFirstBarcode) {
@@ -194,8 +211,8 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
           registerBarcode(barcodeInput.trim());
         }
       }} placeholder="Scan or enter barcode" className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30 pr-16" autoComplete="off" />
-        <Button type="submit" disabled={!barcodeInput.trim() || isProcessing} className="absolute right-0 top-0 bg-inventory-primary hover:bg-inventory-primary/90 h-full px-3 text-sm">
-          {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <span className="flex items-center">
+        <Button type="submit" disabled={!barcodeInput.trim() || isProcessing || isAdding} className="absolute right-0 top-0 bg-inventory-primary hover:bg-inventory-primary/90 h-full px-3 text-sm">
+          {(isProcessing || isAdding) ? <Loader2 className="h-4 w-4 animate-spin" /> : <span className="flex items-center">
               <span className="hidden sm:inline mr-1">Add</span>
               <ArrowRight className="h-4 w-4" />
             </span>}
@@ -203,7 +220,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       </div>
       
       <div className="absolute right-0 top-0 flex h-full">
-        <Button type="button" onClick={registerPlaceholder} disabled={isProcessing} variant="ghost" size="icon" className="h-full rounded-md ml-1 px-[2px] py-[2px] mx-0 my-[40px] text-center text-base bg-gray-400 hover:bg-gray-300 text-zinc-950">
+        <Button type="button" onClick={registerPlaceholder} disabled={isProcessing || isAdding} variant="ghost" size="icon" className="h-full rounded-md ml-1 px-[2px] py-[2px] mx-0 my-[40px] text-center text-base bg-gray-400 hover:bg-gray-300 text-zinc-950">
           <X className="h-4 w-4" />
         </Button>
       </div>
