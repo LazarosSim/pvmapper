@@ -13,11 +13,13 @@ import {useSupabase} from "@/lib/supabase-provider";
 interface BarcodeScanInputProps {
   rowId: string;
   focusInput: () => void;
+  disabled?: boolean;
 }
 
 const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   rowId,
-  focusInput
+  focusInput,
+  disabled = false
 }) => {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -81,7 +83,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   };
   
   const registerBarcode = async (barcodeCode:string) => {
-    if (!barcodeCode || isProcessing) return;
+    if (!barcodeCode || isProcessing || disabled) return;
     try {
       setIsProcessing(true);
       const park = row ? getParkById(row.parkId) : undefined;
@@ -205,13 +207,22 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   
   return <form onSubmit={handleSubmit} className="relative">
       <div className="relative">
-        <Input ref={inputRef} value={barcodeInput} onChange={e => setBarcodeInput(e.target.value)} onKeyDown={e => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          registerBarcode(barcodeInput.trim());
-        }
-      }} placeholder="Scan or enter barcode" className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30 pr-16" autoComplete="off" />
-        <Button type="submit" disabled={!barcodeInput.trim() || isProcessing || isAdding} className="absolute right-0 top-0 bg-inventory-primary hover:bg-inventory-primary/90 h-full px-3 text-sm">
+        <Input 
+          ref={inputRef} 
+          value={barcodeInput} 
+          onChange={e => setBarcodeInput(e.target.value)} 
+          onKeyDown={e => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              registerBarcode(barcodeInput.trim());
+            }
+          }} 
+          placeholder={disabled ? "Sync in progress..." : "Scan or enter barcode"}
+          className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30 pr-16" 
+          autoComplete="off"
+          disabled={disabled}
+        />
+        <Button type="submit" disabled={!barcodeInput.trim() || isProcessing || isAdding || disabled} className="absolute right-0 top-0 bg-inventory-primary hover:bg-inventory-primary/90 h-full px-3 text-sm">
           {(isProcessing || isAdding) ? <Loader2 className="h-4 w-4 animate-spin" /> : <span className="flex items-center">
               <span className="hidden sm:inline mr-1">Add</span>
               <ArrowRight className="h-4 w-4" />
@@ -220,7 +231,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       </div>
       
       <div className="absolute right-0 top-0 flex h-full">
-        <Button type="button" onClick={registerPlaceholder} disabled={isProcessing || isAdding} variant="ghost" size="icon" className="h-full rounded-md ml-1 px-[2px] py-[2px] mx-0 my-[40px] text-center text-base bg-gray-400 hover:bg-gray-300 text-zinc-950">
+        <Button type="button" onClick={registerPlaceholder} disabled={isProcessing || isAdding || disabled} variant="ghost" size="icon" className="h-full rounded-md ml-1 px-[2px] py-[2px] mx-0 my-[40px] text-center text-base bg-gray-400 hover:bg-gray-300 text-zinc-950">
           <X className="h-4 w-4" />
         </Button>
       </div>
