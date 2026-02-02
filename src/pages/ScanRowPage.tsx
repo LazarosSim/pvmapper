@@ -179,7 +179,17 @@ const ScanRowPage = () => {
             </div>
           </div>
         )}
-        <Card className="glass-card">
+        <Card className="glass-card relative overflow-hidden">
+          {/* Sync overlay */}
+          {isSyncing && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <span className="text-sm font-medium">Syncing...</span>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">Please wait</p>
+            </div>
+          )}
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center">
