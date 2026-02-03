@@ -41,16 +41,22 @@ const loadRowsByParkId = async (parkId: string) => {
 
 export const useRow = (rowId: string) => {
     return useQuery({
-        queryKey: ['rows', rowId],
+        queryKey: ['rows', 'single', rowId],
         queryFn: () => loadRowById(rowId),
-        enabled: Boolean(rowId)
+        enabled: Boolean(rowId),
+        networkMode: 'offlineFirst',
+        staleTime: 30000,
+        refetchOnMount: 'always',
     });
 }
 
 export const useRowsByParkId = (parkId: string) => {
     return useQuery({
-        queryKey: ['rows', parkId],
+        queryKey: ['rows', 'park', parkId],
         queryFn: () => loadRowsByParkId(parkId),
-        enabled: Boolean(parkId)
+        enabled: Boolean(parkId),
+        networkMode: 'offlineFirst',
+        staleTime: 30000,
+        refetchOnMount: 'always',
     });
 }
