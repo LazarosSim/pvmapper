@@ -6,7 +6,7 @@ import {useDB} from '@/lib/db-provider';
 import {MapPin} from 'lucide-react';
 import {toast} from 'sonner';
 import {Checkbox} from '@/components/ui/checkbox';
-import {useAddBarcodeToRow, useRowBarcodes} from "@/hooks/use-barcodes-queries.tsx";
+import {useAddBarcodeToRow, useRowBarcodes} from "@/hooks/use-barcodes";
 
 interface AddBarcodeDialogProps {
   open: boolean;

@@ -36,7 +36,8 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     getAllUserStats, getDailyScans, getScansForDateRange
   } = useStats();
   
-  // Initialize barcode state (needed by rows)
+  // Legacy barcode state - kept for backward compatibility but no longer fetched globally
+  // @deprecated Use React Query hooks (useRowBarcodes, useParkBarcodes) instead
   const [barcodes, setBarcodes] = useState<Barcode[]>([]);
   
   // Initialize rows with barcode state
@@ -46,8 +47,9 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   } = useRows(barcodes, setBarcodes);
   
   // Initialize barcodes module with rows and daily scan update function
+  // Note: fetchBarcodes is no longer called globally - individual pages use React Query
   const {
-    fetchBarcodes, updateBarcode, deleteBarcode, searchBarcodes, countBarcodesInPark
+    updateBarcode, deleteBarcode, searchBarcodes, countBarcodesInPark
   } = useBarcodes(rows, () => updateDailyScans(user?.id), decreaseDailyScans);
   
   // Initialize parks module with dependencies
@@ -60,6 +62,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   const { importData, exportData, fetchBarcodesForRow } = useDataManagement(parks, rows, barcodes);
 
   // Load data when user changes
+  // Note: Barcodes are no longer fetched globally - individual pages use React Query hooks
   useEffect(() => {
     let isMounted = true;
     
@@ -69,7 +72,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
           await fetchUserProfile(user.id);
           await fetchParks(user.id);
           await fetchRows(user.id);
-          await fetchBarcodes(user.id);
+          // Note: fetchBarcodes removed - pages now use React Query (useRowBarcodes, useParkBarcodes)
           await fetchDailyScans(user.id);
         }
       } else {

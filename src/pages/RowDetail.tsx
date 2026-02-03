@@ -26,7 +26,7 @@ import {
   useResetRowBarcodes,
   useRowBarcodes,
   useUpdateRowBarcode
-} from "@/hooks/use-barcodes-queries.tsx";
+} from "@/hooks/use-barcodes";
 import {useRow} from "@/hooks/use-row-queries.tsx";
 import {
   Pagination,
