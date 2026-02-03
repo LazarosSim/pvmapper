@@ -11,7 +11,7 @@ import {endOfMonth, format, startOfMonth} from 'date-fns';
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,} from "@/components/ui/tooltip";
 import {Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis} from 'recharts';
 import {ParkProgress} from "@/components/parks/ParkProgress.tsx";
-import {useParkStats} from "@/hooks/use-park-queries.tsx";
+import {useParkStats} from "@/hooks/parks";
 import {useUserStats} from "@/hooks/use-user-stats.tsx";
 import {useCurrentUser} from "@/hooks/use-user.tsx";
 

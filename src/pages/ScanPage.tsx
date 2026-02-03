@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { FolderOpen, Loader2 } from 'lucide-react';
-import { useParkStats } from '@/hooks/use-park-queries';
+import { useParkStats } from '@/hooks/parks';
 
 const ScanPage = () => {
   const { data: parks, isLoading } = useParkStats();

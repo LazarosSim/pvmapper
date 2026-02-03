@@ -32,7 +32,7 @@ import * as XLSX from 'xlsx';
 import {Checkbox} from '@/components/ui/checkbox';
 import {Barcode} from '@/lib/types/db-types';
 import {Park} from "@/types/types.ts";
-import {useDeletePark, useUpdatePark, useArchivePark, useUnarchivePark} from "@/hooks/use-park-queries.tsx";
+import {useDeletePark, useUpdatePark, useArchivePark, useUnarchivePark} from "@/hooks/parks";
 import {useCurrentUser} from "@/hooks/use-user.tsx";
 import {useRowsByParkId} from "@/hooks/use-row-queries.tsx";
 import {useParkBarcodes} from "@/hooks/use-barcodes-queries.tsx";
