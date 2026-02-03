@@ -49,11 +49,17 @@ const updatePark = async (
 }
 
 
-const loadParkStats = async (): Promise<Park[]> => {
-    const {data, error} = await supabase
+const loadParkStats = async (includeArchived: boolean = false): Promise<Park[]> => {
+    let query = supabase
         .from('park_stats')
-        .select('id, name, expected_barcodes, current_barcodes, created_at, created_by, validate_barcode_length')
-        .order('name', { ascending: true })
+        .select('id, name, expected_barcodes, current_barcodes, created_at, created_by, validate_barcode_length, archived, archived_at')
+        .order('name', { ascending: true });
+    
+    if (!includeArchived) {
+        query = query.or('archived.is.null,archived.eq.false');
+    }
+    
+    const {data, error} = await query;
     if (error) {
         console.error("Error loading park stats:", error);
         throw error;
@@ -107,13 +113,67 @@ export const useAddPark = () => {
 
 
 
-export const useParkStats = () => {
+export const useParkStats = (includeArchived: boolean = false) => {
     return useQuery({
-        queryKey: ['parks'],
-        queryFn: () => loadParkStats(),
+        queryKey: ['parks', { includeArchived }],
+        queryFn: () => loadParkStats(includeArchived),
         enabled: onlineManager.isOnline()
     });
 }
+
+const archivePark = async (id: string) => {
+    const { error } = await supabase
+        .from('parks')
+        .update({
+            archived: true,
+            archived_at: new Date().toISOString()
+        })
+        .eq('id', id);
+    
+    if (error) {
+        console.error("Error archiving park:", error);
+        throw error;
+    }
+    return id;
+};
+
+const unarchivePark = async (id: string) => {
+    const { error } = await supabase
+        .from('parks')
+        .update({
+            archived: false,
+            archived_at: null
+        })
+        .eq('id', id);
+    
+    if (error) {
+        console.error("Error unarchiving park:", error);
+        throw error;
+    }
+    return id;
+};
+
+export const useArchivePark = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: archivePark,
+        mutationKey: ['parks', 'archive'],
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['parks'] });
+        },
+    });
+};
+
+export const useUnarchivePark = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: unarchivePark,
+        mutationKey: ['parks', 'unarchive'],
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['parks'] });
+        },
+    });
+};
 
 export const useUpdatePark = () => {
     const queryClient = useQueryClient();

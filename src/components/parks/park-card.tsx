@@ -1,11 +1,12 @@
 import React, {useState} from 'react';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
-import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
-import {Edit, FileDown, FolderOpen, Loader2, MoreVertical, Trash2} from 'lucide-react';
+import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
+import {Archive, ArchiveRestore, Edit, FileDown, FolderOpen, Loader2, MoreVertical, Trash2} from 'lucide-react';
 import {useNavigate} from 'react-router-dom';
 import {formatDistanceToNow} from 'date-fns';
 import {Progress} from '@/components/ui/progress';
+import {Badge} from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +32,7 @@ import * as XLSX from 'xlsx';
 import {Checkbox} from '@/components/ui/checkbox';
 import {Barcode} from '@/lib/types/db-types';
 import {Park} from "@/types/types.ts";
-import {useDeletePark, useUpdatePark} from "@/hooks/use-park-queries.tsx";
+import {useDeletePark, useUpdatePark, useArchivePark, useUnarchivePark} from "@/hooks/use-park-queries.tsx";
 import {useCurrentUser} from "@/hooks/use-user.tsx";
 import {useRowsByParkId} from "@/hooks/use-row-queries.tsx";
 import {useParkBarcodes} from "@/hooks/use-barcodes-queries.tsx";
@@ -62,6 +63,8 @@ const ParkCard: React.FC<ParkCardProps> = ({
   const {data: barcodes, isLoading: barcodesLoading} = useParkBarcodes(park.id);
   const {mutate: updatePark} = useUpdatePark();
   const {mutate: deletePark} = useDeletePark();
+  const {mutate: archivePark} = useArchivePark();
+  const {mutate: unarchivePark} = useUnarchivePark();
 
   const rowCount = rows?.length || 0;
 
@@ -111,6 +114,20 @@ const ParkCard: React.FC<ParkCardProps> = ({
   const handleDelete = () => {
     deletePark(park.id);
     setIsDeleteDialogOpen(false);
+  };
+
+  const handleArchive = () => {
+    archivePark(park.id, {
+      onSuccess: () => toast.success(`${park.name} has been archived`),
+      onError: () => toast.error('Failed to archive park'),
+    });
+  };
+
+  const handleUnarchive = () => {
+    unarchivePark(park.id, {
+      onSuccess: () => toast.success(`${park.name} has been restored`),
+      onError: () => toast.error('Failed to restore park'),
+    });
   };
 
   const sanitizeFileName = (name: string): string => {
@@ -245,10 +262,10 @@ const ParkCard: React.FC<ParkCardProps> = ({
   const canExport = !isDataLoading && rows && rows.length > 0;
 
   return <>
-    <Card className="mb-4 hover:shadow-md transition-shadow glass-card relative overflow-hidden">
+    <Card className={`mb-4 hover:shadow-md transition-shadow glass-card relative overflow-hidden ${park.archived ? 'border-muted' : ''}`}>
       {/* Semi-transparent background image layer - increased opacity to 50% */}
       <div 
-        className="absolute inset-0 bg-cover bg-center opacity-50 z-0" 
+        className={`absolute inset-0 bg-cover bg-center z-0 ${park.archived ? 'opacity-30' : 'opacity-50'}`}
         style={{ 
           backgroundImage: `url(https://ynslzmpfhmoghvcacwzd.supabase.co/storage/v1/object/public/images/XPcanvas.png)` 
         }} 
@@ -256,7 +273,17 @@ const ParkCard: React.FC<ParkCardProps> = ({
       
       {/* Content layer (above the background) */}
       <CardHeader className="pb-2 flex flex-row items-center justify-between relative z-10">
-        <CardTitle className="text-inventory-text text-xl font-semibold text-left">{park.name}</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle className={`text-inventory-text text-xl font-semibold text-left ${park.archived ? 'text-muted-foreground' : ''}`}>
+            {park.name}
+          </CardTitle>
+          {park.archived && (
+            <Badge variant="secondary" className="text-xs">
+              <Archive className="h-3 w-3 mr-1" />
+              Archived
+            </Badge>
+          )}
+        </div>
         <div className="flex gap-2">
           <Button 
             variant="outline" 
@@ -279,6 +306,18 @@ const ParkCard: React.FC<ParkCardProps> = ({
                   <Edit className="mr-2 h-4 w-4" />
                   Edit
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {park.archived ? (
+                  <DropdownMenuItem onClick={handleUnarchive}>
+                    <ArchiveRestore className="mr-2 h-4 w-4" />
+                    Restore
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={handleArchive}>
+                    <Archive className="mr-2 h-4 w-4" />
+                    Archive
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => setIsDeleteDialogOpen(true)} className="text-destructive focus:text-destructive">
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete

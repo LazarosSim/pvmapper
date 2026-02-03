@@ -78,6 +78,8 @@ export type Database = {
       }
       parks: {
         Row: {
+          archived: boolean | null
+          archived_at: string | null
           created_at: string
           expected_barcodes: number | null
           id: string
@@ -86,6 +88,8 @@ export type Database = {
           validate_barcode_length: boolean | null
         }
         Insert: {
+          archived?: boolean | null
+          archived_at?: string | null
           created_at?: string
           expected_barcodes?: number | null
           id?: string
@@ -94,6 +98,8 @@ export type Database = {
           validate_barcode_length?: boolean | null
         }
         Update: {
+          archived?: boolean | null
+          archived_at?: string | null
           created_at?: string
           expected_barcodes?: number | null
           id?: string
@@ -173,6 +179,8 @@ export type Database = {
     Views: {
       park_stats: {
         Row: {
+          archived: boolean | null
+          archived_at: string | null
           created_at: string | null
           created_by: string | null
           current_barcodes: number | null
