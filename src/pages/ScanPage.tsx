@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
-import { useDB } from '@/lib/db-provider';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -11,15 +10,26 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen, Loader2 } from 'lucide-react';
+import { useParkStats } from '@/hooks/use-park-queries';
 
 const ScanPage = () => {
-  const { parks } = useDB();
+  const { data: parks, isLoading } = useParkStats();
   const navigate = useNavigate();
   // Set captureLocation to true by default
   const [captureLocation, setCaptureLocation] = useState(true);
 
-  if (parks.length === 0) {
+  if (isLoading) {
+    return (
+      <Layout title="Select Park" showBack>
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!parks || parks.length === 0) {
     return <Navigate to="/" replace />;
   }
 

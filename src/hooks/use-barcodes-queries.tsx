@@ -162,6 +162,7 @@ export const useAddBarcodeToRow = (rowId: string) => {
         onSettled: () => {
             if(onlineManager.isOnline()) {
                 queryClient.invalidateQueries({queryKey: ['barcodes', 'row', rowId]});
+                queryClient.invalidateQueries({queryKey: ['parks']}); // Refresh park counts
             }
         },
 
@@ -204,6 +205,7 @@ export const useDeleteRowBarcode = (rowId: string) => {
                     }
                     return oldData;
                 })
+            queryClient.invalidateQueries({queryKey: ['parks']}); // Refresh park counts
         }
     })
 }
@@ -220,6 +222,7 @@ export const useResetRowBarcodes = (rowId: string) => {
                 queryKey: ['barcodes', 'row', rowId],
                 exact: true,    // only that one
             })
+            queryClient.invalidateQueries({queryKey: ['parks']}); // Refresh park counts
         }
     })
 }

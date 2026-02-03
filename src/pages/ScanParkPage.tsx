@@ -4,17 +4,19 @@ import Layout from '@/components/layout/layout';
 import {useDB} from '@/lib/db-provider';
 import {Button} from '@/components/ui/button';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle,} from "@/components/ui/card";
-import {ArrowDown, FolderOpen, Plus, Search} from 'lucide-react';
+import {ArrowDown, FolderOpen, Loader2, Plus, Search} from 'lucide-react';
 import {Input} from '@/components/ui/input';
 import type {Row} from '@/lib/types/db-types';
 import {toast} from 'sonner';
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,} from "@/components/ui/dialog";
 import {Label} from '@/components/ui/label';
 import {useParkBarcodes} from "@/hooks/use-barcodes-queries.tsx";
+import {useParkStats} from "@/hooks/use-park-queries.tsx";
 
 const ScanParkPage = () => {
   const { parkId } = useParams<{ parkId: string }>();
-  const { parks, getRowsByParkId, getParkById, addRow, countBarcodesInRow, addSubRow, isManager } = useDB();
+  const { getRowsByParkId, addRow, countBarcodesInRow, addSubRow, isManager } = useDB();
+  const { data: parks, isLoading: parksLoading } = useParkStats();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddSubRowDialogOpen, setIsAddSubRowDialogOpen] = useState(false);
@@ -23,13 +25,21 @@ const ScanParkPage = () => {
 
   const {data: barcodes} = useParkBarcodes(parkId);
 
+  if (parksLoading) {
+    return (
+      <Layout title="Select Row" showBack>
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
 
-
-  if (!parkId || !parks.some(p => p.id === parkId)) {
+  if (!parkId || !parks?.some(p => p.id === parkId)) {
     return <Navigate to="/scan" replace />;
   }
 
-  const park = getParkById(parkId);
+  const park = parks?.find(p => p.id === parkId);
   const rows = getRowsByParkId(parkId);
   
   const filteredRows = rows.filter(row => 
