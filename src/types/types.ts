@@ -30,6 +30,8 @@ export type RawPark = {
     created_at: string,
     created_by: string,
     validate_barcode_length: boolean,
+    archived: boolean,
+    archived_at: string | null,
 }
 
 export type Park = {
@@ -40,6 +42,8 @@ export type Park = {
     expectedBarcodes: number,
     currentBarcodes: number,
     validateBarcodeLength: boolean,
+    archived: boolean,
+    archivedAt: Date | null,
 }
 
 export function mapPark(raw: RawPark): Park {
@@ -51,5 +55,7 @@ export function mapPark(raw: RawPark): Park {
         expectedBarcodes: raw.expected_barcodes,
         currentBarcodes: raw.current_barcodes,
         validateBarcodeLength: raw.validate_barcode_length,
+        archived: raw.archived ?? false,
+        archivedAt: raw.archived_at ? new Date(raw.archived_at) : null,
     }
 }
