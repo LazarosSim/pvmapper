@@ -1,266 +1,155 @@
 
-# Plan: Fix Navigation Persistence, Logout Error, and Park 1 Data Display
 
-## Problem Analysis
+# Plan: Fix Park 1 Data Not Displaying (1000-Row Limit Issue)
 
-Based on my exploration, I've identified the root causes of all three issues:
+## Root Cause
 
----
+The database contains **2018 rows** total, but the Supabase/PostgREST default limit is **1000 rows per query**. The legacy `fetchRows()` function in `src/lib/hooks/rows/row-operations/fetch-rows.ts` fetches rows with:
 
-## Issue 1: Navigation Persistence Not Working
-
-### Root Cause
-The current `ScrollToTop` component only stores the route in `localStorage` but **never restores it**. On page refresh:
-
-1. The browser URL is correct (e.g., `/scan/row/123`)
-2. But the `AuthGuard` shows a loading state during session verification
-3. During this time, React Query cache is being restored from localStorage
-4. The issue is that the **session isn't being restored fast enough** before the AuthGuard redirects
-
-Additionally, I found a critical issue in `LoginPage.tsx` at lines 40-51:
 ```typescript
-useEffect(() => {
-  const clearSession = async () => {
-    try {
-      await supabase.auth.signOut();  // THIS CLEARS THE SESSION!
-    } catch (error) {
-      console.log('No active session to clear');
-    }
-  };
-  if (location.pathname === '/login') {
-    clearSession();  // This runs on every /login visit
-  }
-}, [location]);
+supabase.from('rows').select('*').order('created_at', { ascending: false })
 ```
 
-**This is problematic because:**
-- When the user refreshes ANY page, if the session restoration is slow, the AuthGuard might briefly redirect to `/login`
-- When `/login` loads, it immediately calls `signOut()`, destroying the valid session
-- This causes a cascade where the user appears logged out
+This returns only the newest 1000 rows. Since **Park 1** was created in April 2025 (older data) and all its 21 rows fall **beyond position 1000**, they are silently excluded from the result set.
 
-### Solution
+**Query Analysis:**
+- Total rows in database: 2018
+- Park 1 rows within first 1000 (by created_at DESC): **0**
+- Park 1 rows beyond the limit (excluded): **21**
+- Test park rows within first 1000: **14** (all included)
 
-1. **Remove the aggressive session clearing** in `LoginPage.tsx` - Only clear session when the user explicitly navigates to login (not on refresh)
-2. **Add navigation state restoration** - Store the intended route and restore it after auth is verified
-3. **Enable `autoRefreshToken`** in Supabase client - Currently it's disabled (`autoRefreshToken: false`), which may cause token refresh issues
+This explains why Test park shows its rows correctly while Park 1 appears empty.
 
 ---
 
-## Issue 2: Logout Error "Auth session missing"
+## Solution Overview
 
-### Root Cause
-The auth logs show:
-```
-error_code: session_not_found
-msg: session id (f60545d9-e6b1-48ba-ae1f-8c4f7e34ceec) doesn't exist
-```
-
-This happens because:
-1. The `LoginPage.tsx` `clearSession()` effect runs when visiting `/login`
-2. The user's session is already cleared before they click "Logout"
-3. When `logout()` is called in `ProfilePage.tsx`, the session is already gone
-4. Supabase returns a 403 error because there's no session to sign out
-
-Additionally, the logout function in `src/lib/hooks/use-user.ts` (line 60-74) doesn't handle the "session_not_found" case gracefully.
-
-### Solution
-
-1. **Remove the auto-signOut in LoginPage** - This is the primary culprit
-2. **Make logout resilient** - Treat "session_not_found" as a successful logout (the user is already signed out)
-3. **Clear local state regardless** - When logout is called, always clear local React Query cache and navigate to login
-
----
-
-## Issue 3: Park 1 Data Not Displaying
-
-### Root Cause
-I verified that "Park 1" exists in the database with:
-- `archived: false` (so it should be visible)
-- `current_barcodes: 395` (has data)
-
-The `useParkStats` hook has `enabled: onlineManager.isOnline()` at line 121:
-```typescript
-export const useParkStats = (includeArchived: boolean = false) => {
-    return useQuery({
-        queryKey: ['parks', { includeArchived }],
-        queryFn: () => loadParkStats(includeArchived),
-        enabled: onlineManager.isOnline()  // <-- Only fetches when online!
-    });
-}
-```
-
-**This means:**
-- If the app starts in an "offline" state (before network detection kicks in), the query never runs
-- The cached data from React Query persistence might be stale or empty
-- "Park 1" appears in the `park_stats` view but may not be in the persisted cache
-
-Additionally, the query key is `['parks', { includeArchived }]` which means:
-- `showArchived: false` uses key `['parks', { includeArchived: false }]`
-- `showArchived: true` uses key `['parks', { includeArchived: true }]`
-- These are different cache entries, so toggling "Show Archived" triggers a new fetch
-
-### Solution
-
-1. **Remove the `enabled: onlineManager.isOnline()` condition** - Let React Query's `networkMode: 'offlineFirst'` handle offline gracefully
-2. **Force a refetch on mount** - Use `staleTime: 0` for parks or call `refetch()` on mount
-3. **Add loading and error states** to the Index page to show when data is being fetched
+Replace the global row fetching approach with **on-demand, park-scoped queries** using React Query. This aligns with the existing architecture pattern (already used for barcodes) and eliminates the 1000-row limit problem.
 
 ---
 
 ## Implementation Plan
 
-### Phase 1: Fix Session Management (Critical)
+### Phase 1: Migrate Row Fetching to React Query (Park-Scoped)
+
+The app already has `useRowsByParkId` in `src/hooks/use-row-queries.tsx`. The problem is that some pages still use the legacy `useDB().getRowsByParkId()` which relies on the globally-fetched `rows` state.
+
+**Pages using legacy pattern (need migration):**
+1. `src/pages/ParkDetail.tsx` - Uses `getRowsByParkId` from useDB
+2. `src/pages/ScanParkPage.tsx` - Uses `getRowsByParkId` from useDB
 
 **Files to modify:**
 
-1. **`src/pages/LoginPage.tsx`**
-   - Remove the `clearSession()` useEffect that auto-signs out users
-   - Only clear the session if the user explicitly navigated to `/login` (e.g., via logout button, not refresh)
+1. **`src/pages/ParkDetail.tsx`**
+   - Replace `const rows = getRowsByParkId(parkId)` with `const { data: rows, isLoading } = useRowsByParkId(parkId)`
+   - Add loading state handling
+   - Remove dependency on `parks.some()` for validation (use React Query park data instead)
 
-2. **`src/integrations/supabase/client.ts`**
-   - Enable `autoRefreshToken: true` to prevent token expiration issues
+2. **`src/pages/ScanParkPage.tsx`**
+   - Already uses `useParkStats()` for parks
+   - Replace `getRowsByParkId(parkId)` with `useRowsByParkId(parkId)`
+   - Add loading state for rows
 
-3. **`src/lib/hooks/use-user.ts`**
-   - Make `logout()` resilient - treat "session_not_found" as success
-   - Clear React Query cache on logout
+3. **`src/hooks/use-row-queries.tsx`**
+   - Add `networkMode: 'offlineFirst'` for offline support
+   - Add `staleTime: 30000` for reasonable caching
 
-4. **`src/lib/supabase-provider.tsx`**
-   - Add logic to handle the `signOut` call gracefully when no session exists
+### Phase 2: Deprecate Global Row Fetching
 
-### Phase 2: Fix Navigation Persistence
-
-**Files to modify:**
-
-1. **`src/components/ScrollToTop.tsx`**
-   - Already stores `lastRoute` in localStorage
-   - No changes needed here
-
-2. **`src/components/auth/auth-guard.tsx`**
-   - Check `localStorage.getItem('lastRoute')` on successful auth
-   - If current route is `/` and `lastRoute` exists, navigate to `lastRoute`
-   - Clear `lastRoute` after restoration to prevent loops
-
-3. **`src/App.tsx`**
-   - No changes needed - route definitions are correct
-
-### Phase 3: Fix Park Data Display
+Once pages are migrated to React Query, the global `fetchRows()` call in DBProvider becomes unnecessary for rows.
 
 **Files to modify:**
 
-1. **`src/hooks/use-park-queries.tsx`**
-   - Remove `enabled: onlineManager.isOnline()` from `useParkStats`
-   - Add `networkMode: 'offlineFirst'` to allow cache-first fetching
-   - Set a reasonable `staleTime` (e.g., 30 seconds) instead of relying on global Infinity
+1. **`src/lib/db-provider.tsx`**
+   - Remove or comment out `await fetchRows(user.id)` in the initialization effect
+   - Keep the `rows` state and `getRowsByParkId` for backward compatibility with any remaining legacy code
+   - Add deprecation comments
 
-2. **`src/pages/Index.tsx`**
-   - Add loading and error states to show fetch status
-   - Add a manual refresh button if needed
+2. **`src/lib/hooks/rows/row-operations/fetch-rows.ts`**
+   - Add deprecation notice in comments
+   - (Optional) Add pagination if global fetch is still needed elsewhere
+
+### Phase 3: Update Row Query to Handle Edge Cases
+
+**Files to modify:**
+
+1. **`src/hooks/use-row-queries.tsx`**
+   - Ensure proper error handling and logging
+   - Add `refetchOnMount: 'always'` for data freshness
 
 ---
 
 ## Technical Details
 
-### Logout Flow After Fix
+### Current Data Flow (Broken)
 
 ```text
-User clicks Logout
-       │
-       ▼
-┌─────────────────────────────┐
-│ 1. Call supabase.auth.signOut() │
-└──────────────┬──────────────┘
-               │
-       ┌───────┴───────┐
-       ▼               ▼
- ┌──────────┐   ┌──────────────────┐
- │ Success  │   │ session_not_found │
- │          │   │ (already logged   │
- │          │   │  out)             │
- └────┬─────┘   └────────┬─────────┘
-      │                  │
-      └────────┬─────────┘
-               ▼
-┌─────────────────────────────┐
-│ 2. Clear React Query cache  │
-│    queryClient.clear()      │
-└──────────────┬──────────────┘
-               │
-               ▼
-┌─────────────────────────────┐
-│ 3. Navigate to /login       │
-└──────────────┬──────────────┘
-               │
-               ▼
-┌─────────────────────────────┐
-│ 4. Show toast "Logged out   │
-│    successfully"            │
-└─────────────────────────────┘
+App Start
+    │
+    ▼
+DBProvider.fetchRows()
+    │
+    ▼
+supabase.from('rows').select('*')  ─────► Returns first 1000 rows (oldest excluded)
+    │
+    ▼
+setRows([...1000 rows])  ─────────────────► Park 1's 21 rows NOT included
+    │
+    ▼
+ParkDetail: getRowsByParkId(parkId)
+    │
+    ▼
+rows.filter(r => r.parkId === parkId)  ───► Park 1: 0 matches, Test park: 14 matches
 ```
 
-### Navigation Restoration Flow
+### New Data Flow (Fixed)
 
 ```text
-Page Refresh on /scan/row/123
-              │
-              ▼
-┌─────────────────────────────┐
-│ Browser loads /scan/row/123 │
-└──────────────┬──────────────┘
-              │
-              ▼
-┌─────────────────────────────┐
-│ AuthGuard: Check auth state │
-│ isInitialized: false        │
-│ (show loading spinner)      │
-└──────────────┬──────────────┘
-              │
-              ▼
-┌─────────────────────────────┐
-│ Supabase restores session   │
-│ from localStorage           │
-└──────────────┬──────────────┘
-              │
-       ┌──────┴──────┐
-       ▼             ▼
-┌──────────┐  ┌──────────────┐
-│ Session  │  │ No session   │
-│ found    │  │              │
-└────┬─────┘  └──────┬───────┘
-     │               │
-     ▼               ▼
-┌──────────┐  ┌──────────────┐
-│ Render   │  │ Redirect to  │
-│ /scan/   │  │ /login       │
-│ row/123  │  │ (user logged │
-│          │  │  out)        │
-└──────────┘  └──────────────┘
+User navigates to ParkDetail
+    │
+    ▼
+useRowsByParkId(parkId) query starts
+    │
+    ▼
+supabase.from('rows').select(...).eq('park_id', parkId)
+    │
+    ▼
+Returns ALL rows for this park (no 1000 limit issue for single park)
+    │
+    ▼
+Park 1: 21 rows, Test park: 14 rows ✓
 ```
+
+### Why Park-Scoped Queries Solve This
+
+- Each park query fetches only that park's rows
+- Park 1 has 21 rows (well under 1000 limit)
+- No cross-park competition for the 1000-row limit
+- Queries are cached per-park with React Query
 
 ---
 
 ## Files Summary
 
-### Files to Modify
-1. `src/pages/LoginPage.tsx` - Remove auto-signOut on mount
-2. `src/integrations/supabase/client.ts` - Enable autoRefreshToken
-3. `src/lib/hooks/use-user.ts` - Make logout resilient
-4. `src/lib/supabase-provider.tsx` - Handle signOut gracefully
-5. `src/hooks/use-park-queries.tsx` - Fix enabled condition for useParkStats
-6. `src/pages/Index.tsx` - Add loading/error states
-7. `src/components/auth/auth-guard.tsx` - Add navigation restoration logic
+| File | Change |
+|------|--------|
+| `src/pages/ParkDetail.tsx` | Replace useDB().getRowsByParkId with useRowsByParkId |
+| `src/pages/ScanParkPage.tsx` | Replace useDB().getRowsByParkId with useRowsByParkId |
+| `src/hooks/use-row-queries.tsx` | Add offlineFirst mode, staleTime |
+| `src/lib/db-provider.tsx` | Remove global fetchRows call |
 
 ---
 
 ## Testing Checklist
 
-After implementation, verify:
+After implementation:
 
-- [ ] Refresh page on `/scan/row/:id` - should stay on same route
-- [ ] Refresh page on `/park/:id` - should stay on same route
-- [ ] Click Logout - should complete without error
-- [ ] Login and navigate to Home - Park 1 should be visible with 395 barcodes
-- [ ] Toggle "Show Archived" - should show/hide archived parks correctly
-- [ ] Go offline then back online - parks should reload correctly
+- [ ] Open Home page - Both Park 1 and Test park should be visible with correct barcode counts
+- [ ] Open Park 1 - Should show all 21 rows
+- [ ] Open Test park - Should show all 14 rows
+- [ ] Scan page > Park 1 - Should show all 21 rows
+- [ ] Verify row counts match database (Park 1: 21, Test park: 14)
+- [ ] Test offline behavior - Cached rows should be available
 
 ---
 
@@ -268,7 +157,16 @@ After implementation, verify:
 
 | Change | Risk | Mitigation |
 |--------|------|------------|
-| Remove auto-signOut | Low | This was causing more harm than good |
-| Enable autoRefreshToken | Low | Standard Supabase behavior |
-| Remove enabled condition from parks query | Low | networkMode handles offline gracefully |
-| Add navigation restoration in AuthGuard | Medium | Add guards to prevent redirect loops |
+| Replace getRowsByParkId with React Query | Low | useRowsByParkId already exists and works |
+| Remove global fetchRows | Medium | Keep rows state for backward compatibility |
+| Add loading states | Low | Improves UX, shows clear loading feedback |
+
+---
+
+## Why This Wasn't Caught Earlier
+
+1. Test park was created recently (Feb 2026), so all its data was within the 1000-row limit
+2. Park 1's rows were created in April-May 2025, pushed beyond the limit as more data was added
+3. No error is thrown - PostgREST silently returns only 1000 rows
+4. The console logs showed "2 parks received" but didn't expose that rows were truncated
+
