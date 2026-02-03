@@ -11,7 +11,7 @@ import {toast} from 'sonner';
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,} from "@/components/ui/dialog";
 import {Label} from '@/components/ui/label';
 import {useParkBarcodes} from "@/hooks/use-barcodes-queries.tsx";
-import {useParkStats} from "@/hooks/use-park-queries.tsx";
+import {useParkStats} from "@/hooks/parks";
 
 const ScanParkPage = () => {
   const { parkId } = useParams<{ parkId: string }>();

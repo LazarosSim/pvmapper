@@ -5,7 +5,7 @@ import {Button} from '@/components/ui/button';
 import {Archive, Plus} from 'lucide-react';
 import CreateParkDialog from '@/components/dialog/create-park-dialog';
 import {Input} from '@/components/ui/input';
-import {useParkStats} from '@/hooks/use-park-queries';
+import {useParkStats} from '@/hooks/parks';
 import {useCurrentUser} from "@/hooks/use-user.tsx";
 import {Badge} from '@/components/ui/badge';
 

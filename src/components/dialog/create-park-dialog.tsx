@@ -6,7 +6,7 @@ import {Form, FormControl, FormDescription, FormField, FormItem, FormLabel} from
 import {useForm} from 'react-hook-form';
 import * as z from 'zod';
 import {zodResolver} from "@hookform/resolvers/zod";
-import {useAddPark} from "@/hooks/use-park-queries.tsx";
+import {useAddPark} from "@/hooks/parks";
 import {useCurrentUser} from "@/hooks/use-user.tsx";
 
 interface CreateParkDialogProps {
