@@ -35,7 +35,11 @@ const loadBarcodesByRow = async (rowId: string): Promise<Barcode[]> => {
         console.error("Error loading barcodes:", error);
         throw error;
     }
-    return barcodes;
+    
+    // Safety sort - ensure order even if cache was corrupted
+    return (barcodes || []).sort((a, b) => 
+        (a.orderInRow ?? Number.MAX_SAFE_INTEGER) - (b.orderInRow ?? Number.MAX_SAFE_INTEGER)
+    );
 }
 
 const loadBarcodesByPark = async (parkId: string) => {
@@ -174,16 +178,23 @@ export const useUpdateRowBarcode = (rowId: string) => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: updateBarcode,
-        onSuccess: (barcode) => {
-            queryClient.setQueryData(['barcodes', 'row', rowId],
-                (oldData:{ id:string, code:string} []) => {
-                    if (oldData) {
-                        const index = oldData.findIndex(b => b.id === barcode.id);
-                        if (index >= 0) {
-                            oldData[index] = barcode;
+        onSuccess: (serverBarcode) => {
+            queryClient.setQueryData<Barcode[]>(['barcodes', 'row', rowId],
+                (oldData) => {
+                    if (!oldData) return oldData;
+                    
+                    // Use .map() for immutable update, preserve orderInRow from cache
+                    return oldData.map(b => {
+                        if (b.id === serverBarcode.id) {
+                            return {
+                                ...b,
+                                code: serverBarcode.code,
+                                // Explicitly preserve order from original cache entry
+                                orderInRow: b.orderInRow,
+                            };
                         }
-                    }
-                    return oldData;
+                        return b;
+                    });
                 })
         }
     })
@@ -194,16 +205,12 @@ export const useDeleteRowBarcode = (rowId: string) => {
     return useMutation({
         mutationFn: deleteBarcode,
         mutationKey: ['barcodes', 'row', rowId],
-        onSuccess: (barcode) => {
-            queryClient.setQueryData(['barcodes', 'row', rowId],
-                (oldData:{ id:string, code:string} []) => {
-                    if (oldData) {
-                        const index = oldData.findIndex(b => b.id === barcode.id);
-                        if (index >= 0) {
-                            oldData.splice(index, 1);
-                        }
-                    }
-                    return oldData;
+        onSuccess: (deletedBarcode) => {
+            queryClient.setQueryData<Barcode[]>(['barcodes', 'row', rowId],
+                (oldData) => {
+                    if (!oldData) return oldData;
+                    // Use .filter() for immutable update, preserves order of remaining items
+                    return oldData.filter(b => b.id !== deletedBarcode.id);
                 })
             queryClient.invalidateQueries({queryKey: ['parks']}); // Refresh park counts
         }
