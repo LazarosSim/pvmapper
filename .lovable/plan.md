@@ -1,142 +1,212 @@
 
+# Plan: Preserve Barcode Order at All Stages of Data Handling
 
-# Plan: Fix Park 1 Data Not Displaying (1000-Row Limit Issue)
+## Root Cause Analysis
 
-## Root Cause
+After a barcode was edited in Row 1 of Test Park, it moved from position 39 to position 2. This is a **critical data integrity bug** caused by field name mismatch between database responses (snake_case) and client cache (camelCase).
 
-The database contains **2018 rows** total, but the Supabase/PostgREST default limit is **1000 rows per query**. The legacy `fetchRows()` function in `src/lib/hooks/rows/row-operations/fetch-rows.ts` fetches rows with:
+### The Bug Flow
+
+```text
+1. User edits barcode at position 39
+2. updateBarcode() calls Supabase .update().select('*')
+3. Server returns: { id: "...", code: "...", order_in_row: 38, ... }
+4. useUpdateRowBarcode.onSuccess replaces cached barcode with server response
+5. Cache now has: { id: "...", code: "...", order_in_row: 38, orderInRow: undefined }
+6. mergeBarcodesWithPending sorts by: (a.orderInRow ?? 0)
+7. undefined ?? 0 = 0, so barcode moves to position 1/2
+```
+
+### Identified Vulnerabilities
+
+| Location | Issue | Severity |
+|----------|-------|----------|
+| `useUpdateRowBarcode` in `use-barcodes-queries.tsx:183` | Replaces cache entry with raw server response (snake_case), losing `orderInRow` | **CRITICAL** |
+| `useDeleteRowBarcode` in `use-barcodes-queries.tsx:197-207` | Mutates array in place (splice) instead of returning new array | Medium |
+| `mergeBarcodesWithPending` in `use-offline-barcodes.ts:71` | Relies on `orderInRow ?? 0` - undefined becomes 0 | High |
+| `updateBarcode` in `barcode-service.ts:56` | Returns `select('*')` without field mapping | Contributing factor |
+| Optimistic update in `use-offline-barcodes.ts:216-223` | Preserves order correctly (no issue here) | OK |
+
+---
+
+## Solution: Order-Preserving Cache Updates
+
+### Phase 1: Fix `useUpdateRowBarcode` Cache Update
+
+**File:** `src/hooks/use-barcodes-queries.tsx`
+
+**Current (broken):**
+```typescript
+onSuccess: (barcode) => {
+    queryClient.setQueryData(['barcodes', 'row', rowId],
+        (oldData:{ id:string, code:string} []) => {
+            if (oldData) {
+                const index = oldData.findIndex(b => b.id === barcode.id);
+                if (index >= 0) {
+                    oldData[index] = barcode; // PROBLEM: Replaces with snake_case
+                }
+            }
+            return oldData;
+        })
+}
+```
+
+**Fixed (order-preserving):**
+```typescript
+onSuccess: (serverBarcode) => {
+    queryClient.setQueryData<Barcode[]>(['barcodes', 'row', rowId],
+        (oldData) => {
+            if (!oldData) return oldData;
+            
+            return oldData.map(b => {
+                if (b.id === serverBarcode.id) {
+                    // Merge: update only the code, preserve all other fields
+                    return {
+                        ...b,
+                        code: serverBarcode.code,
+                        // Explicitly preserve order
+                        orderInRow: b.orderInRow,
+                    };
+                }
+                return b;
+            });
+        })
+}
+```
+
+**Key changes:**
+- Use `.map()` instead of mutating in place (React Query best practice)
+- Merge fields instead of replacing the entire object
+- Explicitly preserve `orderInRow` from the original cache entry
+
+### Phase 2: Fix `useDeleteRowBarcode` Cache Update
+
+**File:** `src/hooks/use-barcodes-queries.tsx`
+
+**Current (mutates in place):**
+```typescript
+onSuccess: (barcode) => {
+    queryClient.setQueryData(['barcodes', 'row', rowId],
+        (oldData:{ id:string, code:string} []) => {
+            if (oldData) {
+                const index = oldData.findIndex(b => b.id === barcode.id);
+                if (index >= 0) {
+                    oldData.splice(index, 1); // Mutates array
+                }
+            }
+            return oldData;
+        })
+    ...
+}
+```
+
+**Fixed (immutable):**
+```typescript
+onSuccess: (deletedBarcode) => {
+    queryClient.setQueryData<Barcode[]>(['barcodes', 'row', rowId],
+        (oldData) => {
+            if (!oldData) return oldData;
+            // Filter returns new array, preserves order of remaining items
+            return oldData.filter(b => b.id !== deletedBarcode.id);
+        })
+    ...
+}
+```
+
+### Phase 3: Add Defensive Ordering in `mergeBarcodesWithPending`
+
+**File:** `src/hooks/use-offline-barcodes.ts`
+
+**Current (vulnerable to undefined):**
+```typescript
+return combined.sort((a, b) => (a.orderInRow ?? 0) - (b.orderInRow ?? 0));
+```
+
+**Fixed (defensive with timestamp fallback):**
+```typescript
+return combined.sort((a, b) => {
+    // Primary sort: by orderInRow (required for correct display)
+    const orderA = a.orderInRow ?? Number.MAX_SAFE_INTEGER;
+    const orderB = b.orderInRow ?? Number.MAX_SAFE_INTEGER;
+    
+    if (orderA !== orderB) {
+        return orderA - orderB;
+    }
+    
+    // Fallback: sort by timestamp to maintain insertion order
+    const timeA = new Date(a.timestamp || 0).getTime();
+    const timeB = new Date(b.timestamp || 0).getTime();
+    return timeA - timeB;
+});
+```
+
+**Why `MAX_SAFE_INTEGER` instead of 0:**
+- If `orderInRow` is undefined (corrupted data), push to end not beginning
+- Prevents newly corrupted data from displacing existing ordered data
+
+### Phase 4: Add Defensive Ordering in Query Functions
+
+**File:** `src/hooks/use-barcodes-queries.tsx`
+
+Already correctly ordering by `order_in_row` in the query (line 30), but add a client-side safety sort after mapping:
 
 ```typescript
-supabase.from('rows').select('*').order('created_at', { ascending: false })
+const loadBarcodesByRow = async (rowId: string): Promise<Barcode[]> => {
+    const query = supabase
+        .from('barcodes')
+        .select('id, code, rowId:row_id, userId:user_id, timestamp, orderInRow:order_in_row, latitude, longitude')
+        .eq("row_id", rowId)
+        .order('order_in_row', {ascending: true});
+
+    const {data: barcodes, error} = await query;
+
+    if (error) {
+        console.error("Error loading barcodes:", error);
+        throw error;
+    }
+    
+    // Safety sort - ensure order even if cache was corrupted
+    return (barcodes || []).sort((a, b) => 
+        (a.orderInRow ?? Number.MAX_SAFE_INTEGER) - (b.orderInRow ?? Number.MAX_SAFE_INTEGER)
+    );
+}
 ```
 
-This returns only the newest 1000 rows. Since **Park 1** was created in April 2025 (older data) and all its 21 rows fall **beyond position 1000**, they are silently excluded from the result set.
+### Phase 5: Improve `updateBarcode` Service Response
 
-**Query Analysis:**
-- Total rows in database: 2018
-- Park 1 rows within first 1000 (by created_at DESC): **0**
-- Park 1 rows beyond the limit (excluded): **21**
-- Test park rows within first 1000: **14** (all included)
+**File:** `src/services/barcode-service.ts`
 
-This explains why Test park shows its rows correctly while Park 1 appears empty.
+**Current:** Returns raw server response with snake_case
 
----
+**Fixed:** Map to client format with explicit ordering:
 
-## Solution Overview
+```typescript
+export const updateBarcode = async ({id, code}: { id: string, code: string }) => {
+    console.log("about to update barcode with id " + id + " and code " + code);
 
-Replace the global row fetching approach with **on-demand, park-scoped queries** using React Query. This aligns with the existing architecture pattern (already used for barcodes) and eliminates the 1000-row limit problem.
+    const {data: updatedRow, error} = await supabase
+        .from('barcodes')
+        .update({code: code})
+        .eq('id', id)
+        .select('id, code, rowId:row_id, userId:user_id, timestamp, orderInRow:order_in_row, latitude, longitude')
+        .single()
 
----
-
-## Implementation Plan
-
-### Phase 1: Migrate Row Fetching to React Query (Park-Scoped)
-
-The app already has `useRowsByParkId` in `src/hooks/use-row-queries.tsx`. The problem is that some pages still use the legacy `useDB().getRowsByParkId()` which relies on the globally-fetched `rows` state.
-
-**Pages using legacy pattern (need migration):**
-1. `src/pages/ParkDetail.tsx` - Uses `getRowsByParkId` from useDB
-2. `src/pages/ScanParkPage.tsx` - Uses `getRowsByParkId` from useDB
-
-**Files to modify:**
-
-1. **`src/pages/ParkDetail.tsx`**
-   - Replace `const rows = getRowsByParkId(parkId)` with `const { data: rows, isLoading } = useRowsByParkId(parkId)`
-   - Add loading state handling
-   - Remove dependency on `parks.some()` for validation (use React Query park data instead)
-
-2. **`src/pages/ScanParkPage.tsx`**
-   - Already uses `useParkStats()` for parks
-   - Replace `getRowsByParkId(parkId)` with `useRowsByParkId(parkId)`
-   - Add loading state for rows
-
-3. **`src/hooks/use-row-queries.tsx`**
-   - Add `networkMode: 'offlineFirst'` for offline support
-   - Add `staleTime: 30000` for reasonable caching
-
-### Phase 2: Deprecate Global Row Fetching
-
-Once pages are migrated to React Query, the global `fetchRows()` call in DBProvider becomes unnecessary for rows.
-
-**Files to modify:**
-
-1. **`src/lib/db-provider.tsx`**
-   - Remove or comment out `await fetchRows(user.id)` in the initialization effect
-   - Keep the `rows` state and `getRowsByParkId` for backward compatibility with any remaining legacy code
-   - Add deprecation comments
-
-2. **`src/lib/hooks/rows/row-operations/fetch-rows.ts`**
-   - Add deprecation notice in comments
-   - (Optional) Add pagination if global fetch is still needed elsewhere
-
-### Phase 3: Update Row Query to Handle Edge Cases
-
-**Files to modify:**
-
-1. **`src/hooks/use-row-queries.tsx`**
-   - Ensure proper error handling and logging
-   - Add `refetchOnMount: 'always'` for data freshness
-
----
-
-## Technical Details
-
-### Current Data Flow (Broken)
-
-```text
-App Start
-    │
-    ▼
-DBProvider.fetchRows()
-    │
-    ▼
-supabase.from('rows').select('*')  ─────► Returns first 1000 rows (oldest excluded)
-    │
-    ▼
-setRows([...1000 rows])  ─────────────────► Park 1's 21 rows NOT included
-    │
-    ▼
-ParkDetail: getRowsByParkId(parkId)
-    │
-    ▼
-rows.filter(r => r.parkId === parkId)  ───► Park 1: 0 matches, Test park: 14 matches
+    assertNoError(error, 'updating barcode');
+    return updatedRow;
+}
 ```
 
-### New Data Flow (Fixed)
-
-```text
-User navigates to ParkDetail
-    │
-    ▼
-useRowsByParkId(parkId) query starts
-    │
-    ▼
-supabase.from('rows').select(...).eq('park_id', parkId)
-    │
-    ▼
-Returns ALL rows for this park (no 1000 limit issue for single park)
-    │
-    ▼
-Park 1: 21 rows, Test park: 14 rows ✓
-```
-
-### Why Park-Scoped Queries Solve This
-
-- Each park query fetches only that park's rows
-- Park 1 has 21 rows (well under 1000 limit)
-- No cross-park competition for the 1000-row limit
-- Queries are cached per-park with React Query
+This ensures the response matches the client type (camelCase) exactly.
 
 ---
 
-## Files Summary
+## Files to Modify
 
-| File | Change |
-|------|--------|
-| `src/pages/ParkDetail.tsx` | Replace useDB().getRowsByParkId with useRowsByParkId |
-| `src/pages/ScanParkPage.tsx` | Replace useDB().getRowsByParkId with useRowsByParkId |
-| `src/hooks/use-row-queries.tsx` | Add offlineFirst mode, staleTime |
-| `src/lib/db-provider.tsx` | Remove global fetchRows call |
+| File | Changes |
+|------|---------|
+| `src/hooks/use-barcodes-queries.tsx` | Fix `useUpdateRowBarcode` and `useDeleteRowBarcode` cache updates |
+| `src/hooks/use-offline-barcodes.ts` | Defensive sorting in `mergeBarcodesWithPending` |
+| `src/services/barcode-service.ts` | Map response fields to camelCase in `updateBarcode` |
 
 ---
 
@@ -144,29 +214,27 @@ Park 1: 21 rows, Test park: 14 rows ✓
 
 After implementation:
 
-- [ ] Open Home page - Both Park 1 and Test park should be visible with correct barcode counts
-- [ ] Open Park 1 - Should show all 21 rows
-- [ ] Open Test park - Should show all 14 rows
-- [ ] Scan page > Park 1 - Should show all 21 rows
-- [ ] Verify row counts match database (Park 1: 21, Test park: 14)
-- [ ] Test offline behavior - Cached rows should be available
+- [ ] Edit barcode at position 39 in Row 1 - verify it stays at position 39
+- [ ] Edit barcode at position 1 in Row 1 - verify it stays at position 1
+- [ ] Delete barcode at position 20 - verify positions 21+ shift down correctly
+- [ ] Add new barcode - verify it appears at the end
+- [ ] Insert barcode at middle position - verify order is maintained
+- [ ] Refresh page after edit - verify database order matches display
+- [ ] Test offline edit + sync - verify order preserved after sync
+- [ ] Export data - verify exported order matches UI order
 
 ---
 
-## Risk Assessment
+## Prevention: Type Safety Improvements
 
-| Change | Risk | Mitigation |
-|--------|------|------------|
-| Replace getRowsByParkId with React Query | Low | useRowsByParkId already exists and works |
-| Remove global fetchRows | Medium | Keep rows state for backward compatibility |
-| Add loading states | Low | Improves UX, shows clear loading feedback |
+Add explicit type checking to catch similar issues in the future:
 
----
-
-## Why This Wasn't Caught Earlier
-
-1. Test park was created recently (Feb 2026), so all its data was within the 1000-row limit
-2. Park 1's rows were created in April-May 2025, pushed beyond the limit as more data was added
-3. No error is thrown - PostgREST silently returns only 1000 rows
-4. The console logs showed "2 parks received" but didn't expose that rows were truncated
-
+```typescript
+// In types/db-types.ts - add validation
+export function assertBarcodeHasOrder(barcode: Partial<Barcode>): asserts barcode is Barcode {
+    if (typeof barcode.orderInRow !== 'number') {
+        console.error('Barcode missing orderInRow:', barcode);
+        throw new Error('Barcode must have orderInRow');
+    }
+}
+```
