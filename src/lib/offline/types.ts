@@ -13,6 +13,9 @@ export interface QueuedMutationPayload {
   userId?: string;
   latitude?: number;
   longitude?: number;
+  // For DELETE/UPDATE operations
+  barcodeId?: string;          // The ID of the barcode being deleted/updated
+  newCode?: string;            // For UPDATE: the new code value
 }
 
 export interface QueuedMutation {
@@ -40,4 +43,7 @@ export interface OfflineBarcode {
   localSequence: number;
   latitude?: number;
   longitude?: number;
+  // Offline mutation indicators
+  isDeleting?: boolean;        // True if pending deletion
+  pendingCode?: string;        // The new code if pending update
 }

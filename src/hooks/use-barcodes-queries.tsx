@@ -79,12 +79,12 @@ const loadBarcodesByPark = async (parkId: string) => {
 export const useRowBarcodes = (rowId: string) => {
     const queryClient = useQueryClient()
     return useQuery({
-        queryKey: ['barcodes', rowId],
+        queryKey: ['barcodes', 'row', rowId],
         queryFn: () => loadBarcodesByRow(rowId),
         enabled: Boolean(rowId) && onlineManager.isOnline(),
         retry: false,
         refetchOnWindowFocus: false,
-        initialData: () => queryClient.getQueryData<Barcode[]>(['barcodes', rowId]),
+        initialData: () => queryClient.getQueryData<Barcode[]>(['barcodes', 'row', rowId]),
     });
 }
 
@@ -92,7 +92,7 @@ export const useParkBarcodes = (parkId: string) => {
     const queryClient = useQueryClient()
 
     const query = useQuery({
-        queryKey: ['barcodes', parkId],
+        queryKey: ['barcodes', 'park', parkId],
         queryFn: () => loadBarcodesByPark(parkId),
         enabled: Boolean(parkId) && onlineManager.isOnline(),
         retry: false,
@@ -109,7 +109,7 @@ export const useParkBarcodes = (parkId: string) => {
                 (byRow[b.rowId] ||= []).push(b);
             });
             Object.entries(byRow).forEach(([rowId, barcodes]) => {
-                queryClient.setQueryData(['barcodes', rowId], barcodes);
+                queryClient.setQueryData(['barcodes', 'row', rowId], barcodes);
             });
         }
     }, [query.data, queryClient, query.isError])
@@ -136,12 +136,12 @@ export const useAddBarcodeToRow = (rowId: string) => {
                          isLast,
                          timestamp
                      }: AddBarcodeVariables) => addBarcode(code, rowId, orderInRow, isLast, user?.id, timestamp),
-        mutationKey: ['barcodes', rowId],
+        mutationKey: ['barcodes', 'row', rowId],
         onMutate: async ({code, orderInRow}) => {
-            const previous = queryClient.getQueryData<Barcode[]>(['barcodes', rowId]);
+            const previous = queryClient.getQueryData<Barcode[]>(['barcodes', 'row', rowId]);
 
             if (previous) {
-                queryClient.setQueryData<Barcode[]>(['barcodes', rowId], [
+                queryClient.setQueryData<Barcode[]>(['barcodes', 'row', rowId], [
                     ...previous,
                     {
                         id: `temp-${Date.now()}`,
@@ -155,13 +155,13 @@ export const useAddBarcodeToRow = (rowId: string) => {
 
         onError: (_err, _vars, context) => {
             if (context?.previous) {
-                queryClient.setQueryData(['barcodes', rowId], context.previous);
+                queryClient.setQueryData(['barcodes', 'row', rowId], context.previous);
             }
         },
 
         onSettled: () => {
             if(onlineManager.isOnline()) {
-                queryClient.invalidateQueries({queryKey: ['barcodes', rowId]});
+                queryClient.invalidateQueries({queryKey: ['barcodes', 'row', rowId]});
             }
         },
 
@@ -174,7 +174,7 @@ export const useUpdateRowBarcode = (rowId: string) => {
     return useMutation({
         mutationFn: updateBarcode,
         onSuccess: (barcode) => {
-            queryClient.setQueryData(['barcodes', rowId],
+            queryClient.setQueryData(['barcodes', 'row', rowId],
                 (oldData:{ id:string, code:string} []) => {
                     if (oldData) {
                         const index = oldData.findIndex(b => b.id === barcode.id);
@@ -192,9 +192,9 @@ export const useDeleteRowBarcode = (rowId: string) => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: deleteBarcode,
-        mutationKey: ['barcodes', rowId],
+        mutationKey: ['barcodes', 'row', rowId],
         onSuccess: (barcode) => {
-            queryClient.setQueryData(['barcodes', rowId],
+            queryClient.setQueryData(['barcodes', 'row', rowId],
                 (oldData:{ id:string, code:string} []) => {
                     if (oldData) {
                         const index = oldData.findIndex(b => b.id === barcode.id);
@@ -214,10 +214,10 @@ export const useResetRowBarcodes = (rowId: string) => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: resetRow,
-        mutationKey: ['barcodes', rowId],
+        mutationKey: ['barcodes', 'row', rowId],
         onSuccess: () => {
             queryClient.invalidateQueries({
-                queryKey: ['barcodes', rowId],
+                queryKey: ['barcodes', 'row', rowId],
                 exact: true,    // only that one
             })
         }

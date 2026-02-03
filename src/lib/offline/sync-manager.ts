@@ -6,6 +6,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { getQueue, removeFromQueue, updateMutationStatus, clearQueue, resetSequences } from './offline-queue';
+import { updateStatsAfterSync, decrementDailyScans, triggerUserTotalScansUpdate } from './stats-sync';
 import type { QueuedMutation, SyncState } from './types';
 
 export type SyncProgressCallback = (state: SyncState) => void;
@@ -15,6 +16,12 @@ interface SyncResult {
   syncedCount: number;
   failedCount: number;
   error?: string;
+}
+
+// Track synced barcodes for stats update
+interface SyncedBarcode {
+  userId: string;
+  timestamp: string;
 }
 
 /**
@@ -33,6 +40,11 @@ export async function executeSync(
 
   const total = pendingMutations.length;
   let syncedCount = 0;
+
+  // Track synced barcodes for stats update
+  const syncedBarcodes: SyncedBarcode[] = [];
+  const deletedBarcodes: Array<{ userId: string; date: string }> = [];
+  const affectedUserIds = new Set<string>();
 
   // Notify start
   onProgress?.({
@@ -79,6 +91,19 @@ export async function executeSync(
         };
       }
 
+      // Track for stats update
+      if (mutation.type === 'ADD_BARCODE' && mutation.payload.userId) {
+        syncedBarcodes.push({
+          userId: mutation.payload.userId,
+          timestamp: mutation.payload.timestamp,
+        });
+        affectedUserIds.add(mutation.payload.userId);
+      } else if (mutation.type === 'DELETE_BARCODE' && mutation.payload.userId) {
+        const date = mutation.payload.timestamp.split('T')[0];
+        deletedBarcodes.push({ userId: mutation.payload.userId, date });
+        affectedUserIds.add(mutation.payload.userId);
+      }
+
       // Success - remove from queue
       await removeFromQueue(mutation.id);
       syncedIds.push(mutation.id);
@@ -90,6 +115,22 @@ export async function executeSync(
         total,
         error: null,
       });
+    }
+
+    // All mutations synced - now update stats
+    if (syncedBarcodes.length > 0) {
+      console.log('[SyncManager] Updating stats for', syncedBarcodes.length, 'synced barcodes');
+      await updateStatsAfterSync(syncedBarcodes);
+    }
+
+    // Handle deleted barcodes stats
+    for (const deleted of deletedBarcodes) {
+      await decrementDailyScans(deleted.userId, deleted.date, 1);
+    }
+
+    // Trigger user total scans update for all affected users
+    for (const userId of affectedUserIds) {
+      await triggerUserTotalScansUpdate(userId);
     }
 
     // All done - reset sequences for clean slate
@@ -191,9 +232,36 @@ async function syncAddBarcode(
 async function syncDeleteBarcode(
   mutation: QueuedMutation
 ): Promise<{ success: boolean; error?: string }> {
-  // For now, just mark as success - delete logic can be added later
-  console.log('[SyncManager] DELETE_BARCODE not implemented yet:', mutation.id);
-  return { success: true };
+  const { barcodeId } = mutation.payload;
+
+  if (!barcodeId) {
+    console.log('[SyncManager] DELETE_BARCODE missing barcodeId, skipping');
+    return { success: true };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('barcodes')
+      .delete()
+      .eq('id', barcodeId);
+
+    if (error) {
+      // If barcode doesn't exist, treat as success (already deleted)
+      if (error.code === 'PGRST116' || error.message.includes('not found')) {
+        console.log('[SyncManager] Barcode already deleted:', barcodeId);
+        return { success: true };
+      }
+      return { success: false, error: error.message };
+    }
+
+    console.log('[SyncManager] Deleted barcode:', barcodeId);
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Network error',
+    };
+  }
 }
 
 /**
@@ -202,9 +270,36 @@ async function syncDeleteBarcode(
 async function syncUpdateBarcode(
   mutation: QueuedMutation
 ): Promise<{ success: boolean; error?: string }> {
-  // For now, just mark as success - update logic can be added later
-  console.log('[SyncManager] UPDATE_BARCODE not implemented yet:', mutation.id);
-  return { success: true };
+  const { barcodeId, newCode } = mutation.payload;
+
+  if (!barcodeId || !newCode) {
+    console.log('[SyncManager] UPDATE_BARCODE missing barcodeId or newCode, skipping');
+    return { success: true };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('barcodes')
+      .update({ code: newCode })
+      .eq('id', barcodeId);
+
+    if (error) {
+      // If barcode doesn't exist, treat as success (may have been deleted)
+      if (error.code === 'PGRST116' || error.message.includes('not found')) {
+        console.log('[SyncManager] Barcode not found for update:', barcodeId);
+        return { success: true };
+      }
+      return { success: false, error: error.message };
+    }
+
+    console.log('[SyncManager] Updated barcode:', barcodeId, 'to:', newCode);
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Network error',
+    };
+  }
 }
 
 /**

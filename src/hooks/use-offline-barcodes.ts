@@ -4,9 +4,15 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { useQueryClient, onlineManager } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { queueBarcodeScan, getPendingBarcodesForRow } from '@/lib/offline/barcode-queue-service';
+import { useQueryClient } from '@tanstack/react-query';
+import { 
+  queueBarcodeScan, 
+  getPendingBarcodesForRow,
+  queueBarcodeDelete,
+  queueBarcodeUpdate,
+  getPendingDeleteIds,
+  getPendingUpdates,
+} from '@/lib/offline/barcode-queue-service';
 import { getQueue } from '@/lib/offline/offline-queue';
 import type { OfflineBarcode, QueuedMutation } from '@/lib/offline/types';
 import type { Barcode } from '@/lib/types/db-types';
@@ -16,10 +22,60 @@ interface UseOfflineBarcodesOptions {
   userId?: string;
 }
 
+// Extended type for merged barcodes that can have offline indicators
+export type MergedBarcode = (Barcode | OfflineBarcode) & { 
+  isPending?: boolean; 
+  isDeleting?: boolean; 
+  pendingCode?: string;
+};
+
 /**
  * Merge server barcodes with pending offline barcodes
+ * Handles ADD, DELETE, and UPDATE mutations
  */
-export const mergeBarcodesWithPending = (
+export const mergeBarcodesWithPending = async (
+  serverBarcodes: Barcode[],
+  rowId: string
+): Promise<MergedBarcode[]> => {
+  // Get all pending mutations for this row
+  const pendingAdds = await getPendingBarcodesForRow(rowId);
+  const pendingDeleteIds = await getPendingDeleteIds(rowId);
+  const pendingUpdates = await getPendingUpdates(rowId);
+
+  // Create a set of pending add IDs to avoid duplicates
+  const pendingAddIds = new Set(pendingAdds.map(b => b.id));
+
+  // Process server barcodes
+  const processedServer: MergedBarcode[] = serverBarcodes
+    // Filter out barcodes that are also in pending adds (shouldn't happen but safety check)
+    .filter(b => !pendingAddIds.has(b.id))
+    // Mark deleted items and apply pending updates
+    .map(b => {
+      const isDeleting = pendingDeleteIds.has(b.id);
+      const pendingCode = pendingUpdates.get(b.id);
+      
+      return {
+        ...b,
+        isDeleting,
+        pendingCode,
+        // If there's a pending update, show the new code
+        code: pendingCode || b.code,
+      };
+    })
+    // Filter out items marked for deletion from the display
+    .filter(b => !b.isDeleting);
+
+  // Combine and sort by orderInRow
+  const combined: MergedBarcode[] = [...processedServer, ...pendingAdds];
+  
+  return combined.sort((a, b) => (a.orderInRow ?? 0) - (b.orderInRow ?? 0));
+};
+
+/**
+ * Simplified merge that just returns (Barcode | OfflineBarcode)[] 
+ * for cases where we don't need delete/update indicators
+ */
+export const mergeBarcodesWithPendingSimple = (
   serverBarcodes: Barcode[],
   pendingBarcodes: OfflineBarcode[]
 ): (Barcode | OfflineBarcode)[] => {
@@ -65,7 +121,7 @@ export const useOfflineAddBarcode = ({ rowId, userId }: UseOfflineBarcodesOption
 
       // Optimistically update the UI
       queryClient.setQueryData<(Barcode | OfflineBarcode)[]>(
-        ['barcodes', rowId],
+        ['barcodes', 'row', rowId],
         (old = []) => [
           ...old,
           {
@@ -89,6 +145,90 @@ export const useOfflineAddBarcode = ({ rowId, userId }: UseOfflineBarcodesOption
   }, [rowId, userId, queryClient]);
 
   return { addBarcode, isAdding };
+};
+
+/**
+ * Hook to delete barcodes with offline-first support
+ */
+export const useOfflineDeleteBarcode = ({ rowId, userId }: UseOfflineBarcodesOptions) => {
+  const queryClient = useQueryClient();
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const deleteBarcode = useCallback(async (
+    barcodeId: string,
+    code: string,
+    timestamp: string
+  ) => {
+    setIsDeleting(true);
+    
+    try {
+      // Queue the delete operation
+      const mutation = await queueBarcodeDelete(
+        barcodeId,
+        rowId,
+        code,
+        timestamp,
+        userId
+      );
+
+      // Optimistically remove from UI
+      queryClient.setQueryData<(Barcode | OfflineBarcode)[]>(
+        ['barcodes', 'row', rowId],
+        (old = []) => old.filter(b => b.id !== barcodeId)
+      );
+
+      return mutation;
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [rowId, userId, queryClient]);
+
+  return { deleteBarcode, isDeleting };
+};
+
+/**
+ * Hook to update barcodes with offline-first support
+ */
+export const useOfflineUpdateBarcode = ({ rowId, userId }: UseOfflineBarcodesOptions) => {
+  const queryClient = useQueryClient();
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const updateBarcode = useCallback(async (
+    barcodeId: string,
+    oldCode: string,
+    newCode: string,
+    timestamp: string
+  ) => {
+    setIsUpdating(true);
+    
+    try {
+      // Queue the update operation
+      const mutation = await queueBarcodeUpdate(
+        barcodeId,
+        rowId,
+        oldCode,
+        newCode,
+        timestamp,
+        userId
+      );
+
+      // Optimistically update the UI
+      queryClient.setQueryData<(Barcode | OfflineBarcode)[]>(
+        ['barcodes', 'row', rowId],
+        (old = []) => old.map(b => 
+          b.id === barcodeId 
+            ? { ...b, code: newCode, pendingCode: newCode }
+            : b
+        )
+      );
+
+      return mutation;
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [rowId, userId, queryClient]);
+
+  return { updateBarcode, isUpdating };
 };
 
 /**
@@ -132,8 +272,7 @@ export const useMergedBarcodes = (
     const loadAndMerge = async () => {
       setIsLoading(true);
       try {
-        const pending = await getPendingBarcodesForRow(rowId);
-        const merged = mergeBarcodesWithPending(serverBarcodes || [], pending);
+        const merged = await mergeBarcodesWithPending(serverBarcodes || [], rowId);
         setMergedBarcodes(merged);
       } catch (error) {
         console.error('Error merging barcodes:', error);

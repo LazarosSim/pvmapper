@@ -88,7 +88,8 @@ export const useSync = (): UseSyncReturn => {
       }
       
       // Invalidate queries to refresh data from server
-      queryClient.invalidateQueries({ queryKey: ['barcodes'] });
+      queryClient.invalidateQueries({ queryKey: ['barcodes', 'row'] });
+      queryClient.invalidateQueries({ queryKey: ['barcodes', 'park'] });
       queryClient.invalidateQueries({ queryKey: ['rows'] });
     } else {
       toast.error(`Sync failed: ${result.error}`);
