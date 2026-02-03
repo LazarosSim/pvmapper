@@ -3,7 +3,7 @@ import {useParams} from 'react-router-dom';
 import {Barcode, useDB} from '@/lib/db-provider';
 import Layout from '@/components/layout/layout';
 import {Button} from '@/components/ui/button';
-import {ArrowDown, Check, Edit, Loader2, Plus, Trash2, X} from 'lucide-react';
+import {ArrowDown, Check, Cloud, CloudOff, Edit, Loader2, Pencil, Plus, Trash2, X} from 'lucide-react';
 import AddBarcodeDialog from '@/components/dialog/add-barcode-dialog';
 import {Input} from '@/components/ui/input';
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from "@/components/ui/table";
@@ -25,7 +25,10 @@ import {
   useDeleteRowBarcode,
   useResetRowBarcodes,
   useRowBarcodes,
-  useUpdateRowBarcode
+  useUpdateRowBarcode,
+  useMergedBarcodes,
+  useOfflineUpdateBarcode,
+  type MergedBarcode,
 } from "@/hooks/use-barcodes";
 import {useRow} from "@/hooks/use-row-queries.tsx";
 import {
@@ -36,6 +39,7 @@ import {
   PaginationNext,
   PaginationPrevious
 } from "@/components/ui/pagination.tsx";
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip";
 
 
 const RowDetail = () => {
@@ -44,7 +48,7 @@ const RowDetail = () => {
   const {updateRow } = useDB();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isInsertDialogOpen, setIsInsertDialogOpen] = useState(false);
-  const [insertAfterBarcode, setInsertAfterBarcode] = useState<Barcode | null>(null);
+  const [insertAfterBarcode, setInsertAfterBarcode] = useState<MergedBarcode | null>(null);
   const [insertCode, setInsertCode] = useState('');
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -65,7 +69,12 @@ const RowDetail = () => {
   const {mutate: updateBarcode} = useUpdateRowBarcode(rowId);
   const {mutate: deleteBarcode} = useDeleteRowBarcode(rowId);
 
-  const {data: barcodes} = useRowBarcodes(rowId);
+  // Use server barcodes + merged with pending offline changes
+  const {data: serverBarcodes} = useRowBarcodes(rowId);
+  const {mergedBarcodes: barcodes} = useMergedBarcodes(rowId, serverBarcodes);
+  
+  // Offline update hook for pending barcodes
+  const { updateBarcode: offlineUpdateBarcode } = useOfflineUpdateBarcode({ rowId });
 
   if (isError) {
     toast.error("Failed to fetch row data");
@@ -73,11 +82,10 @@ const RowDetail = () => {
 
   const park = row ? row.park : undefined;
 
-
   const indexedBarcodes = barcodes?.map((barcode, index) => (
-      {barcode, index:index+1}));
-  const filteredBarcodes = indexedBarcodes?.filter(barcode =>
-    barcode.barcode.code.toLowerCase().includes(searchQuery.toLowerCase())
+      {barcode: barcode as MergedBarcode, index:index+1}));
+  const filteredBarcodes = indexedBarcodes?.filter(item =>
+    item.barcode.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const breadcrumb = park ? `${park.name} / ${row?.name}` : row?.name;
@@ -127,11 +135,23 @@ const RowDetail = () => {
     setEditingBarcode({id, code});
   };
 
-  const saveEditedBarcode = async () => {
+  const saveEditedBarcode = async (barcode: MergedBarcode) => {
     if (editingBarcode) {
-      const result = updateBarcode({id:editingBarcode.id, code:editingBarcode.code});
-      if (result !== undefined && result !== null) {
-        toast.success("Barcode updated successfully");
+      // Check if this is a pending (not synced) barcode - use offline update
+      if (barcode.isPending) {
+        await offlineUpdateBarcode(
+          editingBarcode.id,
+          barcode.code,
+          editingBarcode.code,
+          new Date().toISOString()
+        );
+        toast.success("Barcode updated (will sync later)");
+      } else {
+        // Synced barcode - use regular update
+        const result = updateBarcode({id:editingBarcode.id, code:editingBarcode.code});
+        if (result !== undefined && result !== null) {
+          toast.success("Barcode updated successfully");
+        }
       }
       setEditingBarcode(null);
     }
@@ -160,7 +180,7 @@ const RowDetail = () => {
     }
   };
   
-  const handleInsertBarcode = async (barcode:Barcode) => {
+  const handleInsertBarcode = async (barcode: MergedBarcode) => {
     setIsInserting(true);
 
     const index = barcodes.findIndex((item) => barcode.id === item.id);
@@ -211,15 +231,44 @@ const RowDetail = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-20">No.</TableHead>
+                <TableHead className="w-12">Sync</TableHead>
+                <TableHead className="w-16">No.</TableHead>
                 <TableHead>Barcode</TableHead>
                 <TableHead className="w-40">Timestamp</TableHead>
                 <TableHead className="w-28">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {currentBarcodes.map(({barcode, index}) => (
-                  <TableRow key={barcode.id}>
+              {currentBarcodes.map(({barcode, index}) => {
+                // Determine sync status
+                const isPending = barcode.isPending;
+                const isDeleting = barcode.isDeleting;
+                const hasUpdate = barcode.pendingCode && barcode.pendingCode !== barcode.code;
+                
+                return (
+                  <TableRow key={barcode.id} className={isDeleting ? 'opacity-50' : ''}>
+                    <TableCell>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            {isDeleting ? (
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            ) : hasUpdate ? (
+                              <Pencil className="h-4 w-4 text-amber-500" />
+                            ) : isPending ? (
+                              <CloudOff className="h-4 w-4 text-amber-500" />
+                            ) : (
+                              <Cloud className="h-4 w-4 text-green-500" />
+                            )}
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {isDeleting ? 'Pending deletion' : 
+                             hasUpdate ? 'Pending update' : 
+                             isPending ? 'Not synced' : 'Synced'}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableCell>
                     <TableCell className="font-medium">{index}</TableCell>
                     <TableCell>
                       {editingBarcode && editingBarcode.id === barcode.id ? (
@@ -230,7 +279,7 @@ const RowDetail = () => {
                               className="w-full"
                               autoFocus
                             />
-                            <Button variant="ghost" size="icon" onClick={saveEditedBarcode} className="text-inventory-secondary">
+                            <Button variant="ghost" size="icon" onClick={() => saveEditedBarcode(barcode)} className="text-inventory-secondary">
                               <Check className="h-4 w-4" />
                             </Button>
                             <Button variant="ghost" size="icon" onClick={cancelEditBarcode} className="text-red-500">
@@ -238,7 +287,9 @@ const RowDetail = () => {
                             </Button>
                           </div>
                         ) : (
-                          barcode.code
+                          <span className={isDeleting ? 'line-through' : ''}>
+                            {barcode.code}
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
@@ -278,7 +329,8 @@ const RowDetail = () => {
                         </div>
                       </TableCell>
                     </TableRow>
-                ))}
+                );
+              })}
               </TableBody>
             </Table>
           </div>
@@ -406,7 +458,7 @@ const RowDetail = () => {
                 Cancel
               </Button>
               <Button 
-                onClick={() => handleInsertBarcode(insertAfterBarcode)}
+                onClick={() => handleInsertBarcode(insertAfterBarcode!)}
                 disabled={!insertCode.trim() || isInserting}
                 className="bg-inventory-primary hover:bg-inventory-primary/90"
               >
