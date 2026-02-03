@@ -117,7 +117,8 @@ export const useParkStats = (includeArchived: boolean = false) => {
     return useQuery({
         queryKey: ['parks', { includeArchived }],
         queryFn: () => loadParkStats(includeArchived),
-        enabled: onlineManager.isOnline()
+        networkMode: 'offlineFirst',
+        staleTime: 30000, // 30 seconds
     });
 }
 

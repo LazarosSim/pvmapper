@@ -14,7 +14,7 @@ const Index = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showArchived, setShowArchived] = useState(false);
 
-  const {data: parks} = useParkStats(showArchived);
+  const {data: parks, isLoading: parksLoading, error: parksError} = useParkStats(showArchived);
 
   const filteredParks = parks ? parks.filter(park =>
     park.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -71,7 +71,16 @@ const Index = () => {
 
         {/* Active Parks */}
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-          {activeParks.length > 0 ? (
+          {parksLoading ? (
+            <div className="text-center py-8 col-span-full">
+              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+              <p className="text-muted-foreground">Loading parks...</p>
+            </div>
+          ) : parksError ? (
+            <div className="text-center py-8 col-span-full glass-card rounded-lg p-8 animate-fade-in">
+              <p className="text-destructive mb-4">Failed to load parks. Please try again.</p>
+            </div>
+          ) : activeParks.length > 0 ? (
             activeParks.map(park => (
               <div key={park.id} className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
                 <ParkCard park={park} />

@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useDB } from '@/lib/db-provider';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSupabase } from '@/lib/supabase-provider';
 import { Loader } from 'lucide-react';
 
@@ -14,9 +14,17 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, requireManager = false 
   const { currentUser, isDBLoading } = useDB();
   const { user, isInitialized } = useSupabase();
   const navigate = useNavigate();
+  const location = useLocation();
   const [authChecked, setAuthChecked] = useState(false);
   const [shouldRedirect, setShouldRedirect] = useState(false);
   const [redirectPath, setRedirectPath] = useState('');
+
+  // Store current route for navigation persistence (excluding login page)
+  useEffect(() => {
+    if (location.pathname !== '/login' && user) {
+      localStorage.setItem('lastRoute', location.pathname);
+    }
+  }, [location.pathname, user]);
 
   useEffect(() => {
     // Only run the auth check if both supabase and DB providers are initialized

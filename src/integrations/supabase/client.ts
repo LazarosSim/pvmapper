@@ -13,7 +13,7 @@ export const supabase = createClient<Database>(
     SUPABASE_PUBLISHABLE_KEY,
     {
         auth: {
-            autoRefreshToken: false,
+            autoRefreshToken: true,
             persistSession: true,
             detectSessionInUrl: false,
         },
