@@ -91,6 +91,7 @@ export const useSync = (): UseSyncReturn => {
       queryClient.invalidateQueries({ queryKey: ['barcodes', 'row'] });
       queryClient.invalidateQueries({ queryKey: ['barcodes', 'park'] });
       queryClient.invalidateQueries({ queryKey: ['rows'] });
+      queryClient.invalidateQueries({ queryKey: ['parks'] }); // Refresh park counts on Home page
     } else {
       toast.error(`Sync failed: ${result.error}`);
     }
