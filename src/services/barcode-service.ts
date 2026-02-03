@@ -53,7 +53,7 @@ export const updateBarcode = async ({id, code}: { id: string, code: string }) =>
         .from('barcodes')
         .update({code: code})
         .eq('id', id)
-        .select('*')
+        .select('id, code, rowId:row_id, userId:user_id, timestamp, orderInRow:order_in_row, latitude, longitude')
         .single()
 
     assertNoError(error, 'updating barcode');

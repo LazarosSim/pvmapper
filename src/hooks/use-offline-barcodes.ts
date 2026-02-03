@@ -65,10 +65,24 @@ export const mergeBarcodesWithPending = async (
     // Filter out items marked for deletion from the display
     .filter(b => !b.isDeleting);
 
-  // Combine and sort by orderInRow
+  // Combine and sort by orderInRow with defensive fallback
   const combined: MergedBarcode[] = [...processedServer, ...pendingAdds];
   
-  return combined.sort((a, b) => (a.orderInRow ?? 0) - (b.orderInRow ?? 0));
+  return combined.sort((a, b) => {
+    // Primary sort: by orderInRow (required for correct display)
+    // Use MAX_SAFE_INTEGER for undefined to push corrupted data to end, not beginning
+    const orderA = a.orderInRow ?? Number.MAX_SAFE_INTEGER;
+    const orderB = b.orderInRow ?? Number.MAX_SAFE_INTEGER;
+    
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+    
+    // Fallback: sort by timestamp to maintain insertion order
+    const timeA = new Date(a.timestamp || 0).getTime();
+    const timeB = new Date(b.timestamp || 0).getTime();
+    return timeA - timeB;
+  });
 };
 
 /**
