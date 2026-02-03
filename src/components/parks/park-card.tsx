@@ -56,7 +56,11 @@ const ParkCard: React.FC<ParkCardProps> = ({
 
   const [isExporting, setIsExporting] = useState(false);
 
-  const progress = ((park.currentBarcodes / park.expectedBarcodes) * 100).toFixed(2);
+  // Guard against null/0 expected barcodes causing Infinity/NaN and breaking rendering
+  const expectedBarcodesSafe = Number.isFinite(park.expectedBarcodes) ? park.expectedBarcodes : 0;
+  const currentBarcodesSafe = Number.isFinite(park.currentBarcodes) ? park.currentBarcodes : 0;
+  const progressValue = expectedBarcodesSafe > 0 ? (currentBarcodesSafe / expectedBarcodesSafe) * 100 : 0;
+  const progress = Number.isFinite(progressValue) ? progressValue.toFixed(2) : '0.00';
 
   const {data: currentUser} = useCurrentUser()
   const {data: rows, isLoading: rowsLoading} = useRowsByParkId(park.id);
@@ -340,8 +344,8 @@ const ParkCard: React.FC<ParkCardProps> = ({
           }} />
             </Progress>
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{park.currentBarcodes} scanned</span>
-              <span>{park.expectedBarcodes} expected</span>
+               <span>{currentBarcodesSafe} scanned</span>
+               <span>{expectedBarcodesSafe} expected</span>
             </div>
           </div>}
         
@@ -349,7 +353,7 @@ const ParkCard: React.FC<ParkCardProps> = ({
           <div>
             <span className="text-sm font-medium">{rowCount} Rows</span>
             <span className="mx-2 text-muted-foreground">•</span>
-            <span className="text-sm font-medium">{park.currentBarcodes} Barcodes</span>
+             <span className="text-sm font-medium">{currentBarcodesSafe} Barcodes</span>
             {isDataLoading && <span className="mx-2 text-muted-foreground text-xs">(Loading...)</span>}
           </div>
           <Button variant="outline" size="sm" onClick={handleOpenPark} className="bg-inventory-secondary/10 text-inventory-secondary hover:bg-inventory-secondary/20 border-inventory-secondary/30">
