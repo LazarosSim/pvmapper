@@ -1,17 +1,17 @@
-import {supabase} from "@/integrations/supabase/client.ts";
-import {onlineManager, useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
-import {Barcode} from "@/lib/types/db-types.ts";
-import {useSupabase} from "@/lib/supabase-provider.tsx";
-import {useEffect} from "react";
-import {addBarcode, deleteBarcode, updateBarcode} from "@/services/barcode-service.ts";
+import { supabase } from "@/integrations/supabase/client.ts";
+import { onlineManager, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Barcode } from "@/lib/types/db-types.ts";
+import { useSupabase } from "@/lib/supabase-provider.tsx";
+import { useEffect } from "react";
+import { addBarcode, deleteBarcode, updateBarcode } from "@/services/barcode-service.ts";
 
-const resetRow = async (rowId: string)=> {
-    if(!rowId.trim())
+const resetRow = async (rowId: string) => {
+    if (!rowId.trim())
         throw new Error("Row ID is required");
 
-    const {count , error} = await supabase
+    const { count, error } = await supabase
         .from('barcodes')
-        .delete({count:"exact"})
+        .delete({ count: "exact" })
         .eq('row_id', rowId)
     if (error) {
         console.error("Error resetting row:", error);
@@ -27,17 +27,17 @@ const loadBarcodesByRow = async (rowId: string): Promise<Barcode[]> => {
         .from('barcodes')
         .select('id, code, rowId:row_id, userId:user_id, timestamp, orderInRow:order_in_row, latitude, longitude')
         .eq("row_id", rowId)
-        .order('order_in_row', {ascending: true});
+        .order('order_in_row', { ascending: true });
 
-    const {data: barcodes, error} = await query;
+    const { data: barcodes, error } = await query;
 
     if (error) {
         console.error("Error loading barcodes:", error);
         throw error;
     }
-    
+
     // Safety sort - ensure order even if cache was corrupted
-    return (barcodes || []).sort((a, b) => 
+    return (barcodes || []).sort((a, b) =>
         (a.orderInRow ?? Number.MAX_SAFE_INTEGER) - (b.orderInRow ?? Number.MAX_SAFE_INTEGER)
     );
 }
@@ -49,24 +49,25 @@ const loadBarcodesByPark = async (parkId: string) => {
         .from('barcodes')
         .select('id, code, park:rows (park_id, parks(name)) ,userId:user_id, timestamp, orderInRow:order_in_row, rowId:row_id')
         .eq("rows.park_id", parkId)
-        .order('order_in_row', {ascending: true});
+        .order('order_in_row', { ascending: true });
 
-    const {data: barcodes, error} = await query;
+    const { data: barcodes, error } = await query;
     if (error) {
         console.error("Error loading barcodes:", error);
         throw error;
     }
 
     const flattenedBarcodes = barcodes.map(({
-                                                id,
-                                                code,
-                                                userId,
-                                                timestamp,
-                                                orderInRow,
-                                                rowId,
-                                                park: {park_id, parks: {name}}
-                                            }) => (
-        {   id,
+        id,
+        code,
+        userId,
+        timestamp,
+        orderInRow,
+        rowId,
+        park: { park_id, parks: { name } }
+    }) => (
+        {
+            id,
             code,
             userId,
             timestamp,
@@ -85,7 +86,8 @@ export const useRowBarcodes = (rowId: string) => {
     return useQuery({
         queryKey: ['barcodes', 'row', rowId],
         queryFn: () => loadBarcodesByRow(rowId),
-        enabled: Boolean(rowId) && onlineManager.isOnline(),
+        enabled: Boolean(rowId),
+        networkMode: 'offlineFirst',
         retry: false,
         refetchOnWindowFocus: false,
         initialData: () => queryClient.getQueryData<Barcode[]>(['barcodes', 'row', rowId]),
@@ -98,7 +100,8 @@ export const useParkBarcodes = (parkId: string) => {
     const query = useQuery({
         queryKey: ['barcodes', 'park', parkId],
         queryFn: () => loadBarcodesByPark(parkId),
-        enabled: Boolean(parkId) && onlineManager.isOnline(),
+        enabled: Boolean(parkId),
+        networkMode: 'offlineFirst',
         retry: false,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
@@ -135,13 +138,13 @@ export const useAddBarcodeToRow = (rowId: string) => {
     const { user } = useSupabase();
     return useMutation({
         mutationFn: ({
-                         code,
-                         orderInRow,
-                         isLast,
-                         timestamp
-                     }: AddBarcodeVariables) => addBarcode(code, rowId, orderInRow, isLast, user?.id, timestamp),
+            code,
+            orderInRow,
+            isLast,
+            timestamp
+        }: AddBarcodeVariables) => addBarcode(code, rowId, orderInRow, isLast, user?.id, timestamp),
         mutationKey: ['barcodes', 'row', rowId],
-        onMutate: async ({code, orderInRow}) => {
+        onMutate: async ({ code, orderInRow }) => {
             const previous = queryClient.getQueryData<Barcode[]>(['barcodes', 'row', rowId]);
 
             if (previous) {
@@ -154,7 +157,7 @@ export const useAddBarcodeToRow = (rowId: string) => {
                     } as Barcode,
                 ]);
             }
-            return {previous};
+            return { previous };
         },
 
         onError: (_err, _vars, context) => {
@@ -164,14 +167,14 @@ export const useAddBarcodeToRow = (rowId: string) => {
         },
 
         onSettled: () => {
-            if(onlineManager.isOnline()) {
-                queryClient.invalidateQueries({queryKey: ['barcodes', 'row', rowId]});
-                queryClient.invalidateQueries({queryKey: ['parks']}); // Refresh park counts
+            if (onlineManager.isOnline()) {
+                queryClient.invalidateQueries({ queryKey: ['barcodes', 'row', rowId] });
+                queryClient.invalidateQueries({ queryKey: ['parks'] }); // Refresh park counts
             }
         },
 
         retry: false
-        });
+    });
 }
 
 export const useUpdateRowBarcode = (rowId: string) => {
@@ -182,7 +185,7 @@ export const useUpdateRowBarcode = (rowId: string) => {
             queryClient.setQueryData<Barcode[]>(['barcodes', 'row', rowId],
                 (oldData) => {
                     if (!oldData) return oldData;
-                    
+
                     // Use .map() for immutable update, preserve orderInRow from cache
                     return oldData.map(b => {
                         if (b.id === serverBarcode.id) {
@@ -212,7 +215,7 @@ export const useDeleteRowBarcode = (rowId: string) => {
                     // Use .filter() for immutable update, preserves order of remaining items
                     return oldData.filter(b => b.id !== deletedBarcode.id);
                 })
-            queryClient.invalidateQueries({queryKey: ['parks']}); // Refresh park counts
+            queryClient.invalidateQueries({ queryKey: ['parks'] }); // Refresh park counts
         }
     })
 }
@@ -229,7 +232,7 @@ export const useResetRowBarcodes = (rowId: string) => {
                 queryKey: ['barcodes', 'row', rowId],
                 exact: true,    // only that one
             })
-            queryClient.invalidateQueries({queryKey: ['parks']}); // Refresh park counts
+            queryClient.invalidateQueries({ queryKey: ['parks'] }); // Refresh park counts
         }
     })
 }

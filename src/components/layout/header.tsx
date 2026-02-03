@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { useDB } from '@/lib/db-provider';
 import { Switch } from '@/components/ui/switch';
+import { SettingsDialog } from '@/components/settings/SettingsDialog';
 
 interface HeaderProps {
   title: string;
@@ -27,9 +28,9 @@ interface HeaderProps {
   onRename?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ 
-  title, 
-  showBack = false, 
+const Header: React.FC<HeaderProps> = ({
+  title,
+  showBack = false,
   titleAction,
   showSettings = false,
   rowId,
@@ -41,24 +42,25 @@ const Header: React.FC<HeaderProps> = ({
   const navigate = useNavigate();
   const [isEditingRowName, setIsEditingRowName] = useState(false);
   const [rowName, setRowName] = useState('');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { updateRow } = useDB();
-  
+
   const handleBackClick = () => {
     navigate(-1);
   };
-  
+
   const startEditingName = () => {
     if (onRename) {
       onRename();
       return;
     }
-    
+
     if (rowId) {
       setRowName(title);
       setIsEditingRowName(true);
     }
   };
-  
+
   const saveRowName = async () => {
     if (rowId && rowName.trim()) {
       await updateRow(rowId, rowName);
@@ -68,25 +70,25 @@ const Header: React.FC<HeaderProps> = ({
       toast.error("Row name cannot be empty");
     }
   };
-  
+
   const cancelEditName = () => {
     setIsEditingRowName(false);
   };
-  
+
   const handleToggleLocation = () => {
     if (setCaptureLocation) {
       setCaptureLocation(!captureLocation);
       toast.success(captureLocation ? "GPS location capture disabled" : "GPS location capture enabled");
     }
   };
-  
+
   return (
     <header className="sticky top-0 w-full bg-gradient-to-r from-xpenergy-primary to-xpenergy-secondary text-white py-4 px-4 flex items-center z-10 shadow-md">
       <div className="flex-1 flex items-center">
         {showBack && (
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={handleBackClick}
             className="mr-2 text-white hover:bg-xpenergy-primary/20 hover:text-white/90"
           >
@@ -94,9 +96,9 @@ const Header: React.FC<HeaderProps> = ({
           </Button>
         )}
         <div className="flex items-center">
-          <img 
+          <img
             src="/xplogo.png"
-            alt="XP Energy Logo" 
+            alt="XP Energy Logo"
             className="h-10 mr-3"
             onError={(e) => {
               const img = e.target as HTMLImageElement;
@@ -107,14 +109,24 @@ const Header: React.FC<HeaderProps> = ({
           {titleAction ? titleAction : <h1 className="text-xl font-semibold font-montserrat">{title}</h1>}
         </div>
       </div>
-      
-      {/* Settings Dropdown */}
-      {showSettings && (
-        <div className="ml-auto">
+
+      {/* Global Settings Gear Icon */}
+      <div className="ml-auto flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsSettingsOpen(true)}
+          className="text-white hover:bg-xpenergy-primary/20"
+        >
+          <Settings className="h-5 w-5" />
+        </Button>
+
+        {/* Row-Specific Settings Dropdown (only show when showSettings is true) */}
+        {showSettings && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="text-white hover:bg-xpenergy-primary/20">
-                <Settings className="h-5 w-5" />
+                <Edit className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 bg-white">
@@ -134,8 +146,8 @@ const Header: React.FC<HeaderProps> = ({
                     <MapPin className="mr-2 h-4 w-4" />
                     <span>Capture GPS Location</span>
                     <div className="ml-auto">
-                      <Switch 
-                        checked={captureLocation} 
+                      <Switch
+                        checked={captureLocation}
                         onCheckedChange={(checked) => {
                           if (setCaptureLocation) {
                             setCaptureLocation(checked);
@@ -150,9 +162,12 @@ const Header: React.FC<HeaderProps> = ({
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
-      )}
-      
+        )}
+      </div>
+
+      {/* Settings Dialog */}
+      <SettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
+
       {/* Editing Row Name Modal */}
       {isEditingRowName && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

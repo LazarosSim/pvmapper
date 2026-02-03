@@ -1,18 +1,18 @@
-import React, {useState} from 'react';
-import {Navigate, useNavigate, useParams} from 'react-router-dom';
+import React, { useState } from 'react';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
-import {useDB} from '@/lib/db-provider';
-import {Button} from '@/components/ui/button';
-import {Card, CardContent, CardDescription, CardHeader, CardTitle,} from "@/components/ui/card";
-import {ArrowDown, FolderOpen, Loader2, Plus, Search} from 'lucide-react';
-import {Input} from '@/components/ui/input';
-import type {Row} from '@/lib/types/db-types';
-import {toast} from 'sonner';
-import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,} from "@/components/ui/dialog";
-import {Label} from '@/components/ui/label';
-import {useParkBarcodes} from "@/hooks/use-barcodes-queries.tsx";
-import {useParkStats} from "@/hooks/parks";
-import {useRowsByParkId} from "@/hooks/use-row-queries";
+import { useDB } from '@/lib/db-provider';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, } from "@/components/ui/card";
+import { ArrowDown, FolderOpen, Loader2, Plus, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import type { Row } from '@/lib/types/db-types';
+import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, } from "@/components/ui/dialog";
+import { Label } from '@/components/ui/label';
+import { useParkBarcodes } from "@/hooks/use-barcodes-queries.tsx";
+import { useParkStats } from "@/hooks/parks";
+import { useRowsByParkId } from "@/hooks/use-row-queries";
 
 const ScanParkPage = () => {
   const { parkId } = useParams<{ parkId: string }>();
@@ -25,7 +25,7 @@ const ScanParkPage = () => {
   const [selectedParentRowId, setSelectedParentRowId] = useState<string | null>(null);
   const [expectedBarcodes, setExpectedBarcodes] = useState<string>('');
 
-  const {data: barcodes} = useParkBarcodes(parkId);
+  const { data: barcodes } = useParkBarcodes(parkId);
 
   if (parksLoading || rowsLoading) {
     return (
@@ -37,13 +37,36 @@ const ScanParkPage = () => {
     );
   }
 
-  if (!parkId || !parks?.some(p => p.id === parkId)) {
-    return <Navigate to="/scan" replace />;
+  if (!parkId) {
+    return (
+      <Layout title="Select Row" showBack>
+        <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+          <p className="text-destructive font-medium mb-2">No park selected</p>
+          <p className="text-muted-foreground mb-4">Please select a park to continue.</p>
+          <Button onClick={() => navigate('/scan')} variant="outline">Go to Park Selection</Button>
+        </div>
+      </Layout>
+    );
   }
 
   const park = parks?.find(p => p.id === parkId);
-  
-  const filteredRows = (rows || []).filter(row => 
+
+  // Show error if park not found after loading completes
+  if (!parksLoading && !park) {
+    return (
+      <Layout title="Park Not Found" showBack>
+        <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+          <p className="text-destructive font-medium mb-2">Park not found</p>
+          <p className="text-muted-foreground mb-4">
+            This park may not be available or prefetched for offline use.
+          </p>
+          <Button onClick={() => navigate('/scan')} variant="outline">Go to Park Selection</Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  const filteredRows = (rows || []).filter(row =>
     row.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -59,19 +82,19 @@ const ScanParkPage = () => {
   const handleAddSubRow = async () => {
     try {
       setIsAddSubRowDialogOpen(false);
-      
+
       if (selectedParentRowId) {
         // Parse expected barcodes or set to undefined if empty
-        const expectedBarcodesValue = expectedBarcodes.trim() 
-          ? parseInt(expectedBarcodes, 10) 
+        const expectedBarcodesValue = expectedBarcodes.trim()
+          ? parseInt(expectedBarcodes, 10)
           : undefined;
-        
+
         const newRow = await addSubRow(selectedParentRowId, expectedBarcodesValue);
         if (newRow) {
           toast.success(`Added subrow ${newRow.name}`);
         }
       }
-      
+
       setExpectedBarcodes('');
       setSelectedParentRowId(null);
     } catch (error) {
@@ -79,21 +102,21 @@ const ScanParkPage = () => {
       toast.error("Failed to add subrow");
     }
   };
-  
+
   const handleSelectRow = (rowId: string) => {
     navigate(`/scan/row/${rowId}`);
   };
-  
+
   const openAddSubRowDialog = (parentRowId: string) => {
     setSelectedParentRowId(parentRowId);
     setExpectedBarcodes('');
     setIsAddSubRowDialogOpen(true);
   };
-  
+
   // Group rows by their base number for display
   const groupRows = () => {
     const grouped: { [key: string]: { rows: Row[], order: number } } = {};
-    
+
     filteredRows.forEach(row => {
       // Extract row number (e.g. "Row 1_a" -> "1")
       const match = row.name.match(/^Row\s+(\d+)/i);
@@ -112,7 +135,7 @@ const ScanParkPage = () => {
         grouped['other'].rows.push(row);
       }
     });
-    
+
     // Sort rows within each group
     Object.keys(grouped).forEach(key => {
       grouped[key].rows.sort((a, b) => {
@@ -122,10 +145,10 @@ const ScanParkPage = () => {
         return suffixA.localeCompare(suffixB);
       });
     });
-    
+
     return grouped;
   };
-  
+
   const rowGroups = groupRows();
 
   return (
@@ -165,8 +188,8 @@ const ScanParkPage = () => {
                           </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             className="w-full"
                             onClick={() => handleSelectRow(row.id)}
                           >
@@ -187,7 +210,7 @@ const ScanParkPage = () => {
                   ))}
                 </div>
               </div>
-          ))
+            ))
         ) : (
           <div className="text-center py-8">
             <p className="text-muted-foreground mb-4">
@@ -195,9 +218,9 @@ const ScanParkPage = () => {
             </p>
           </div>
         )}
-        
+
         <div className="pt-4">
-          <Button 
+          <Button
             onClick={handleAddRow}
             className="w-full"
           >

@@ -8,24 +8,26 @@ import { useDB } from '@/lib/db-provider';
 const BottomNav = () => {
   const location = useLocation();
   const { currentUser } = useDB();
-  
-  if (!currentUser) return null;
-  
+
+  // Don't hide nav when user is loading - it might be loading from cache offline
+  // Only hide if we're definitely logged out (on login page)
+  if (location.pathname === '/login') return null;
+
   const isManager = currentUser?.role === 'manager';
-  
+
   const links = [
     {
       href: '/',
       label: 'Home',
       icon: <Home className="h-5 w-5" />,
       active: location.pathname === '/'
-    }, 
+    },
     {
       href: '/scan',
       label: 'Scan',
       icon: <ScanBarcode className="h-5 w-5" />,
       active: location.pathname.startsWith('/scan')
-    }, 
+    },
     {
       href: '/profile',
       label: 'Profile',
@@ -43,18 +45,18 @@ const BottomNav = () => {
       active: location.pathname === '/dashboard'
     });
   }
-  
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 border-t shadow-lg py-2 px-4 z-10 bg-gradient-to-r from-[#F97316] to-[#FDBA74]">
       <div className="flex items-center justify-around">
         {links.map(link => (
-          <Link 
-            key={link.href} 
-            to={link.href} 
+          <Link
+            key={link.href}
+            to={link.href}
             className={cn(
               "flex flex-col items-center px-2 py-1 rounded-md",
-              link.active 
-                ? "text-white font-medium" 
+              link.active
+                ? "text-white font-medium"
                 : "text-white/80 hover:text-white transition"
             )}
           >

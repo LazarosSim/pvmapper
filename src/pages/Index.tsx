@@ -1,20 +1,20 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import Layout from '@/components/layout/layout';
 import ParkCard from '@/components/parks/park-card';
-import {Button} from '@/components/ui/button';
-import {Archive, Plus} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Archive, Plus } from 'lucide-react';
 import CreateParkDialog from '@/components/dialog/create-park-dialog';
-import {Input} from '@/components/ui/input';
-import {useParkStats} from '@/hooks/parks';
-import {useCurrentUser} from "@/hooks/use-user.tsx";
-import {Badge} from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { useParkStats } from '@/hooks/parks';
+import { useCurrentUser } from "@/hooks/use-user.tsx";
+import { useAppSettings } from '@/hooks/use-app-settings';
 
 const Index = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showArchived, setShowArchived] = useState(false);
+  const { showArchived } = useAppSettings();
 
-  const {data: parks, isLoading: parksLoading, error: parksError} = useParkStats(showArchived);
+  const { data: parks, isLoading: parksLoading, error: parksError } = useParkStats(showArchived);
 
   const filteredParks = parks ? parks.filter(park =>
     park.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -24,7 +24,7 @@ const Index = () => {
   const activeParks = filteredParks.filter(p => !p.archived);
   const archivedParks = filteredParks.filter(p => p.archived);
 
-  const {data: currentUser} = useCurrentUser()
+  const { data: currentUser } = useCurrentUser()
   const isUserManager = currentUser?.role === 'manager';
 
 
@@ -48,26 +48,6 @@ const Index = () => {
             className="flex-1 bg-white/90 backdrop-blur-sm border border-xpenergy-secondary/30 focus-visible:ring-xpenergy-primary shadow-sm"
           />
         </div>
-
-        {/* Archive filter toggle - only show to managers */}
-        {isUserManager && (
-          <div className="flex items-center justify-end mb-4">
-            <Button
-              variant={showArchived ? "secondary" : "outline"}
-              size="sm"
-              onClick={() => setShowArchived(!showArchived)}
-              className="flex items-center gap-2"
-            >
-              <Archive className="h-4 w-4" />
-              {showArchived ? 'Hide Archived' : 'Show Archived'}
-              {showArchived && archivedParks.length > 0 && (
-                <Badge variant="secondary" className="ml-1">
-                  {archivedParks.length}
-                </Badge>
-              )}
-            </Button>
-          </div>
-        )}
 
         {/* Active Parks */}
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
@@ -114,7 +94,7 @@ const Index = () => {
 
         {/* Only show the add park button to managers */}
         {isUserManager && (
-            <Button
+          <Button
             onClick={() => setIsDialogOpen(true)}
             className="fixed bottom-20 right-4 rounded-full w-14 h-14 shadow-lg bg-gradient-to-r from-xpenergy-primary to-xpenergy-secondary hover:from-xpenergy-primary/90 hover:to-xpenergy-secondary/90 transition-all duration-300"
           >

@@ -1,13 +1,14 @@
-import {Toaster} from "@/components/ui/toaster";
-import {Toaster as Sonner} from "@/components/ui/sonner";
-import {TooltipProvider} from "@/components/ui/tooltip";
-import {ReactQueryDevtools} from '@tanstack/react-query-devtools';
-import {QueryClient, QueryClientProvider} from "@tanstack/react-query";
-import {BrowserRouter, Route, Routes} from "react-router-dom";
-import {SupabaseProvider} from "@/lib/supabase-provider";
-import {DBProvider} from "@/lib/db-provider";
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { SupabaseProvider } from "@/lib/supabase-provider";
+import { DBProvider } from "@/lib/db-provider";
 import AuthGuard from "@/components/auth/auth-guard";
 import ScrollToTop from "@/components/ScrollToTop";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 import Index from "./pages/Index";
 import ParkDetail from "./pages/ParkDetail";
 import RowDetail from "./pages/RowDetail";
@@ -18,8 +19,8 @@ import ProfilePage from "./pages/ProfilePage";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import NotFound from "./pages/NotFound";
-import {persistQueryClient,} from '@tanstack/react-query-persist-client'
-import {createSyncStoragePersister} from '@tanstack/query-sync-storage-persister'
+import { persistQueryClient, } from '@tanstack/react-query-persist-client'
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 
 
 const queryClient = new QueryClient({
@@ -32,7 +33,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const persister = createSyncStoragePersister({storage: window.localStorage})
+const persister = createSyncStoragePersister({ storage: window.localStorage })
 
 persistQueryClient({
   queryClient,
@@ -57,9 +58,9 @@ XMLHttpRequest.prototype.open = function (method, url) {
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   navigator.serviceWorker
-      .register('/sw.js')
-      .then(() => console.log('SW registered'))
-      .catch(console.error);
+    .register('/sw.js')
+    .then(() => console.log('SW registered'))
+    .catch(console.error);
 }
 
 const App = () => {
@@ -72,10 +73,11 @@ const App = () => {
               <ScrollToTop />
               <Toaster />
               <Sonner />
+              <OfflineIndicator />
               <Routes>
                 {/* Public route */}
                 <Route path="/login" element={<LoginPage />} />
-                
+
                 {/* Protected routes */}
                 <Route path={"/"} element={<AuthGuard><Index /></AuthGuard>} />
                 <Route path="/park/:parkId" element={<AuthGuard><ParkDetail /></AuthGuard>} />
@@ -84,17 +86,17 @@ const App = () => {
                 <Route path="/scan/park/:parkId" element={<AuthGuard><ScanParkPage /></AuthGuard>} />
                 <Route path="/scan/row/:rowId" element={<AuthGuard><ScanRowPage /></AuthGuard>} />
                 <Route path="/profile" element={<AuthGuard><ProfilePage /></AuthGuard>} />
-                
+
                 {/* Manager-only route */}
                 <Route path="/dashboard" element={<AuthGuard requireManager={true}><DashboardPage /></AuthGuard>} />
-                
+
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </DBProvider>
           </SupabaseProvider>
         </BrowserRouter>
       </TooltipProvider>
-      <ReactQueryDevtools/>
+      <ReactQueryDevtools />
     </QueryClientProvider>
   );
 };

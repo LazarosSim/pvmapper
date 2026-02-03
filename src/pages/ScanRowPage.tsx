@@ -1,25 +1,25 @@
-import React, {useEffect, useRef, useState} from 'react';
-import {Navigate, useParams} from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
-import {useDB} from '@/lib/db-provider';
-import {Card, CardContent, CardDescription, CardHeader, CardTitle,} from "@/components/ui/card";
-import {Input} from "@/components/ui/input";
-import {Button} from "@/components/ui/button";
-import {Check, X} from "lucide-react";
-import {toast} from 'sonner';
+import { useDB } from '@/lib/db-provider';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Check, X } from "lucide-react";
+import { toast } from 'sonner';
 import AuthGuard from '@/components/auth/auth-guard';
 import BarcodeScanInput from '@/components/scan/BarcodeScanInput';
 import RecentScans from '@/components/scan/RecentScans';
 import ResetRowDialog from '@/components/scan/ResetRowDialog';
-import {useRow} from "@/hooks/use-row-queries.tsx";
+import { useRow } from "@/hooks/use-row-queries.tsx";
 import {
   useResetRowBarcodes,
   useRowBarcodes,
   useMergedBarcodes,
   useSync,
 } from "@/hooks/use-barcodes";
-import {SyncButton} from "@/components/offline/SyncButton";
-import {OfflineStatusBanner} from "@/components/offline/OfflineStatusBanner";
+import { SyncButton } from "@/components/offline/SyncButton";
+import { OfflineStatusBanner } from "@/components/offline/OfflineStatusBanner";
 
 // Audio notification for success/error
 const NOTIF_SOUND = "data:audio/wav;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAFAAAGUACFhYWFhYWFhYWFhYWFhYWFhYWFra2tra2tra2tra2tra2tra2traOjo6Ojo6Ojo6Ojo6Ojo6Ojo6P///////////////////////////////////////////wAAADJMQVNNRTMuOTlyAc0AAAAAAAAAABSAJAJAQgAAgAAAA+aieizgAAAAAAAAAAAAAAAAAAAA//uQZAAAApEGUFUGAAArIMoKoMAABZAZnW40AAClAzOtxpgALEwy1AAAAAEVf7kGQRmBmD3QEAgEDhnePhI/JH4iByB+SPxA/IH5gQB+IPzAQA+TAMDhOIPA/IEInjB4P4fn///jHJ+T/ngfgYAgEAgEAgEAgg5nwuZIuZw5QmCvG0Ooy0JtC2CnAp1vdSlLMuOQylYZl0LERgAAAAAAlMy5z3O+n//zTjN/9/+Z//O//9y5/8ud/z//5EHL/D+KDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDEppqampqampqampqampqampqampqampqampqampqamgAAA//tQZAAAAtAeUqsMAARfA7pVYYACCUCXPqggAEAAAP8AAAAATEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkYA/wAAB/gAAACAAAD/AAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=";
@@ -27,21 +27,21 @@ const NOTIF_SOUND = "data:audio/wav;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 const ScanRowPage = () => {
 
   const { rowId } = useParams<{ rowId: string }>();
-  const { 
+  const {
     currentUser,
     updateRow
   } = useDB();
-  
+
   // State for dialogs and UI
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
 
   // State for editing row name
   const [isEditingRowName, setIsEditingRowName] = useState(false);
   const [rowName, setRowName] = useState('');
-  
+
   // State for location capture - default to true
   const [captureLocation, setCaptureLocation] = useState(true);
-  
+
   // Reference to the audio element
   const audioRef = useRef<HTMLAudioElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -54,15 +54,15 @@ const ScanRowPage = () => {
   };
 
 
-  const {data: row, isLoading, isError } = useRow(rowId);
-  const {mutate: resetRow} = useResetRowBarcodes(rowId);
+  const { data: row, isLoading, isError } = useRow(rowId);
+  const { mutate: resetRow } = useResetRowBarcodes(rowId);
 
   // Server barcodes
-  const {data: serverBarcodes} = useRowBarcodes(rowId);
-  
+  const { data: serverBarcodes } = useRowBarcodes(rowId);
+
   // Merged barcodes (server + pending offline) - imported from hook
-  const {mergedBarcodes: barcodes} = useMergedBarcodes(rowId, serverBarcodes);
-  
+  const { mergedBarcodes: barcodes } = useMergedBarcodes(rowId, serverBarcodes);
+
   // Sync state - used to block scanning during sync
   const { isSyncing } = useSync();
 
@@ -100,9 +100,53 @@ const ScanRowPage = () => {
     );
   }
 
-  if (isError || !row) {
-    toast.error("Failed to fetch row data");
-    return <Navigate to="/scan" replace />;
+  // If error and row not in cache, show error UI instead of redirecting
+  // This allows users to see what went wrong when offline
+  if (isError && !row) {
+    return (
+      <AuthGuard>
+        <Layout title="Error Loading Row" showBack>
+          <div className="flex flex-col items-center justify-center py-8 space-y-4">
+            <div className="text-destructive text-center">
+              <p className="font-medium">Failed to load row data</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                This row may not be cached for offline use.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Please ensure you've prefetched this park as a workspace while online.
+              </p>
+            </div>
+            <Button onClick={() => window.history.back()} variant="outline">
+              Go Back
+            </Button>
+          </div>
+        </Layout>
+      </AuthGuard>
+    );
+  }
+
+  // Generic error UI if row is missing for any reason
+  if (!row) {
+    return (
+      <AuthGuard>
+        <Layout title="Row Not Found" showBack>
+          <div className="flex flex-col items-center justify-center py-8 space-y-4">
+            <div className="text-destructive text-center">
+              <p className="font-medium">Row not found</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Unable to load row details.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                If you are offline, ensure this workspace was fully downloaded.
+              </p>
+            </div>
+            <Button onClick={() => window.history.back()} variant="outline">
+              Go Back
+            </Button>
+          </div>
+        </Layout>
+      </AuthGuard>
+    );
   }
 
   // Create breadcrumb format
@@ -114,8 +158,8 @@ const ScanRowPage = () => {
       onSuccess: (affectedBarcodes) => {
         if (!affectedBarcodes || affectedBarcodes === 0) {
           toast.info("Row is already empty");
-        }else{
-          toast.success("Successfully reset " + affectedBarcodes + " barcode" +(affectedBarcodes > 1 ? "s" : ""));
+        } else {
+          toast.success("Successfully reset " + affectedBarcodes + " barcode" + (affectedBarcodes > 1 ? "s" : ""));
         }
       },
       onError: (error) => {
@@ -135,7 +179,7 @@ const ScanRowPage = () => {
       setIsEditingRowName(true);
     }
   };
-  
+
   const saveRowName = async () => {
     if (rowName.trim()) {
       await updateRow(rowId, rowName);
@@ -155,7 +199,7 @@ const ScanRowPage = () => {
   return (
     <AuthGuard>
       <OfflineStatusBanner />
-      <Layout 
+      <Layout
         title={breadcrumb || 'Scan Barcode'}
         showBack
         showSettings={true}
@@ -203,7 +247,7 @@ const ScanRowPage = () => {
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center">
                 <span>
-                  Scanned: <span className="font-bold">{scanCount}</span> 
+                  Scanned: <span className="font-bold">{scanCount}</span>
                   {row?.expectedBarcodes ? ` / ${row.expectedBarcodes}` : '/∞'}
                 </span>
               </div>

@@ -30,12 +30,19 @@ const ScanPage = () => {
   }
 
   if (!parks || parks.length === 0) {
-    return <Navigate to="/" replace />;
+    return (
+      <Layout title="Select Park" showBack>
+        <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+          <p className="text-muted-foreground mb-4">No parks found.</p>
+          <Button onClick={() => navigate('/')} variant="outline">Go Home</Button>
+        </div>
+      </Layout>
+    );
   }
 
   return (
-    <Layout 
-      title="Select Park" 
+    <Layout
+      title="Select Park"
       showBack
       captureLocation={captureLocation}
       setCaptureLocation={setCaptureLocation}
@@ -50,8 +57,8 @@ const ScanPage = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full"
                 onClick={() => {
                   navigate(`/scan/park/${park.id}`);
