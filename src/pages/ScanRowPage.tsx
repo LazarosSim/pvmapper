@@ -28,7 +28,6 @@ const ScanRowPage = () => {
 
   const { rowId } = useParams<{ rowId: string }>();
   const { 
-    rows, 
     currentUser,
     updateRow
   } = useDB();
@@ -67,9 +66,10 @@ const ScanRowPage = () => {
   // Sync state - used to block scanning during sync
   const { isSyncing } = useSync();
 
-  if (isError) {
-    toast.error("Failed to fetch row data");
-  }
+  // Persist selected row/park for convenience elsewhere (not for refresh routing)
+  useEffect(() => {
+    if (rowId) localStorage.setItem('selectedRowId', rowId);
+  }, [rowId]);
 
   const latestBarcodes = barcodes?.slice(-10).reverse();
   const scanCount = Math.max(barcodes?.length || 0, 0);
@@ -83,19 +83,25 @@ const ScanRowPage = () => {
     return <Navigate to="/login" replace />;
   }
 
-  if (!rowId || !rows.some(r => r.id === rowId)) {
-    // Try to get remembered row from localStorage
-    const rememberedRowId = localStorage.getItem('selectedRowId');
-    if (rememberedRowId && rows.some(r => r.id === rememberedRowId)) {
-      return <Navigate to={`/scan/row/${rememberedRowId}`} replace />;
-    }
-    
-    // If no remembered row, try to get remembered park
-    const rememberedParkId = localStorage.getItem('selectedParkId');
-    if (rememberedParkId) {
-      return <Navigate to={`/scan/park/${rememberedParkId}`} replace />;
-    }
-    
+  // If the URL doesn't have a rowId, we can't deep-link.
+  if (!rowId) return <Navigate to="/scan" replace />;
+
+  // IMPORTANT: On refresh, the DB provider's in-memory rows list may be empty briefly.
+  // Do NOT redirect away from /scan/row/:rowId while the row query is still loading.
+  if (isLoading) {
+    return (
+      <AuthGuard>
+        <Layout title="Loading row..." showBack>
+          <div className="flex items-center justify-center py-8">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          </div>
+        </Layout>
+      </AuthGuard>
+    );
+  }
+
+  if (isError || !row) {
+    toast.error("Failed to fetch row data");
     return <Navigate to="/scan" replace />;
   }
 
