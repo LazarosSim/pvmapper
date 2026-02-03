@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useDB } from '@/lib/db-provider';
 import Layout from '@/components/layout/layout';
 import RowCard from '@/components/rows/row-card';
 import { Button } from '@/components/ui/button';
-import { Plus, List } from 'lucide-react';
+import { Plus, List, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import BulkRowsDialog from '@/components/dialog/bulk-rows-dialog';
 import type { Row } from '@/lib/types/db-types';
@@ -23,10 +22,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useRowsByParkId } from '@/hooks/use-row-queries';
+import { useParkStats } from '@/hooks/parks';
 
 const ParkDetail = () => {
   const { parkId } = useParams<{ parkId: string }>();
-  const { parks, getRowsByParkId, getParkById, addRow, isManager } = useDB();
+  const { addRow, isManager } = useDB();
+  const { data: parks, isLoading: parksLoading } = useParkStats();
+  const { data: rows, isLoading: rowsLoading } = useRowsByParkId(parkId || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddRowDialogOpen, setIsAddRowDialogOpen] = useState(false);
   const [expectedBarcodes, setExpectedBarcodes] = useState<string>('');
@@ -42,19 +45,29 @@ const ParkDetail = () => {
     }
   }, [parkId]);
 
-  if (!parkId || !parks.some(p => p.id === parkId)) {
+  // Show loading state while parks or rows are loading
+  if (parksLoading || rowsLoading) {
+    return (
+      <Layout title="Park Detail" showBack>
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!parkId || !parks?.some(p => p.id === parkId)) {
     // Try to get remembered park from localStorage
     const rememberedParkId = localStorage.getItem('selectedParkId');
-    if (rememberedParkId && parks.some(p => p.id === rememberedParkId)) {
+    if (rememberedParkId && parks?.some(p => p.id === rememberedParkId)) {
       return <Navigate to={`/park/${rememberedParkId}`} replace />;
     }
     return <Navigate to="/" replace />;
   }
 
-  const park = getParkById(parkId);
-  const rows = getRowsByParkId(parkId);
+  const park = parks?.find(p => p.id === parkId);
   
-  const filteredRows = rows.filter(row => 
+  const filteredRows = (rows || []).filter(row => 
     row.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 

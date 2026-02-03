@@ -12,11 +12,13 @@ import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,} from "@
 import {Label} from '@/components/ui/label';
 import {useParkBarcodes} from "@/hooks/use-barcodes-queries.tsx";
 import {useParkStats} from "@/hooks/parks";
+import {useRowsByParkId} from "@/hooks/use-row-queries";
 
 const ScanParkPage = () => {
   const { parkId } = useParams<{ parkId: string }>();
-  const { getRowsByParkId, addRow, countBarcodesInRow, addSubRow, isManager } = useDB();
+  const { addRow, countBarcodesInRow, addSubRow, isManager } = useDB();
   const { data: parks, isLoading: parksLoading } = useParkStats();
+  const { data: rows, isLoading: rowsLoading } = useRowsByParkId(parkId || '');
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddSubRowDialogOpen, setIsAddSubRowDialogOpen] = useState(false);
@@ -25,7 +27,7 @@ const ScanParkPage = () => {
 
   const {data: barcodes} = useParkBarcodes(parkId);
 
-  if (parksLoading) {
+  if (parksLoading || rowsLoading) {
     return (
       <Layout title="Select Row" showBack>
         <div className="flex items-center justify-center py-8">
@@ -40,9 +42,8 @@ const ScanParkPage = () => {
   }
 
   const park = parks?.find(p => p.id === parkId);
-  const rows = getRowsByParkId(parkId);
   
-  const filteredRows = rows.filter(row => 
+  const filteredRows = (rows || []).filter(row => 
     row.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 

@@ -1,9 +1,12 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Row } from '../../../types/db-types';
 
 /**
+ * @deprecated Use useRowsByParkId from src/hooks/use-row-queries.tsx instead.
+ * This function has a 1000-row limit issue due to Supabase/PostgREST defaults.
+ * Park-scoped queries via React Query avoid this limit and provide better caching.
+ * 
  * Fetch rows data from Supabase
  */
 export const fetchRows = async (

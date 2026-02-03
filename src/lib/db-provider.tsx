@@ -62,7 +62,8 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   const { importData, exportData, fetchBarcodesForRow } = useDataManagement(parks, rows, barcodes);
 
   // Load data when user changes
-  // Note: Barcodes are no longer fetched globally - individual pages use React Query hooks
+  // Note: Rows and Barcodes are no longer fetched globally - pages use React Query hooks
+  // (useRowsByParkId, useRowBarcodes, useParkBarcodes)
   useEffect(() => {
     let isMounted = true;
     
@@ -71,7 +72,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
         if (isMounted) {
           await fetchUserProfile(user.id);
           await fetchParks(user.id);
-          await fetchRows(user.id);
+          // Note: fetchRows removed - pages now use React Query (useRowsByParkId)
           // Note: fetchBarcodes removed - pages now use React Query (useRowBarcodes, useParkBarcodes)
           await fetchDailyScans(user.id);
         }
