@@ -82,12 +82,17 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     signOut: async () => {
       try {
         const { error } = await supabase.auth.signOut();
-        if (error) {
+        // Treat "session_not_found" as successful - user is already signed out
+        if (error && !error.message.includes('session_not_found') && !error.message.includes('Auth session missing')) {
           console.error("SignOut error:", error);
           toast.error(error.message);
           throw error;
         }
       } catch (error: any) {
+        // If it's a session not found error, treat as success
+        if (error?.message?.includes('session_not_found') || error?.message?.includes('Auth session missing')) {
+          return; // Silently succeed
+        }
         console.error("SignOut error:", error);
         toast.error(error.message || 'Failed to sign out');
         throw error;

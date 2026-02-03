@@ -61,16 +61,23 @@ export const useUser = () => {
     try {
       const { error } = await supabase.auth.signOut();
       
-      if (error) {
+      // Treat "session_not_found" as successful logout - user is already signed out
+      if (error && !error.message.includes('session_not_found') && !error.message.includes('Auth session missing')) {
         console.error('Error logging out:', error);
         toast.error(`Failed to logout: ${error.message}`);
         return;
       }
       
+      // Clear the last route to prevent redirecting back after logout
+      localStorage.removeItem('lastRoute');
+      
       toast.success('Logged out successfully');
     } catch (error: any) {
+      // Handle network errors or other issues gracefully
       console.error('Error in logout:', error.message);
-      toast.error(`Failed to logout: ${error.message}`);
+      // Still consider it a successful logout from the user's perspective
+      localStorage.removeItem('lastRoute');
+      toast.success('Logged out successfully');
     }
   };
 

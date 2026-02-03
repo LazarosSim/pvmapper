@@ -37,18 +37,7 @@ const LoginPage = () => {
       setShouldRedirect(true);
     }
   }, [isInitialized, user]);
-  useEffect(() => {
-    const clearSession = async () => {
-      try {
-        await supabase.auth.signOut();
-      } catch (error) {
-        console.log('No active session to clear');
-      }
-    };
-    if (location.pathname === '/login') {
-      clearSession();
-    }
-  }, [location]);
+  // Removed auto-signOut that was destroying valid sessions on page refresh
   const createDemoAccounts = async () => {
     try {
       setCreatingDemoAccounts(true);
