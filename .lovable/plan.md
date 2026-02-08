@@ -1,240 +1,159 @@
 
-# Plan: Preserve Barcode Order at All Stages of Data Handling
 
-## Root Cause Analysis
+# Plan: Fix Offline Barcode Editing Display and Counter Accuracy
 
-After a barcode was edited in Row 1 of Test Park, it moved from position 39 to position 2. This is a **critical data integrity bug** caused by field name mismatch between database responses (snake_case) and client cache (camelCase).
+## Issues Identified
 
-### The Bug Flow
+### 1. Build Error (Blocking)
+`src/hooks/use-workspace.ts` line 52 sets `createdBy` on a `Park` object, but the imported `Park` type from `src/lib/types/db-types.ts` has `userId` instead. This must be fixed first.
 
+### 2. Editing Offline Barcode Not Displayed Until Sync
+When a user edits a barcode that was scanned offline, the change appears briefly (optimistic cache update) but then reverts because `useMergedBarcodes` re-runs and reconstructs from IndexedDB. The merge logic in `mergeBarcodesWithPending` only applies pending UPDATE_BARCODE mutations to **server barcodes**, not to **pending adds**.
+
+**Current flow:**
 ```text
-1. User edits barcode at position 39
-2. updateBarcode() calls Supabase .update().select('*')
-3. Server returns: { id: "...", code: "...", order_in_row: 38, ... }
-4. useUpdateRowBarcode.onSuccess replaces cached barcode with server response
-5. Cache now has: { id: "...", code: "...", order_in_row: 38, orderInRow: undefined }
-6. mergeBarcodesWithPending sorts by: (a.orderInRow ?? 0)
-7. undefined ?? 0 = 0, so barcode moves to position 1/2
+1. Barcode "ABC" scanned offline -> queued as ADD_BARCODE
+2. User edits "ABC" to "XYZ" -> queued as UPDATE_BARCODE
+3. Optimistic cache update shows "XYZ" briefly
+4. useMergedBarcodes re-merges from IndexedDB:
+   - Pending adds: still shows "ABC" (original ADD_BARCODE)
+   - Pending updates: only checked against server barcodes
+5. Display reverts to "ABC"
 ```
 
-### Identified Vulnerabilities
-
-| Location | Issue | Severity |
-|----------|-------|----------|
-| `useUpdateRowBarcode` in `use-barcodes-queries.tsx:183` | Replaces cache entry with raw server response (snake_case), losing `orderInRow` | **CRITICAL** |
-| `useDeleteRowBarcode` in `use-barcodes-queries.tsx:197-207` | Mutates array in place (splice) instead of returning new array | Medium |
-| `mergeBarcodesWithPending` in `use-offline-barcodes.ts:71` | Relies on `orderInRow ?? 0` - undefined becomes 0 | High |
-| `updateBarcode` in `barcode-service.ts:56` | Returns `select('*')` without field mapping | Contributing factor |
-| Optimistic update in `use-offline-barcodes.ts:216-223` | Preserves order correctly (no issue here) | OK |
+### 3. Row and Park Card Counters Ignore Offline Mutations
+- **Row cards** (`row-card.tsx` line 51): Display `row.currentBarcodes` from the database, which does not include pending offline adds or reflect pending deletes.
+- **Park cards** (`park-card.tsx` line 61): Display `park.currentBarcodes` from the `park_stats` view, same issue.
+- **ScanParkPage** (line 183): Uses `countBarcodesInRow(row.id)` from `useDB()`, which relies on the deprecated global rows state (no longer populated since `fetchRows` was removed).
 
 ---
 
-## Solution: Order-Preserving Cache Updates
+## Solution
 
-### Phase 1: Fix `useUpdateRowBarcode` Cache Update
+### Phase 1: Fix Build Error
 
-**File:** `src/hooks/use-barcodes-queries.tsx`
+**File: `src/hooks/use-workspace.ts`**
+- Change `createdBy: data.created_by || ''` to `userId: data.created_by || ''` to match the `Park` type from `db-types.ts`.
 
-**Current (broken):**
-```typescript
-onSuccess: (barcode) => {
-    queryClient.setQueryData(['barcodes', 'row', rowId],
-        (oldData:{ id:string, code:string} []) => {
-            if (oldData) {
-                const index = oldData.findIndex(b => b.id === barcode.id);
-                if (index >= 0) {
-                    oldData[index] = barcode; // PROBLEM: Replaces with snake_case
-                }
-            }
-            return oldData;
-        })
-}
+### Phase 2: Fix Offline Edit Display in mergeBarcodesWithPending
+
+**File: `src/hooks/use-offline-barcodes.ts`**
+
+Update `mergeBarcodesWithPending` to also apply pending updates to pending adds:
+
+```text
+Current logic:
+  1. Get pending adds, deletes, updates
+  2. Process server barcodes (apply updates + mark deletes)
+  3. Combine server + pending adds
+  4. Sort
+
+Fixed logic:
+  1. Get pending adds, deletes, updates
+  2. Process server barcodes (apply updates + mark deletes)
+  3. Process pending adds (apply updates to them too)
+  4. Combine server + updated pending adds
+  5. Sort
 ```
 
-**Fixed (order-preserving):**
+The key change is adding step 3: iterating pending adds and checking if any UPDATE_BARCODE mutation targets them (matching by `barcodeId`). If so, update the displayed code.
+
+### Phase 3: Create an Offline-Aware Counter Hook
+
+**New file: `src/hooks/use-offline-counts.ts`**
+
+Create a hook `useOfflineAdjustedCounts` that:
+1. Reads the offline queue from IndexedDB
+2. Computes per-row adjustments: `+1` for each pending ADD_BARCODE, `-1` for each pending DELETE_BARCODE
+3. Aggregates per-park adjustments from row adjustments
+4. Returns functions: `getRowCountAdjustment(rowId)` and `getParkCountAdjustment(parkId)`
+5. Refreshes periodically (every 2 seconds, matching `usePendingCount`)
+
+### Phase 4: Update Row Card to Use Offline-Aware Counter
+
+**File: `src/components/rows/row-card.tsx`**
+
+- Import `useOfflineAdjustedCounts`
+- Change barcode count display from `row.currentBarcodes` to `row.currentBarcodes + adjustment`
+- Show a small indicator when there are pending offline changes
+
+### Phase 5: Update Park Card to Use Offline-Aware Counter
+
+**File: `src/components/parks/park-card.tsx`**
+
+- Import `useOfflineAdjustedCounts`
+- Adjust `currentBarcodesSafe` to include offline adjustment
+- Recalculate progress based on adjusted count
+
+### Phase 6: Fix ScanParkPage Counter
+
+**File: `src/pages/ScanParkPage.tsx`**
+
+- Replace `countBarcodesInRow(row.id)` (from deprecated `useDB()`) with `row.currentBarcodes + adjustment` using the new offline-aware hook
+- Remove the `countBarcodesInRow` import from `useDB()`
+
+---
+
+## Technical Details
+
+### Offline Counter Hook Design
+
 ```typescript
-onSuccess: (serverBarcode) => {
-    queryClient.setQueryData<Barcode[]>(['barcodes', 'row', rowId],
-        (oldData) => {
-            if (!oldData) return oldData;
-            
-            return oldData.map(b => {
-                if (b.id === serverBarcode.id) {
-                    // Merge: update only the code, preserve all other fields
-                    return {
-                        ...b,
-                        code: serverBarcode.code,
-                        // Explicitly preserve order
-                        orderInRow: b.orderInRow,
-                    };
-                }
-                return b;
-            });
-        })
-}
+// src/hooks/use-offline-counts.ts
+
+export const useOfflineAdjustedCounts = () => {
+  // State: Map<rowId, adjustment>
+  // Reads from IndexedDB queue periodically
+  
+  // For each pending ADD_BARCODE: rowAdjustments[rowId] += 1
+  // For each pending DELETE_BARCODE: rowAdjustments[rowId] -= 1
+  // UPDATE_BARCODE doesn't change counts
+  
+  return {
+    getRowAdjustment: (rowId: string) => number,
+    getParkAdjustment: (parkId: string, rows: Row[]) => number,
+    hasPendingChanges: boolean,
+  };
+};
 ```
 
-**Key changes:**
-- Use `.map()` instead of mutating in place (React Query best practice)
-- Merge fields instead of replacing the entire object
-- Explicitly preserve `orderInRow` from the original cache entry
+### mergeBarcodesWithPending Fix
 
-### Phase 2: Fix `useDeleteRowBarcode` Cache Update
+The fix applies pending updates to pending adds by checking `barcodeId` matches:
 
-**File:** `src/hooks/use-barcodes-queries.tsx`
-
-**Current (mutates in place):**
 ```typescript
-onSuccess: (barcode) => {
-    queryClient.setQueryData(['barcodes', 'row', rowId],
-        (oldData:{ id:string, code:string} []) => {
-            if (oldData) {
-                const index = oldData.findIndex(b => b.id === barcode.id);
-                if (index >= 0) {
-                    oldData.splice(index, 1); // Mutates array
-                }
-            }
-            return oldData;
-        })
-    ...
-}
-```
-
-**Fixed (immutable):**
-```typescript
-onSuccess: (deletedBarcode) => {
-    queryClient.setQueryData<Barcode[]>(['barcodes', 'row', rowId],
-        (oldData) => {
-            if (!oldData) return oldData;
-            // Filter returns new array, preserves order of remaining items
-            return oldData.filter(b => b.id !== deletedBarcode.id);
-        })
-    ...
-}
-```
-
-### Phase 3: Add Defensive Ordering in `mergeBarcodesWithPending`
-
-**File:** `src/hooks/use-offline-barcodes.ts`
-
-**Current (vulnerable to undefined):**
-```typescript
-return combined.sort((a, b) => (a.orderInRow ?? 0) - (b.orderInRow ?? 0));
-```
-
-**Fixed (defensive with timestamp fallback):**
-```typescript
-return combined.sort((a, b) => {
-    // Primary sort: by orderInRow (required for correct display)
-    const orderA = a.orderInRow ?? Number.MAX_SAFE_INTEGER;
-    const orderB = b.orderInRow ?? Number.MAX_SAFE_INTEGER;
-    
-    if (orderA !== orderB) {
-        return orderA - orderB;
-    }
-    
-    // Fallback: sort by timestamp to maintain insertion order
-    const timeA = new Date(a.timestamp || 0).getTime();
-    const timeB = new Date(b.timestamp || 0).getTime();
-    return timeA - timeB;
+// After getting pendingAdds, apply any UPDATE_BARCODE mutations
+const updatedPendingAdds = pendingAdds.map(add => {
+  const updatedCode = pendingUpdates.get(add.id);
+  if (updatedCode) {
+    return { ...add, code: updatedCode, pendingCode: updatedCode };
+  }
+  return add;
 });
 ```
 
-**Why `MAX_SAFE_INTEGER` instead of 0:**
-- If `orderInRow` is undefined (corrupted data), push to end not beginning
-- Prevents newly corrupted data from displacing existing ordered data
-
-### Phase 4: Add Defensive Ordering in Query Functions
-
-**File:** `src/hooks/use-barcodes-queries.tsx`
-
-Already correctly ordering by `order_in_row` in the query (line 30), but add a client-side safety sort after mapping:
-
-```typescript
-const loadBarcodesByRow = async (rowId: string): Promise<Barcode[]> => {
-    const query = supabase
-        .from('barcodes')
-        .select('id, code, rowId:row_id, userId:user_id, timestamp, orderInRow:order_in_row, latitude, longitude')
-        .eq("row_id", rowId)
-        .order('order_in_row', {ascending: true});
-
-    const {data: barcodes, error} = await query;
-
-    if (error) {
-        console.error("Error loading barcodes:", error);
-        throw error;
-    }
-    
-    // Safety sort - ensure order even if cache was corrupted
-    return (barcodes || []).sort((a, b) => 
-        (a.orderInRow ?? Number.MAX_SAFE_INTEGER) - (b.orderInRow ?? Number.MAX_SAFE_INTEGER)
-    );
-}
-```
-
-### Phase 5: Improve `updateBarcode` Service Response
-
-**File:** `src/services/barcode-service.ts`
-
-**Current:** Returns raw server response with snake_case
-
-**Fixed:** Map to client format with explicit ordering:
-
-```typescript
-export const updateBarcode = async ({id, code}: { id: string, code: string }) => {
-    console.log("about to update barcode with id " + id + " and code " + code);
-
-    const {data: updatedRow, error} = await supabase
-        .from('barcodes')
-        .update({code: code})
-        .eq('id', id)
-        .select('id, code, rowId:row_id, userId:user_id, timestamp, orderInRow:order_in_row, latitude, longitude')
-        .single()
-
-    assertNoError(error, 'updating barcode');
-    return updatedRow;
-}
-```
-
-This ensures the response matches the client type (camelCase) exactly.
-
 ---
 
-## Files to Modify
+## Files Summary
 
-| File | Changes |
-|------|---------|
-| `src/hooks/use-barcodes-queries.tsx` | Fix `useUpdateRowBarcode` and `useDeleteRowBarcode` cache updates |
-| `src/hooks/use-offline-barcodes.ts` | Defensive sorting in `mergeBarcodesWithPending` |
-| `src/services/barcode-service.ts` | Map response fields to camelCase in `updateBarcode` |
+| File | Change |
+|------|--------|
+| `src/hooks/use-workspace.ts` | Fix `createdBy` -> `userId` build error |
+| `src/hooks/use-offline-barcodes.ts` | Apply pending updates to pending adds in merge |
+| `src/hooks/use-offline-counts.ts` | **New** - Offline-aware counter adjustment hook |
+| `src/components/rows/row-card.tsx` | Use adjusted counter |
+| `src/components/parks/park-card.tsx` | Use adjusted counter |
+| `src/pages/ScanParkPage.tsx` | Replace deprecated `countBarcodesInRow` with adjusted counter |
 
 ---
 
 ## Testing Checklist
 
-After implementation:
+- [ ] Build error resolved - app compiles without errors
+- [ ] Scan a barcode offline, then edit it from Home > Row Detail - the new code should display immediately without syncing
+- [ ] Scan barcodes offline - row card counter should increase on Home and Scan navigation
+- [ ] Delete a barcode offline - row card counter should decrease
+- [ ] Park card total should reflect offline adds/deletes
+- [ ] After syncing, counters should still be accurate (adjustments reset to 0)
+- [ ] While online with no pending changes, counters should match database values exactly
 
-- [ ] Edit barcode at position 39 in Row 1 - verify it stays at position 39
-- [ ] Edit barcode at position 1 in Row 1 - verify it stays at position 1
-- [ ] Delete barcode at position 20 - verify positions 21+ shift down correctly
-- [ ] Add new barcode - verify it appears at the end
-- [ ] Insert barcode at middle position - verify order is maintained
-- [ ] Refresh page after edit - verify database order matches display
-- [ ] Test offline edit + sync - verify order preserved after sync
-- [ ] Export data - verify exported order matches UI order
-
----
-
-## Prevention: Type Safety Improvements
-
-Add explicit type checking to catch similar issues in the future:
-
-```typescript
-// In types/db-types.ts - add validation
-export function assertBarcodeHasOrder(barcode: Partial<Barcode>): asserts barcode is Barcode {
-    if (typeof barcode.orderInRow !== 'number') {
-        console.error('Barcode missing orderInRow:', barcode);
-        throw new Error('Barcode must have orderInRow');
-    }
-}
-```
