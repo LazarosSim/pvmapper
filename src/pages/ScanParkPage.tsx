@@ -13,10 +13,12 @@ import { Label } from '@/components/ui/label';
 import { useParkBarcodes } from "@/hooks/use-barcodes-queries.tsx";
 import { useParkStats } from "@/hooks/parks";
 import { useRowsByParkId } from "@/hooks/use-row-queries";
+import { useOfflineAdjustedCounts } from '@/hooks/use-offline-counts';
 
 const ScanParkPage = () => {
   const { parkId } = useParams<{ parkId: string }>();
-  const { addRow, countBarcodesInRow, addSubRow, isManager } = useDB();
+  const { addRow, addSubRow, isManager } = useDB();
+  const { getRowAdjustment } = useOfflineAdjustedCounts();
   const { data: parks, isLoading: parksLoading } = useParkStats();
   const { data: rows, isLoading: rowsLoading } = useRowsByParkId(parkId || '');
   const navigate = useNavigate();
@@ -180,7 +182,7 @@ const ScanParkPage = () => {
                           <div className="flex justify-between items-center">
                             <CardTitle className="text-lg font-semibold">{row.name}</CardTitle>
                             <span className="text-sm text-muted-foreground">
-                              {countBarcodesInRow(row.id)} {row.expectedBarcodes ? `/ ${row.expectedBarcodes}` : ''} barcodes
+                              {(row.currentBarcodes || 0) + getRowAdjustment(row.id)} {row.expectedBarcodes ? `/ ${row.expectedBarcodes}` : ''} barcodes
                             </span>
                           </div>
                           <CardDescription>
