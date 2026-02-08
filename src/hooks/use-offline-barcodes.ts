@@ -65,8 +65,17 @@ export const mergeBarcodesWithPending = async (
     // Filter out items marked for deletion from the display
     .filter(b => !b.isDeleting);
 
+  // Apply pending updates to pending adds (fixes offline edit not showing)
+  const updatedPendingAdds: MergedBarcode[] = pendingAdds.map(add => {
+    const updatedCode = pendingUpdates.get(add.id);
+    if (updatedCode) {
+      return { ...add, code: updatedCode, pendingCode: updatedCode };
+    }
+    return add;
+  });
+
   // Combine and sort by orderInRow with defensive fallback
-  const combined: MergedBarcode[] = [...processedServer, ...pendingAdds];
+  const combined: MergedBarcode[] = [...processedServer, ...updatedPendingAdds];
   
   return combined.sort((a, b) => {
     // Primary sort: by orderInRow (required for correct display)

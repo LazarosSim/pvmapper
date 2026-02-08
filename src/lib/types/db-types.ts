@@ -17,6 +17,9 @@ export type Park = {
   createdAt: string;
   userId: string;
   validateBarcodeLength?: boolean;
+  currentBarcodes?: number;
+  archived?: boolean;
+  archivedAt?: string | null;
 };
 
 // Row type

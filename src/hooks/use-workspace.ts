@@ -49,7 +49,7 @@ const loadParkById = async (parkId: string): Promise<Park | null> => {
     id: data.id!,
     name: data.name!,
     createdAt: data.created_at!,
-    createdBy: data.created_by || '',
+    userId: data.created_by || '',
     expectedBarcodes: data.expected_barcodes ?? 0,
     currentBarcodes: data.current_barcodes ?? 0,
     validateBarcodeLength: data.validate_barcode_length ?? false,

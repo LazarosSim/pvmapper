@@ -7,10 +7,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Edit, Trash2, MoreVertical, FolderOpen, Plus } from 'lucide-react';
+import { Edit, Trash2, MoreVertical, FolderOpen, Plus, Cloud } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDB, Row } from '@/lib/db-provider';
 import { formatDistanceToNow } from 'date-fns';
+import { useOfflineAdjustedCounts } from '@/hooks/use-offline-counts';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +41,7 @@ interface RowCardProps {
 const RowCard: React.FC<RowCardProps> = ({ row, onOpen }) => {
   const navigate = useNavigate();
   const { countBarcodesInRow, deleteRow, updateRow, addSubRow, isManager } = useDB();
+  const { getRowAdjustment } = useOfflineAdjustedCounts();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
   const [editName, setEditName] = React.useState(row.name);
@@ -47,8 +49,9 @@ const RowCard: React.FC<RowCardProps> = ({ row, onOpen }) => {
     row.expectedBarcodes !== undefined && row.expectedBarcodes !== null ? String(row.expectedBarcodes) : ''
   );
   
-  // Use the currentBarcodes directly from the row object
-  const barcodeCount = row.currentBarcodes || 0;
+  // Use the currentBarcodes + offline adjustment for accurate display
+  const offlineAdjustment = getRowAdjustment(row.id);
+  const barcodeCount = (row.currentBarcodes || 0) + offlineAdjustment;
   const createdAt = formatDistanceToNow(new Date(row.createdAt), { addSuffix: true });
   
   const handleEdit = () => {
@@ -143,10 +146,15 @@ const RowCard: React.FC<RowCardProps> = ({ row, onOpen }) => {
         <CardContent>
           <div className="text-sm text-muted-foreground mb-2">Created {createdAt}</div>
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex items-center gap-1">
               <span className="text-sm font-medium">
                 {barcodeCount} {row.expectedBarcodes ? `/ ${row.expectedBarcodes}` : ''} Barcodes
               </span>
+              {offlineAdjustment !== 0 && (
+                <span title={`${offlineAdjustment > 0 ? '+' : ''}${offlineAdjustment} pending`}>
+                  <Cloud className="h-3 w-3 text-amber-500" />
+                </span>
+              )}
             </div>
             <Button variant="outline" size="sm" onClick={handleOpenRow}>
               <FolderOpen className="mr-2 h-4 w-4" />

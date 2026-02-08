@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
-import {Archive, ArchiveRestore, Edit, FileDown, FolderOpen, Loader2, MoreVertical, Trash2} from 'lucide-react';
+import {Archive, ArchiveRestore, Cloud, Edit, FileDown, FolderOpen, Loader2, MoreVertical, Trash2} from 'lucide-react';
 import {useNavigate} from 'react-router-dom';
 import {formatDistanceToNow} from 'date-fns';
 import {Progress} from '@/components/ui/progress';
@@ -37,6 +37,7 @@ import {useCurrentUser} from "@/hooks/use-user.tsx";
 import {useRowsByParkId} from "@/hooks/use-row-queries.tsx";
 import {useParkBarcodes} from "@/hooks/use-barcodes-queries.tsx";
 import {supabase} from '@/integrations/supabase/client';
+import {useOfflineAdjustedCounts} from '@/hooks/use-offline-counts';
 
 interface ParkCardProps {
   park: Park;
@@ -56,12 +57,6 @@ const ParkCard: React.FC<ParkCardProps> = ({
 
   const [isExporting, setIsExporting] = useState(false);
 
-  // Guard against null/0 expected barcodes causing Infinity/NaN and breaking rendering
-  const expectedBarcodesSafe = Number.isFinite(park.expectedBarcodes) ? park.expectedBarcodes : 0;
-  const currentBarcodesSafe = Number.isFinite(park.currentBarcodes) ? park.currentBarcodes : 0;
-  const progressValue = expectedBarcodesSafe > 0 ? (currentBarcodesSafe / expectedBarcodesSafe) * 100 : 0;
-  const progress = Number.isFinite(progressValue) ? progressValue.toFixed(2) : '0.00';
-
   const {data: currentUser} = useCurrentUser()
   const {data: rows, isLoading: rowsLoading} = useRowsByParkId(park.id);
   const {data: barcodes, isLoading: barcodesLoading} = useParkBarcodes(park.id);
@@ -69,6 +64,17 @@ const ParkCard: React.FC<ParkCardProps> = ({
   const {mutate: deletePark} = useDeletePark();
   const {mutate: archivePark} = useArchivePark();
   const {mutate: unarchivePark} = useUnarchivePark();
+
+  // Offline-aware counter adjustments (must be after rows hook)
+  const { getParkAdjustment } = useOfflineAdjustedCounts();
+  const rowIds = (rows || []).map(r => r.id);
+  const parkOfflineAdjustment = getParkAdjustment(rowIds);
+
+  // Guard against null/0 expected barcodes causing Infinity/NaN and breaking rendering
+  const expectedBarcodesSafe = Number.isFinite(park.expectedBarcodes) ? park.expectedBarcodes : 0;
+  const currentBarcodesSafe = (Number.isFinite(park.currentBarcodes) ? park.currentBarcodes : 0) + parkOfflineAdjustment;
+  const progressValue = expectedBarcodesSafe > 0 ? (currentBarcodesSafe / expectedBarcodesSafe) * 100 : 0;
+  const progress = Number.isFinite(progressValue) ? progressValue.toFixed(2) : '0.00';
 
   const rowCount = rows?.length || 0;
 
@@ -350,10 +356,15 @@ const ParkCard: React.FC<ParkCardProps> = ({
           </div>}
         
         <div className="flex items-center justify-between mt-2">
-          <div>
+          <div className="flex items-center gap-1">
             <span className="text-sm font-medium">{rowCount} Rows</span>
             <span className="mx-2 text-muted-foreground">•</span>
-             <span className="text-sm font-medium">{currentBarcodesSafe} Barcodes</span>
+            <span className="text-sm font-medium">{currentBarcodesSafe} Barcodes</span>
+            {parkOfflineAdjustment !== 0 && (
+              <span title={`${parkOfflineAdjustment > 0 ? '+' : ''}${parkOfflineAdjustment} pending`}>
+                <Cloud className="h-3 w-3 text-amber-500 ml-1" />
+              </span>
+            )}
             {isDataLoading && <span className="mx-2 text-muted-foreground text-xs">(Loading...)</span>}
           </div>
           <Button variant="outline" size="sm" onClick={handleOpenPark} className="bg-inventory-secondary/10 text-inventory-secondary hover:bg-inventory-secondary/20 border-inventory-secondary/30">
