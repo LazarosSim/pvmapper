@@ -6,6 +6,7 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/compo
 import {Textarea} from '@/components/ui/textarea';
 import {toast} from 'sonner';
 import {utils as XLSXUtils, writeFile as writeXLSXFile} from 'xlsx';
+import {naturalCompare} from '@/lib/utils';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/components/ui/select";
 import {
   AlertDialog,
@@ -165,7 +166,7 @@ const BackupPage = () => {
       }
 
       // Sort worksheets alphabetically by name
-      worksheets.sort((a, b) => a.name.localeCompare(b.name));
+      worksheets.sort((a, b) => naturalCompare(a.name, b.name));
 
       // Add sorted worksheets to workbook
       worksheets.forEach(({ name, worksheet }) => {
