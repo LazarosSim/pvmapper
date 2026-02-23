@@ -14,6 +14,7 @@ import { useParkBarcodes } from "@/hooks/use-barcodes-queries.tsx";
 import { useParkStats } from "@/hooks/parks";
 import { useRowsByParkId } from "@/hooks/use-row-queries";
 import { useOfflineAdjustedCounts } from '@/hooks/use-offline-counts';
+import { naturalCompare } from '@/lib/utils';
 
 const ScanParkPage = () => {
   const { parkId } = useParams<{ parkId: string }>();
@@ -117,35 +118,27 @@ const ScanParkPage = () => {
 
   // Group rows by their base number for display
   const groupRows = () => {
-    const grouped: { [key: string]: { rows: Row[], order: number } } = {};
+    const grouped: { [key: string]: { rows: Row[] } } = {};
 
     filteredRows.forEach(row => {
-      // Extract row number (e.g. "Row 1_a" -> "1")
-      const match = row.name.match(/^Row\s+(\d+)/i);
+      const match = row.name.match(/^Row\s+([\d.]+)/i);
       if (match) {
         const baseNum = match[1];
-        const order = parseInt(baseNum);
         if (!grouped[baseNum]) {
-          grouped[baseNum] = { rows: [], order };
+          grouped[baseNum] = { rows: [] };
         }
         grouped[baseNum].rows.push(row);
       } else {
-        // Fallback for rows that don't match the pattern
         if (!grouped['other']) {
-          grouped['other'] = { rows: [], order: Infinity };
+          grouped['other'] = { rows: [] };
         }
         grouped['other'].rows.push(row);
       }
     });
 
-    // Sort rows within each group
+    // Sort rows within each group using natural sort
     Object.keys(grouped).forEach(key => {
-      grouped[key].rows.sort((a, b) => {
-        // Sort by suffix (a, b, c, etc.) if they have the same base number
-        const suffixA = a.name.match(/_([a-z])$/i)?.[1] || '';
-        const suffixB = b.name.match(/_([a-z])$/i)?.[1] || '';
-        return suffixA.localeCompare(suffixB);
-      });
+      grouped[key].rows.sort((a, b) => naturalCompare(a.name, b.name));
     });
 
     return grouped;
@@ -171,7 +164,7 @@ const ScanParkPage = () => {
         {/* Render grouped rows */}
         {Object.keys(rowGroups).length > 0 ? (
           Object.keys(rowGroups)
-            .sort((a, b) => rowGroups[a].order - rowGroups[b].order)
+            .sort((a, b) => naturalCompare(a, b))
             .map(groupKey => (
               <div key={groupKey} className="mb-6">
                 <div className="flex flex-wrap gap-4">

@@ -5,6 +5,7 @@ import Layout from '@/components/layout/layout';
 import RowCard from '@/components/rows/row-card';
 import { Button } from '@/components/ui/button';
 import { Plus, List, Loader2 } from 'lucide-react';
+import { naturalCompare } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import BulkRowsDialog from '@/components/dialog/bulk-rows-dialog';
 import type { Row } from '@/lib/types/db-types';
@@ -96,7 +97,7 @@ const ParkDetail = () => {
     const grouped: { [key: string]: Row[] } = {};
     
     filteredRows.forEach(row => {
-      const match = row.name.match(/^Row\s+(\d+)/i);
+      const match = row.name.match(/^Row\s+([\d.]+)/i);
       if (match) {
         const baseNum = match[1];
         if (!grouped[baseNum]) {
@@ -112,11 +113,7 @@ const ParkDetail = () => {
     });
     
     Object.keys(grouped).forEach(key => {
-      grouped[key].sort((a, b) => {
-        const suffixA = a.name.match(/_([a-z])$/i)?.[1] || '';
-        const suffixB = b.name.match(/_([a-z])$/i)?.[1] || '';
-        return suffixA.localeCompare(suffixB);
-      });
+      grouped[key].sort((a, b) => naturalCompare(a.name, b.name));
     });
     
     return grouped;
@@ -137,12 +134,7 @@ const ParkDetail = () => {
         </div>
 
         {Object.keys(rowGroups).length > 0 ? (
-          Object.keys(rowGroups).sort((a, b) => {
-            if (!isNaN(Number(a)) && !isNaN(Number(b))) {
-              return Number(a) - Number(b);
-            }
-            return a.localeCompare(b);
-          }).map(groupKey => (
+          Object.keys(rowGroups).sort((a, b) => naturalCompare(a, b)).map(groupKey => (
             <div key={groupKey} className="mb-6">
               <div className="flex flex-wrap gap-4">
                 {rowGroups[groupKey].map(row => (

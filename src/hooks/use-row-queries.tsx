@@ -1,5 +1,6 @@
 import {supabase} from "@/integrations/supabase/client.ts";
 import {useQuery} from "@tanstack/react-query";
+import {naturalCompare} from "@/lib/utils";
 
 const loadRows = async () => {
     const {data, error} = await supabase
@@ -10,7 +11,7 @@ const loadRows = async () => {
         throw error;
     }
 
-    return data;
+    return data.sort((a, b) => naturalCompare(a.name, b.name));
 }
 
 const loadRowById = async (rowId: string) => {
@@ -36,7 +37,7 @@ const loadRowsByParkId = async (parkId: string) => {
     if (error) {
         throw error;
     }
-    return data;
+    return data.sort((a, b) => naturalCompare(a.name, b.name));
 }
 
 export const useRow = (rowId: string) => {
