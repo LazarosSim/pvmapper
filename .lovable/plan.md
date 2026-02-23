@@ -1,159 +1,102 @@
 
 
-# Plan: Fix Offline Barcode Editing Display and Counter Accuracy
+# Plan: Offline Row Reset and Natural Row Ordering
 
-## Issues Identified
+## Issue 1: Cannot Reset a Row While Offline
 
-### 1. Build Error (Blocking)
-`src/hooks/use-workspace.ts` line 52 sets `createdBy` on a `Park` object, but the imported `Park` type from `src/lib/types/db-types.ts` has `userId` instead. This must be fixed first.
+**Root cause:** The `useResetRowBarcodes` mutation (in `use-barcodes-queries.tsx`) calls Supabase directly to delete barcodes. When offline, this network call fails silently or throws an error. There is no offline queue support for a "reset row" operation.
 
-### 2. Editing Offline Barcode Not Displayed Until Sync
-When a user edits a barcode that was scanned offline, the change appears briefly (optimistic cache update) but then reverts because `useMergedBarcodes` re-runs and reconstructs from IndexedDB. The merge logic in `mergeBarcodesWithPending` only applies pending UPDATE_BARCODE mutations to **server barcodes**, not to **pending adds**.
+**Solution:** When offline, instead of calling Supabase, clear the row's pending barcodes from IndexedDB and the React Query cache locally. When back online, queue individual DELETE operations or simply let the next sync handle it.
 
-**Current flow:**
+The approach:
+
+1. **Detect offline state** in the reset handler (`ScanRowPage.tsx` and `RowDetail.tsx`).
+2. **When offline:**
+   - Remove all `ADD_BARCODE` mutations for this row from IndexedDB (they haven't been synced yet, so just discard them).
+   - Queue `DELETE_BARCODE` mutations for any **server-synced** barcodes that are in the React Query cache for this row.
+   - Clear the React Query cache for `['barcodes', 'row', rowId]`.
+   - Show a success toast indicating the reset is queued.
+3. **When online:** Keep the existing direct Supabase delete behavior (it already works).
+
+**Files to modify:**
+- `src/lib/offline/types.ts` -- Add `RESET_ROW` mutation type (or reuse `DELETE_BARCODE` per-barcode)
+- `src/lib/offline/offline-queue.ts` -- Add helper: `removeQueuedMutationsByRow(rowId)` to bulk-remove pending adds for a row
+- `src/hooks/use-barcodes-queries.tsx` -- Update `useResetRowBarcodes` to handle offline case
+- `src/hooks/use-offline-counts.ts` -- Ensure counter adjustments reflect the reset
+
+---
+
+## Issue 2: Rows Appear in Wrong Order
+
+**Root cause:** Row ordering happens in three places, all using simple lexicographic (string) sorting which fails for multi-part numeric names:
+
+| Location | Sorting Method | Problem |
+|---|---|---|
+| Database query (`use-row-queries.tsx`) | `.order('name', { ascending: true })` | PostgreSQL sorts strings: `"10.1_19"` < `"10.1_2"` because `"1" < "2"` at position 5 |
+| `ParkDetail.tsx` grouping | Regex `^Row\s+(\d+)` only captures first integer | Names like `Row 10.1_2` -- the dot makes the regex miss the full number |
+| `ScanParkPage.tsx` grouping | Same regex, same problem | Same issue |
+
+**Example of the bug:**
 ```text
-1. Barcode "ABC" scanned offline -> queued as ADD_BARCODE
-2. User edits "ABC" to "XYZ" -> queued as UPDATE_BARCODE
-3. Optimistic cache update shows "XYZ" briefly
-4. useMergedBarcodes re-merges from IndexedDB:
-   - Pending adds: still shows "ABC" (original ADD_BARCODE)
-   - Pending updates: only checked against server barcodes
-5. Display reverts to "ABC"
+Lexicographic:  10.1_17, 10.1_18, 10.1_19, 10.1_2, 10.1_20
+Natural order:  10.1_1, 10.1_2, ..., 10.1_17, 10.1_18, 10.1_19, 10.1_20
 ```
 
-### 3. Row and Park Card Counters Ignore Offline Mutations
-- **Row cards** (`row-card.tsx` line 51): Display `row.currentBarcodes` from the database, which does not include pending offline adds or reflect pending deletes.
-- **Park cards** (`park-card.tsx` line 61): Display `park.currentBarcodes` from the `park_stats` view, same issue.
-- **ScanParkPage** (line 183): Uses `countBarcodesInRow(row.id)` from `useDB()`, which relies on the deprecated global rows state (no longer populated since `fetchRows` was removed).
+**Solution:** Implement a natural sort comparison function and apply it everywhere rows are displayed.
 
----
+### Natural Sort Function
 
-## Solution
-
-### Phase 1: Fix Build Error
-
-**File: `src/hooks/use-workspace.ts`**
-- Change `createdBy: data.created_by || ''` to `userId: data.created_by || ''` to match the `Park` type from `db-types.ts`.
-
-### Phase 2: Fix Offline Edit Display in mergeBarcodesWithPending
-
-**File: `src/hooks/use-offline-barcodes.ts`**
-
-Update `mergeBarcodesWithPending` to also apply pending updates to pending adds:
+Create a shared utility that splits row names into numeric and non-numeric segments, then compares segments numerically where possible:
 
 ```text
-Current logic:
-  1. Get pending adds, deletes, updates
-  2. Process server barcodes (apply updates + mark deletes)
-  3. Combine server + pending adds
-  4. Sort
+"Row 10.1_2"  -> ["Row ", 10, ".", 1, "_", 2]
+"Row 10.1_19" -> ["Row ", 10, ".", 1, "_", 19]
 
-Fixed logic:
-  1. Get pending adds, deletes, updates
-  2. Process server barcodes (apply updates + mark deletes)
-  3. Process pending adds (apply updates to them too)
-  4. Combine server + updated pending adds
-  5. Sort
+Compare segment by segment:
+  "Row " == "Row "  -> equal
+  10 == 10          -> equal
+  "." == "."        -> equal
+  1 == 1            -> equal
+  "_" == "_"        -> equal
+  2 < 19            -> Row 10.1_2 comes first
 ```
 
-The key change is adding step 3: iterating pending adds and checking if any UPDATE_BARCODE mutation targets them (matching by `barcodeId`). If so, update the displayed code.
+### Where to Apply
 
-### Phase 3: Create an Offline-Aware Counter Hook
+1. **Database queries** (`use-row-queries.tsx`, `use-workspace.ts`): Keep `.order('name')` for the DB (can't do natural sort in PostgreSQL easily), but add a **client-side re-sort** after fetching.
+2. **ParkDetail.tsx** `groupRows()`: Update regex to capture full numeric identifiers like `10.1` (e.g., `^Row\s+([\d.]+)`), and sort groups using natural comparison.
+3. **ScanParkPage.tsx** `groupRows()`: Same fix as ParkDetail.
+4. **Within-group sorting**: Replace `suffixA.localeCompare(suffixB)` with the natural sort function so `_2` sorts before `_19`.
 
-**New file: `src/hooks/use-offline-counts.ts`**
-
-Create a hook `useOfflineAdjustedCounts` that:
-1. Reads the offline queue from IndexedDB
-2. Computes per-row adjustments: `+1` for each pending ADD_BARCODE, `-1` for each pending DELETE_BARCODE
-3. Aggregates per-park adjustments from row adjustments
-4. Returns functions: `getRowCountAdjustment(rowId)` and `getParkCountAdjustment(parkId)`
-5. Refreshes periodically (every 2 seconds, matching `usePendingCount`)
-
-### Phase 4: Update Row Card to Use Offline-Aware Counter
-
-**File: `src/components/rows/row-card.tsx`**
-
-- Import `useOfflineAdjustedCounts`
-- Change barcode count display from `row.currentBarcodes` to `row.currentBarcodes + adjustment`
-- Show a small indicator when there are pending offline changes
-
-### Phase 5: Update Park Card to Use Offline-Aware Counter
-
-**File: `src/components/parks/park-card.tsx`**
-
-- Import `useOfflineAdjustedCounts`
-- Adjust `currentBarcodesSafe` to include offline adjustment
-- Recalculate progress based on adjusted count
-
-### Phase 6: Fix ScanParkPage Counter
-
-**File: `src/pages/ScanParkPage.tsx`**
-
-- Replace `countBarcodesInRow(row.id)` (from deprecated `useDB()`) with `row.currentBarcodes + adjustment` using the new offline-aware hook
-- Remove the `countBarcodesInRow` import from `useDB()`
+**Files to modify:**
+- `src/lib/utils.ts` -- Add `naturalCompare(a: string, b: string): number` utility
+- `src/hooks/use-row-queries.tsx` -- Add client-side natural sort after query
+- `src/hooks/use-workspace.ts` -- Add client-side natural sort after fetch
+- `src/pages/ParkDetail.tsx` -- Update `groupRows()` regex and sorting
+- `src/pages/ScanParkPage.tsx` -- Update `groupRows()` regex and sorting
 
 ---
 
-## Technical Details
-
-### Offline Counter Hook Design
-
-```typescript
-// src/hooks/use-offline-counts.ts
-
-export const useOfflineAdjustedCounts = () => {
-  // State: Map<rowId, adjustment>
-  // Reads from IndexedDB queue periodically
-  
-  // For each pending ADD_BARCODE: rowAdjustments[rowId] += 1
-  // For each pending DELETE_BARCODE: rowAdjustments[rowId] -= 1
-  // UPDATE_BARCODE doesn't change counts
-  
-  return {
-    getRowAdjustment: (rowId: string) => number,
-    getParkAdjustment: (parkId: string, rows: Row[]) => number,
-    hasPendingChanges: boolean,
-  };
-};
-```
-
-### mergeBarcodesWithPending Fix
-
-The fix applies pending updates to pending adds by checking `barcodeId` matches:
-
-```typescript
-// After getting pendingAdds, apply any UPDATE_BARCODE mutations
-const updatedPendingAdds = pendingAdds.map(add => {
-  const updatedCode = pendingUpdates.get(add.id);
-  if (updatedCode) {
-    return { ...add, code: updatedCode, pendingCode: updatedCode };
-  }
-  return add;
-});
-```
-
----
-
-## Files Summary
+## Summary of All File Changes
 
 | File | Change |
-|------|--------|
-| `src/hooks/use-workspace.ts` | Fix `createdBy` -> `userId` build error |
-| `src/hooks/use-offline-barcodes.ts` | Apply pending updates to pending adds in merge |
-| `src/hooks/use-offline-counts.ts` | **New** - Offline-aware counter adjustment hook |
-| `src/components/rows/row-card.tsx` | Use adjusted counter |
-| `src/components/parks/park-card.tsx` | Use adjusted counter |
-| `src/pages/ScanParkPage.tsx` | Replace deprecated `countBarcodesInRow` with adjusted counter |
+|---|---|
+| `src/lib/utils.ts` | Add `naturalCompare` sort utility |
+| `src/lib/offline/offline-queue.ts` | Add `removeQueuedMutationsByRow(rowId)` helper |
+| `src/hooks/use-barcodes-queries.tsx` | Offline-aware `useResetRowBarcodes` |
+| `src/hooks/use-row-queries.tsx` | Client-side natural sort on query results |
+| `src/hooks/use-workspace.ts` | Client-side natural sort on prefetched rows |
+| `src/hooks/use-offline-counts.ts` | Account for reset operations in adjustments |
+| `src/pages/ParkDetail.tsx` | Fix `groupRows()` regex and use natural sort |
+| `src/pages/ScanParkPage.tsx` | Fix `groupRows()` regex and use natural sort |
 
 ---
 
 ## Testing Checklist
 
-- [ ] Build error resolved - app compiles without errors
-- [ ] Scan a barcode offline, then edit it from Home > Row Detail - the new code should display immediately without syncing
-- [ ] Scan barcodes offline - row card counter should increase on Home and Scan navigation
-- [ ] Delete a barcode offline - row card counter should decrease
-- [ ] Park card total should reflect offline adds/deletes
-- [ ] After syncing, counters should still be accurate (adjustments reset to 0)
-- [ ] While online with no pending changes, counters should match database values exactly
+- [ ] Go offline, open a row with scanned barcodes, tap Reset -- barcodes should clear from the UI
+- [ ] Go back online, sync -- the reset should persist on the server
+- [ ] Verify rows with names like `Row 10.1_1` through `Row 10.1_20` appear in correct numeric order on both Home (ParkDetail) and Scan (ScanParkPage) navigation
+- [ ] Verify rows with simple names (`Row 1`, `Row 2`, ..., `Row 10`) also sort correctly
+- [ ] Verify subrow suffixes sort correctly: `Row 5_a`, `Row 5_b`, ..., `Row 5_z`
 
