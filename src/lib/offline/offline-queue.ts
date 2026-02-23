@@ -356,3 +356,36 @@ export async function getQueueGroupedByRow(): Promise<Record<string, QueuedMutat
 
   return grouped;
 }
+
+/**
+ * Remove all queued mutations for a specific row.
+ * Used when resetting a row while offline to discard pending adds/updates/deletes.
+ */
+export async function removeQueuedMutationsByRow(rowId: string): Promise<number> {
+  const db = await getDB();
+  const mutations = await getQueueByRow(rowId);
+
+  if (mutations.length === 0) return 0;
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    let removed = 0;
+
+    for (const mutation of mutations) {
+      const request = store.delete(mutation.id);
+      request.onsuccess = () => {
+        removed++;
+      };
+    }
+
+    transaction.oncomplete = () => {
+      console.log(`[OfflineQueue] Removed ${removed} mutations for row ${rowId}`);
+      resolve(removed);
+    };
+
+    transaction.onerror = () => {
+      reject(transaction.error);
+    };
+  });
+}

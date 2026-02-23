@@ -4,6 +4,8 @@ import { Barcode } from "@/lib/types/db-types.ts";
 import { useSupabase } from "@/lib/supabase-provider.tsx";
 import { useEffect } from "react";
 import { addBarcode, deleteBarcode, updateBarcode } from "@/services/barcode-service.ts";
+import { removeQueuedMutationsByRow } from "@/lib/offline/offline-queue";
+import { addToQueue, getNextLocalSequence } from "@/lib/offline/offline-queue";
 
 const resetRow = async (rowId: string) => {
     if (!rowId.trim())
@@ -224,15 +226,50 @@ export const useDeleteRowBarcode = (rowId: string) => {
 
 export const useResetRowBarcodes = (rowId: string) => {
     const queryClient = useQueryClient();
+    const { user } = useSupabase();
+
+    const offlineReset = async (targetRowId: string) => {
+        // 1. Remove all pending offline mutations for this row
+        await removeQueuedMutationsByRow(targetRowId);
+
+        // 2. Get server-synced barcodes from the cache
+        const cachedBarcodes = queryClient.getQueryData<Barcode[]>(['barcodes', 'row', targetRowId]) || [];
+        const serverBarcodes = cachedBarcodes.filter(b => !b.id.startsWith('temp-'));
+
+        // 3. Queue DELETE_BARCODE for each server-synced barcode
+        for (const barcode of serverBarcodes) {
+            const localSeq = await getNextLocalSequence(targetRowId);
+            await addToQueue('DELETE_BARCODE', {
+                code: barcode.code,
+                rowId: targetRowId,
+                orderInRow: barcode.orderInRow ?? 0,
+                timestamp: new Date().toISOString(),
+                localSequence: localSeq,
+                userId: user?.id,
+                barcodeId: barcode.id,
+            });
+        }
+
+        // 4. Clear the cache for this row
+        queryClient.setQueryData(['barcodes', 'row', targetRowId], []);
+
+        return serverBarcodes.length;
+    };
+
     return useMutation({
-        mutationFn: resetRow,
+        mutationFn: async (targetRowId: string) => {
+            if (!onlineManager.isOnline()) {
+                return offlineReset(targetRowId);
+            }
+            return resetRow(targetRowId);
+        },
         mutationKey: ['barcodes', 'row', rowId],
         onSuccess: () => {
             queryClient.invalidateQueries({
                 queryKey: ['barcodes', 'row', rowId],
-                exact: true,    // only that one
+                exact: true,
             })
-            queryClient.invalidateQueries({ queryKey: ['parks'] }); // Refresh park counts
+            queryClient.invalidateQueries({ queryKey: ['parks'] });
         }
     })
 }

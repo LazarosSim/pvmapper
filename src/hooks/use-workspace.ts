@@ -8,6 +8,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Park, Row, Barcode } from '@/lib/types/db-types';
+import { naturalCompare } from '@/lib/utils';
 
 const WORKSPACE_STORAGE_KEY = 'pvmapper:current-workspace';
 
@@ -67,7 +68,7 @@ const loadRowsByParkId = async (parkId: string): Promise<Row[]> => {
     .order('name', { ascending: true });
 
   if (error) throw error;
-  return data as Row[];
+  return (data as Row[]).sort((a, b) => naturalCompare(a.name, b.name));
 };
 
 // Helper to load barcodes by row ID
