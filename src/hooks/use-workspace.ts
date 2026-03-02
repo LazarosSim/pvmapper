@@ -7,7 +7,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import type { Park, Row, Barcode } from '@/lib/types/db-types';
+import type { Park, Row } from '@/lib/types/db-types';
 import { naturalCompare } from '@/lib/utils';
 
 const WORKSPACE_STORAGE_KEY = 'pvmapper:current-workspace';
@@ -19,7 +19,7 @@ interface WorkspaceStatus {
   progress: {
     current: number;
     total: number;
-    stage: 'park' | 'rows' | 'barcodes' | 'complete';
+    stage: 'park' | 'rows' | 'complete';
   };
   error: string | null;
 }
@@ -71,21 +71,6 @@ const loadRowsByParkId = async (parkId: string): Promise<Row[]> => {
   return (data as Row[]).sort((a, b) => naturalCompare(a.name, b.name));
 };
 
-// Helper to load barcodes by row ID
-const loadBarcodesByRow = async (rowId: string): Promise<Barcode[]> => {
-  const { data, error } = await supabase
-    .from('barcodes')
-    .select('id, code, rowId:row_id, userId:user_id, timestamp, orderInRow:order_in_row, latitude, longitude')
-    .eq('row_id', rowId)
-    .order('order_in_row', { ascending: true });
-
-  if (error) throw error;
-
-  return (data || []).sort((a, b) =>
-    (a.orderInRow ?? Number.MAX_SAFE_INTEGER) - (b.orderInRow ?? Number.MAX_SAFE_INTEGER)
-  ) as Barcode[];
-};
-
 export const useWorkspace = (): UseWorkspaceReturn => {
   const queryClient = useQueryClient();
 
@@ -110,6 +95,22 @@ export const useWorkspace = (): UseWorkspaceReturn => {
     error: null,
   });
 
+  // On mount, check if workspace data is already cached
+  useEffect(() => {
+    if (currentWorkspace) {
+      const cachedRows = queryClient.getQueryData(['rows', 'park', currentWorkspace]);
+      if (cachedRows) {
+        console.log('[Workspace] Found cached row structure, marking as ready');
+        setWorkspaceStatus(prev => ({
+          ...prev,
+          parkId: currentWorkspace,
+          isPrefetched: true,
+          progress: { current: 0, total: 0, stage: 'complete' },
+        }));
+      }
+    }
+  }, [currentWorkspace, queryClient]);
+
   // Update status when workspace changes
   useEffect(() => {
     setWorkspaceStatus(prev => ({
@@ -122,14 +123,18 @@ export const useWorkspace = (): UseWorkspaceReturn => {
     try {
       localStorage.setItem(WORKSPACE_STORAGE_KEY, parkId);
       setCurrentWorkspace(parkId);
+      
+      // Check if we already have cached data for this park
+      const cachedRows = queryClient.getQueryData(['rows', 'park', parkId]);
+      
       setWorkspaceStatus({
         parkId,
         isPrefetching: false,
-        isPrefetched: false,
+        isPrefetched: !!cachedRows,
         progress: {
           current: 0,
           total: 0,
-          stage: 'park',
+          stage: cachedRows ? 'complete' : 'park',
         },
         error: null,
       });
@@ -137,7 +142,7 @@ export const useWorkspace = (): UseWorkspaceReturn => {
       console.error('Failed to save workspace:', error);
       toast.error('Failed to save workspace selection');
     }
-  }, []);
+  }, [queryClient]);
 
   const clearWorkspace = useCallback(() => {
     try {
@@ -205,21 +210,9 @@ export const useWorkspace = (): UseWorkspaceReturn => {
 
       console.log('[Workspace] Fetched rows:', rows.length);
 
-      // Stage 3: Prefetch barcodes for every row
-      setWorkspaceStatus(prev => ({
-        ...prev,
-        progress: {
-          current: 0,
-          total: rows.length,
-          stage: 'barcodes',
-        },
-      }));
-
+      // Prefetch individual row data (needed by ScanRowPage's useRow hook)
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        console.log(`[Workspace] Prefetching data for row ${i + 1}/${rows.length}:`, row.id);
-
-        // Prefetch individual row data (needed by ScanRowPage's useRow hook)
         await queryClient.prefetchQuery({
           queryKey: ['rows', 'single', row.id],
           queryFn: async () => {
@@ -232,20 +225,6 @@ export const useWorkspace = (): UseWorkspaceReturn => {
             return data;
           },
         });
-
-        // Prefetch barcodes for this row
-        await queryClient.prefetchQuery({
-          queryKey: ['barcodes', 'row', row.id],
-          queryFn: () => loadBarcodesByRow(row.id),
-        });
-
-        setWorkspaceStatus(prev => ({
-          ...prev,
-          progress: {
-            ...prev.progress,
-            current: i + 1,
-          },
-        }));
       }
 
       // Complete!
