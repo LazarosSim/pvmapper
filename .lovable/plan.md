@@ -1,102 +1,105 @@
 
 
-# Plan: Offline Row Reset and Natural Row Ordering
+# Plan: Streamline Offline Workspace -- Structure-Only Caching
 
-## Issue 1: Cannot Reset a Row While Offline
+## Current Behavior
 
-**Root cause:** The `useResetRowBarcodes` mutation (in `use-barcodes-queries.tsx`) calls Supabase directly to delete barcodes. When offline, this network call fails silently or throws an error. There is no offline queue support for a "reset row" operation.
+When preparing for offline work, the app downloads:
+1. Park metadata
+2. All rows in the park
+3. **All barcodes for every row** (the slowest and most unnecessary step)
 
-**Solution:** When offline, instead of calling Supabase, clear the row's pending barcodes from IndexedDB and the React Query cache locally. When back online, queue individual DELETE operations or simply let the next sync handle it.
+After syncing, the workspace status resets and the user must re-enter offline mode to continue working on the same park.
 
-The approach:
+## New Behavior
 
-1. **Detect offline state** in the reset handler (`ScanRowPage.tsx` and `RowDetail.tsx`).
-2. **When offline:**
-   - Remove all `ADD_BARCODE` mutations for this row from IndexedDB (they haven't been synced yet, so just discard them).
-   - Queue `DELETE_BARCODE` mutations for any **server-synced** barcodes that are in the React Query cache for this row.
-   - Clear the React Query cache for `['barcodes', 'row', rowId]`.
-   - Show a success toast indicating the reset is queued.
-3. **When online:** Keep the existing direct Supabase delete behavior (it already works).
-
-**Files to modify:**
-- `src/lib/offline/types.ts` -- Add `RESET_ROW` mutation type (or reuse `DELETE_BARCODE` per-barcode)
-- `src/lib/offline/offline-queue.ts` -- Add helper: `removeQueuedMutationsByRow(rowId)` to bulk-remove pending adds for a row
-- `src/hooks/use-barcodes-queries.tsx` -- Update `useResetRowBarcodes` to handle offline case
-- `src/hooks/use-offline-counts.ts` -- Ensure counter adjustments reflect the reset
+1. **Prefetch only park metadata and row structure** (with counts). Skip barcode downloads entirely -- you only need empty rows to scan into.
+2. **Cache row structure indefinitely** until the user explicitly switches parks or clears the workspace.
+3. **After sync, remain workspace-ready** -- the row structure is already cached, so there is no need to re-prepare.
 
 ---
 
-## Issue 2: Rows Appear in Wrong Order
+## Changes
 
-**Root cause:** Row ordering happens in three places, all using simple lexicographic (string) sorting which fails for multi-part numeric names:
+### 1. Remove Barcode Prefetching from Workspace
 
-| Location | Sorting Method | Problem |
-|---|---|---|
-| Database query (`use-row-queries.tsx`) | `.order('name', { ascending: true })` | PostgreSQL sorts strings: `"10.1_19"` < `"10.1_2"` because `"1" < "2"` at position 5 |
-| `ParkDetail.tsx` grouping | Regex `^Row\s+(\d+)` only captures first integer | Names like `Row 10.1_2` -- the dot makes the regex miss the full number |
-| `ScanParkPage.tsx` grouping | Same regex, same problem | Same issue |
+**File: `src/hooks/use-workspace.ts`**
 
-**Example of the bug:**
-```text
-Lexicographic:  10.1_17, 10.1_18, 10.1_19, 10.1_2, 10.1_20
-Natural order:  10.1_1, 10.1_2, ..., 10.1_17, 10.1_18, 10.1_19, 10.1_20
-```
+- Remove the entire "Stage 3: Prefetch barcodes for every row" loop (lines 208-249)
+- Remove the `loadBarcodesByRow` helper function (no longer needed)
+- Remove `Barcode` from the type import
+- Update the progress stages: remove `'barcodes'` stage, keep only `'park' | 'rows' | 'complete'`
+- After fetching rows, also prefetch each individual row by ID (for ScanRowPage's `useRow` hook) -- this is already done inside the loop, so just keep that part
+- Mark workspace as ready immediately after rows are fetched and individual row data is cached
 
-**Solution:** Implement a natural sort comparison function and apply it everywhere rows are displayed.
+### 2. Keep Workspace Ready After Sync
 
-### Natural Sort Function
+**File: `src/hooks/use-sync.ts`**
 
-Create a shared utility that splits row names into numeric and non-numeric segments, then compares segments numerically where possible:
+- After a successful sync, do NOT invalidate row structure queries (`['rows', 'park', ...]` and `['rows', 'single', ...]`). These represent the park structure which should persist.
+- Only invalidate barcode-related queries and park-level count queries so counters refresh.
+- The existing `queryClient.invalidateQueries({ queryKey: ['rows'] })` currently invalidates ALL row caches. Change this to only invalidate row count data by refetching rows (which updates `currentBarcodes`) without removing the cached structure.
 
-```text
-"Row 10.1_2"  -> ["Row ", 10, ".", 1, "_", 2]
-"Row 10.1_19" -> ["Row ", 10, ".", 1, "_", 19]
+### 3. Determine Workspace Readiness from Cache
 
-Compare segment by segment:
-  "Row " == "Row "  -> equal
-  10 == 10          -> equal
-  "." == "."        -> equal
-  1 == 1            -> equal
-  "_" == "_"        -> equal
-  2 < 19            -> Row 10.1_2 comes first
-```
+**File: `src/hooks/use-workspace.ts`**
 
-### Where to Apply
+- On mount, if a workspace park ID exists in localStorage, check if the React Query cache already has data for `['rows', 'park', parkId]`. If so, mark `isPrefetched: true` immediately -- no need to re-download.
+- This means after sync + app restart, the workspace is still ready because the row structure persists in localStorage via the query persister.
 
-1. **Database queries** (`use-row-queries.tsx`, `use-workspace.ts`): Keep `.order('name')` for the DB (can't do natural sort in PostgreSQL easily), but add a **client-side re-sort** after fetching.
-2. **ParkDetail.tsx** `groupRows()`: Update regex to capture full numeric identifiers like `10.1` (e.g., `^Row\s+([\d.]+)`), and sort groups using natural comparison.
-3. **ScanParkPage.tsx** `groupRows()`: Same fix as ParkDetail.
-4. **Within-group sorting**: Replace `suffixA.localeCompare(suffixB)` with the natural sort function so `_2` sorts before `_19`.
+### 4. Update WorkspaceSelector UI
 
-**Files to modify:**
-- `src/lib/utils.ts` -- Add `naturalCompare(a: string, b: string): number` utility
-- `src/hooks/use-row-queries.tsx` -- Add client-side natural sort after query
-- `src/hooks/use-workspace.ts` -- Add client-side natural sort after fetch
-- `src/pages/ParkDetail.tsx` -- Update `groupRows()` regex and sorting
-- `src/pages/ScanParkPage.tsx` -- Update `groupRows()` regex and sorting
+**File: `src/components/WorkspaceSelector.tsx`**
+
+- Remove references to "barcodes" in progress labels (line 76: "Downloading barcodes..." becomes unnecessary)
+- Simplify progress calculation: park = 30%, rows = 70%, complete = 100%
+- Update description text: "All rows and barcodes will be downloaded" -> "Park structure and row layout will be downloaded"
 
 ---
 
-## Summary of All File Changes
+## Technical Details
+
+### Modified Prefetch Flow
+
+```text
+Before:                          After:
+1. Fetch park metadata           1. Fetch park metadata
+2. Fetch all rows                2. Fetch all rows
+3. For EACH row:                 3. For EACH row:
+   a. Fetch row details             a. Fetch row details (for ScanRowPage)
+   b. Fetch ALL barcodes         4. Done! Workspace ready.
+4. Done! Workspace ready.
+```
+
+### Cache Persistence After Sync
+
+```text
+Before:                          After:
+Sync complete ->                 Sync complete ->
+  invalidate ['rows']              invalidate ['barcodes', 'row']
+  invalidate ['barcodes', 'row']   invalidate ['barcodes', 'park']
+  invalidate ['barcodes', 'park']  invalidate ['parks']
+  invalidate ['parks']             refetch ['rows'] (update counts only)
+  User must re-prepare             Workspace remains ready
+```
+
+### Workspace Readiness on Mount
+
+```text
+App starts ->
+  Read parkId from localStorage ->
+  Check queryClient.getQueryData(['rows', 'park', parkId]) ->
+  If data exists: isPrefetched = true (no network needed)
+  If no data: isPrefetched = false (user must click Prepare)
+```
+
+---
+
+## Files Summary
 
 | File | Change |
-|---|---|
-| `src/lib/utils.ts` | Add `naturalCompare` sort utility |
-| `src/lib/offline/offline-queue.ts` | Add `removeQueuedMutationsByRow(rowId)` helper |
-| `src/hooks/use-barcodes-queries.tsx` | Offline-aware `useResetRowBarcodes` |
-| `src/hooks/use-row-queries.tsx` | Client-side natural sort on query results |
-| `src/hooks/use-workspace.ts` | Client-side natural sort on prefetched rows |
-| `src/hooks/use-offline-counts.ts` | Account for reset operations in adjustments |
-| `src/pages/ParkDetail.tsx` | Fix `groupRows()` regex and use natural sort |
-| `src/pages/ScanParkPage.tsx` | Fix `groupRows()` regex and use natural sort |
-
----
-
-## Testing Checklist
-
-- [ ] Go offline, open a row with scanned barcodes, tap Reset -- barcodes should clear from the UI
-- [ ] Go back online, sync -- the reset should persist on the server
-- [ ] Verify rows with names like `Row 10.1_1` through `Row 10.1_20` appear in correct numeric order on both Home (ParkDetail) and Scan (ScanParkPage) navigation
-- [ ] Verify rows with simple names (`Row 1`, `Row 2`, ..., `Row 10`) also sort correctly
-- [ ] Verify subrow suffixes sort correctly: `Row 5_a`, `Row 5_b`, ..., `Row 5_z`
+|------|--------|
+| `src/hooks/use-workspace.ts` | Remove barcode prefetch stage; check cache on mount for readiness |
+| `src/hooks/use-sync.ts` | Preserve row structure cache after sync; only refresh counts |
+| `src/components/WorkspaceSelector.tsx` | Update progress labels and description text |
 
