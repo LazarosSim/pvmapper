@@ -88,10 +88,12 @@ export const useSync = (): UseSyncReturn => {
       }
       
       // Invalidate queries to refresh data from server
+      // Only invalidate barcodes and park counts — preserve cached row structure for offline workspace
       queryClient.invalidateQueries({ queryKey: ['barcodes', 'row'] });
       queryClient.invalidateQueries({ queryKey: ['barcodes', 'park'] });
-      queryClient.invalidateQueries({ queryKey: ['rows'] });
       queryClient.invalidateQueries({ queryKey: ['parks'] }); // Refresh park counts on Home page
+      // Refetch rows to update currentBarcodes counts without removing cached structure
+      queryClient.refetchQueries({ queryKey: ['rows'] });
     } else {
       toast.error(`Sync failed: ${result.error}`);
     }

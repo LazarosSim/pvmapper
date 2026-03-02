@@ -80,11 +80,9 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
 
         switch (workspaceStatus.progress.stage) {
             case 'park':
-                return 10;
+                return 30;
             case 'rows':
-                return 20;
-            case 'barcodes':
-                return 20 + (current / total) * 70;
+                return 70;
             case 'complete':
                 return 100;
             default:
@@ -100,9 +98,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
             case 'park':
                 return 'Loading park data...';
             case 'rows':
-                return 'Loading rows...';
-            case 'barcodes':
-                return `Downloading barcodes (${workspaceStatus.progress.current}/${workspaceStatus.progress.total} rows)`;
+                return 'Loading row structure...';
             case 'complete':
                 return 'Complete!';
             default:

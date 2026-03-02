@@ -45,17 +45,12 @@ export const WorkspaceSelector = () => {
         if (workspaceStatus.isPrefetched) return 100;
         if (!workspaceStatus.isPrefetching) return 0;
 
-        const { current, total } = workspaceStatus.progress;
-        if (total === 0) return 0;
-
-        // Park = 10%, Rows = 20%, Barcodes = 70%
+        // Park = 30%, Rows = 70%, Complete = 100%
         switch (workspaceStatus.progress.stage) {
             case 'park':
-                return 10;
+                return 30;
             case 'rows':
-                return 20;
-            case 'barcodes':
-                return 20 + (current / total) * 70;
+                return 70;
             case 'complete':
                 return 100;
             default:
@@ -71,9 +66,7 @@ export const WorkspaceSelector = () => {
             case 'park':
                 return 'Loading park data...';
             case 'rows':
-                return 'Loading rows...';
-            case 'barcodes':
-                return `Downloading barcodes (${workspaceStatus.progress.current}/${workspaceStatus.progress.total} rows)`;
+                return 'Loading row structure...';
             case 'complete':
                 return 'Complete!';
             default:
@@ -91,7 +84,7 @@ export const WorkspaceSelector = () => {
                     Offline Workspace
                 </CardTitle>
                 <CardDescription>
-                    Select a park to prepare for offline work. All rows and barcodes will be downloaded.
+                    Select a park to prepare for offline work. Park structure and row layout will be downloaded.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
