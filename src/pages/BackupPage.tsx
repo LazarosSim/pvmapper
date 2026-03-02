@@ -6,7 +6,7 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/compo
 import {Textarea} from '@/components/ui/textarea';
 import {toast} from 'sonner';
 import {utils as XLSXUtils, writeFile as writeXLSXFile} from 'xlsx';
-import {naturalCompare} from '@/lib/utils';
+import {toSafeSheetName, ensureUniqueSheetName, sortWorksheetEntries, type WorksheetEntry} from '@/lib/utils';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/components/ui/select";
 import {
   AlertDialog,
@@ -94,14 +94,13 @@ const BackupPage = () => {
         return;
       }
 
-      // Collect all worksheets with their names for sorting
-      const worksheets: Array<{name: string, worksheet: any}> = [];
+      const usedNames = new Set<string>();
+      const worksheets: WorksheetEntry[] = [];
 
       for (const park of parksToExport) {
         try {
           const parkRows = rows.filter(row => row.parkId === park.id) || [];
           
-          // First create a summary sheet for the park
           const parkSummaryData = [
             ['Park Name', park.name],
             ['Created', new Date(park.createdAt).toLocaleString()],
@@ -110,7 +109,6 @@ const BackupPage = () => {
             ['Total Barcodes', parkRows.reduce((sum, row) => sum + (row.currentBarcodes || 0), 0).toString()],
           ];
           
-          // Add row information to the summary
           parkRows.forEach(row => {
             parkSummaryData.push([
               `Row: ${row.name}`,
@@ -120,43 +118,30 @@ const BackupPage = () => {
           });
           
           const summarySheet = XLSXUtils.aoa_to_sheet(parkSummaryData);
-          const summarySheetName = `${park.name.slice(0, 28)}_Summary`.replace(/[^a-zA-Z0-9]/g, '_');
-          worksheets.push({ name: summarySheetName, worksheet: summarySheet });
+          const summaryRawName = `${park.name.slice(0, 28)}_Summary`;
+          const summarySheetName = ensureUniqueSheetName(toSafeSheetName(summaryRawName), usedNames);
+          worksheets.push({ originalName: summaryRawName, sheetName: summarySheetName, type: 'summary', worksheet: summarySheet });
           
-          // Create a worksheet for each row, regardless of whether it has barcodes or not
           for (const row of parkRows) {
             try {
-              // Fetch barcodes for this row directly from the database
               const rowBarcodes = await fetchBarcodesForRow(row.id);
-              
-              // Create worksheet data with header
-              const rowData = [["Barcode"]]; // Start with header row
-              
-              // Add all barcodes if available
+              const rowData = [["Barcode"]];
               if (rowBarcodes && rowBarcodes.length > 0) {
                 rowBarcodes.forEach(barcode => {
                   rowData.push([barcode.code || '']);
                 });
               }
-              
-              // Create the worksheet (even if empty, it will just have the header)
               const worksheet = XLSXUtils.aoa_to_sheet(rowData);
-              
-              // Limit sheet name to 31 characters (Excel limitation)
-              const sheetName = `${park.name.slice(0, 15)}_${row.name.slice(0, 15)}`
-                .replace(/[^a-zA-Z0-9]/g, '_')
-                .slice(0, 31);
-              
-              worksheets.push({ name: sheetName, worksheet });
+              const rawName = `${park.name.slice(0, 15)}_${row.name.slice(0, 15)}`;
+              const sheetName = ensureUniqueSheetName(toSafeSheetName(rawName), usedNames);
+              worksheets.push({ originalName: row.name, sheetName, type: 'row', worksheet });
             } catch (rowError) {
               console.error(`Error processing row ${row.name}:`, rowError);
-              // Create empty sheet for this row if there's an error
               const emptyRowData = [["Barcode"]];
               const worksheet = XLSXUtils.aoa_to_sheet(emptyRowData);
-              const sheetName = `${park.name.slice(0, 15)}_${row.name.slice(0, 15)}`
-                .replace(/[^a-zA-Z0-9]/g, '_')
-                .slice(0, 31);
-              worksheets.push({ name: sheetName, worksheet });
+              const rawName = `${park.name.slice(0, 15)}_${row.name.slice(0, 15)}`;
+              const sheetName = ensureUniqueSheetName(toSafeSheetName(rawName), usedNames);
+              worksheets.push({ originalName: row.name, sheetName, type: 'row', worksheet });
             }
           }
         } catch (parkError) {
@@ -165,12 +150,9 @@ const BackupPage = () => {
         }
       }
 
-      // Sort worksheets alphabetically by name
-      worksheets.sort((a, b) => naturalCompare(a.name, b.name));
-
-      // Add sorted worksheets to workbook
-      worksheets.forEach(({ name, worksheet }) => {
-        XLSXUtils.book_append_sheet(workbook, worksheet, name);
+      const sorted = sortWorksheetEntries(worksheets);
+      sorted.forEach(({ sheetName, worksheet }) => {
+        XLSXUtils.book_append_sheet(workbook, worksheet, sheetName);
       });
 
       const fileName = selectedParkId === 'all' 
