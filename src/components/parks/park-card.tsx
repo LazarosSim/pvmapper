@@ -38,6 +38,7 @@ import {useRowsByParkId} from "@/hooks/use-row-queries.tsx";
 import {useParkBarcodes} from "@/hooks/use-barcodes-queries.tsx";
 import {supabase} from '@/integrations/supabase/client';
 import {useOfflineAdjustedCounts} from '@/hooks/use-offline-counts';
+import {toSafeSheetName, ensureUniqueSheetName, sortWorksheetEntries, type WorksheetEntry} from '@/lib/utils';
 
 interface ParkCardProps {
   park: Park;
@@ -160,8 +161,8 @@ const ParkCard: React.FC<ParkCardProps> = ({
       
       const wb = XLSX.utils.book_new();
 
-      // Collect all worksheets with their names for sorting
-      const worksheets: Array<{name: string, worksheet: any}> = [];
+      const usedNames = new Set<string>();
+      const worksheets: WorksheetEntry[] = [];
 
       // Create a summary sheet first
       const summaryData = [
@@ -173,7 +174,6 @@ const ParkCard: React.FC<ParkCardProps> = ({
         ["Completion", `${progress}%`]
       ];
 
-      // Add row information to summary
       rows.forEach((row, index) => {
         summaryData.push([
           `Row ${index + 1}`, row.name, 
@@ -183,46 +183,33 @@ const ParkCard: React.FC<ParkCardProps> = ({
       });
       
       const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
-      worksheets.push({ name: "Summary", worksheet: summaryWs });
+      const summaryName = ensureUniqueSheetName('Summary', usedNames);
+      worksheets.push({ originalName: 'Summary', sheetName: summaryName, type: 'summary', worksheet: summaryWs });
 
-      // Create a separate worksheet for each row, regardless of whether it has barcodes
       for (const row of rows) {
         try {
-          // Fetch fresh barcode data directly from the database for each row
           const rowBarcodes = await fetchBarcodesForRow(row.id);
-          
-          // Create worksheet data with header
-          const rowData = [["Barcode"]]; // Start with header row
-
-          // Add barcode data if available
+          const rowData = [["Barcode"]];
           if (rowBarcodes && rowBarcodes.length > 0) {
             rowBarcodes.forEach(barcode => {
               rowData.push([barcode.code || '']);
             });
           }
-          
-          // Create the worksheet (even if empty, it will just have the header)
           const ws = XLSX.utils.aoa_to_sheet(rowData);
-          
-          // Create a safe sheet name (max 31 chars for Excel)
-          const safeSheetName = row.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 31);
-          worksheets.push({ name: safeSheetName, worksheet: ws });
+          const safeName = ensureUniqueSheetName(toSafeSheetName(row.name), usedNames);
+          worksheets.push({ originalName: row.name, sheetName: safeName, type: 'row', worksheet: ws });
         } catch (rowError) {
           console.error(`Error processing row ${row.name}:`, rowError);
-          // Create empty sheet for this row
           const emptyRowData = [["Barcode"]];
           const ws = XLSX.utils.aoa_to_sheet(emptyRowData);
-          const safeSheetName = row.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 31);
-          worksheets.push({ name: safeSheetName, worksheet: ws });
+          const safeName = ensureUniqueSheetName(toSafeSheetName(row.name), usedNames);
+          worksheets.push({ originalName: row.name, sheetName: safeName, type: 'row', worksheet: ws });
         }
       }
 
-      // Sort worksheets alphabetically by name
-      worksheets.sort((a, b) => a.name.localeCompare(b.name));
-
-      // Add sorted worksheets to workbook
-      worksheets.forEach(({ name, worksheet }) => {
-        XLSX.utils.book_append_sheet(wb, worksheet, name);
+      const sorted = sortWorksheetEntries(worksheets);
+      sorted.forEach(({ sheetName, worksheet }) => {
+        XLSX.utils.book_append_sheet(wb, worksheet, sheetName);
       });
 
       const safeFileName = sanitizeFileName(`${park.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
