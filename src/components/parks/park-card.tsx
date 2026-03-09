@@ -28,9 +28,9 @@ import {
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {toast} from 'sonner';
-import * as XLSX from 'xlsx';
 import {Checkbox} from '@/components/ui/checkbox';
 import {Barcode} from '@/lib/types/db-types';
+import {Park} from "@/types/types.ts";
 import {Park} from "@/types/types.ts";
 import {useDeletePark, useUpdatePark, useArchivePark, useUnarchivePark} from "@/hooks/parks";
 import {useCurrentUser} from "@/hooks/use-user.tsx";
