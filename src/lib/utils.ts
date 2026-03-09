@@ -13,7 +13,7 @@ export function cn(...inputs: ClassValue[]) {
 export function naturalCompare(a: string, b: string): number {
   const segmentize = (s: string): (string | number)[] => {
     const parts: (string | number)[] = [];
-    const regex = /(\d+\.?\d*|\D+)/g;
+    const regex = /(\d+|\D+)/g;
     let match: RegExpExecArray | null;
     while ((match = regex.exec(s)) !== null) {
       const token = match[1];
