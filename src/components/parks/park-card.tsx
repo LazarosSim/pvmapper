@@ -31,7 +31,6 @@ import {toast} from 'sonner';
 import {Checkbox} from '@/components/ui/checkbox';
 import {Barcode} from '@/lib/types/db-types';
 import {Park} from "@/types/types.ts";
-import {Park} from "@/types/types.ts";
 import {useDeletePark, useUpdatePark, useArchivePark, useUnarchivePark} from "@/hooks/parks";
 import {useCurrentUser} from "@/hooks/use-user.tsx";
 import {useRowsByParkId} from "@/hooks/use-row-queries.tsx";
