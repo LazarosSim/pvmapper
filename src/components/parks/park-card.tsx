@@ -283,12 +283,12 @@ const ParkCard: React.FC<ParkCardProps> = ({
           <Button 
             variant="outline" 
             size="icon" 
-            onClick={handleExportExcel} 
-            disabled={isExporting || !canExport} 
+            onClick={() => setIsExportDialogOpen(true)} 
+            disabled={!canExport} 
             className="text-inventory-secondary hover:text-inventory-secondary/80"
             title={!canExport ? "Export disabled: No data available" : "Export to Excel"}
           >
-            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            <FileDown className="h-4 w-4" />
           </Button>
           {isManager && <DropdownMenu>
               <DropdownMenuTrigger asChild>
