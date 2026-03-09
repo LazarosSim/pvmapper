@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
-import {Archive, ArchiveRestore, Cloud, Edit, FileDown, FolderOpen, Loader2, MoreVertical, Trash2} from 'lucide-react';
+import {Archive, ArchiveRestore, Cloud, Edit, FileDown, FolderOpen, MoreVertical, Trash2} from 'lucide-react';
 import {useNavigate} from 'react-router-dom';
 import {formatDistanceToNow} from 'date-fns';
 import {Progress} from '@/components/ui/progress';
