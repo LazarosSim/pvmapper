@@ -1,50 +1,72 @@
 
-I traced the issue in the current codebase and found why the bug persists:
 
-1) The export you’re using from the home page (`/`) comes from `src/components/parks/park-card.tsx` (confirmed in session replay by clicking the Park card export icon).
-2) That export path still sorts worksheet tabs with plain string sort:
-- `worksheets.sort((a, b) => a.name.localeCompare(b.name));`
-3) That is why you still get `..._1, ..._10, ..._11, ..._2...` in Excel.
-4) The previous natural-sort fix was applied in `src/pages/BackupPage.tsx`, but that page is not the export path used from park cards.
+# Plan: Export Mode Dialog with "Metlen Standard" Format
 
-Implementation plan to fully fix tab ordering:
+## Overview
 
-1. Fix the active export path in `src/components/parks/park-card.tsx`
-- Import and use `naturalCompare`.
-- Stop sorting by sanitized tab name with `localeCompare`.
-- Sort row sheets by the original row name (`row.name`) using `naturalCompare`, then append in that order.
-- Keep Summary pinned first (not mixed into general alphabetical sorting).
+When the user clicks the export icon on a park card, instead of immediately exporting, a dialog will appear offering two export modes: **Standard** (current behavior) and **Metlen Standard** (all barcodes in a single sheet with specific columns).
 
-2. Make sorting deterministic after sheet-name sanitization/truncation
-- Build worksheet entries with metadata:
-  - `originalName` (for sorting)
-  - `sheetName` (sanitized/truncated Excel tab name)
-  - `type` (`summary` | `row`)
-- Sort by:
-  - Summary first
-  - Then `naturalCompare(originalNameA, originalNameB)`
-- Add a uniqueness guard for `sheetName` collisions after truncation (e.g., append `_2`, `_3` within 31-char limit) so Excel never reorders/fails due duplicates.
+## Changes
 
-3. Align `src/pages/BackupPage.tsx` to the same shared ordering rule
-- It already uses `naturalCompare`, but should use the exact same “sort by original row name + summary first + unique safe name” logic as ParkCard export to avoid future drift.
-- This keeps all export entry points consistent.
+### 1. Create Export Mode Dialog Component
 
-4. Optional hardening (recommended)
-- Extract shared helpers to avoid repeating export logic:
-  - `toSafeSheetName(name: string): string`
-  - `ensureUniqueSheetName(name, usedNames): string`
-  - `sortWorksheetEntries(entries): entries`
-- Use these in both `park-card.tsx` and `BackupPage.tsx`.
+**New file: `src/components/parks/ExportDialog.tsx`**
 
-Validation checklist after implementation:
-- Export from Park card (`/`) and verify tab order:
-  - `Row_10_1_1, Row_10_1_2, ... Row_10_1_9, Row_10_1_10, ...`
-- Verify `Row 10.1_2` appears before `Row 10.1_19`.
-- Verify Summary tab remains first.
-- Verify long/similar row names do not break due duplicate/truncated tab names.
-- Re-test Backup page export to confirm matching behavior across both export flows.
+A dialog with two radio/select options:
+- **Standard** -- current multi-tab export (one tab per row + summary)
+- **Metlen Standard** -- two tabs only: Summary + a single "Barcodes" tab
 
-Technical file targets:
-- `src/components/parks/park-card.tsx` (primary fix)
-- `src/pages/BackupPage.tsx` (consistency fix)
-- `src/lib/utils.ts` or a new shared helper file (if extracting common export helpers)
+The "Metlen Standard" tab structure:
+| A/A | ROW NAME | STRING NAME | SERIAL NUMBER |
+|-----|----------|-------------|---------------|
+| 1   | Row 5.2_1 |            | ABC123        |
+| 2   | Row 5.2_1 |            | DEF456        |
+| 1   | Row 5.2_2 |            | GHI789        |
+
+- **A/A**: Counter that resets to 1 for the first barcode of each row
+- **ROW NAME**: The row's name
+- **STRING NAME**: Empty column (filled manually later)
+- **SERIAL NUMBER**: The barcode code
+- Column widths set via `!cols` property so text fits without truncation (A/A: 6, ROW NAME: 20, STRING NAME: 20, SERIAL NUMBER: 30)
+- Rows are ordered using `naturalCompare` on row name, barcodes within each row ordered by `order_in_row`
+
+### 2. Update ParkCard Export Button
+
+**File: `src/components/parks/park-card.tsx`**
+
+- Click on export icon opens the new `ExportDialog` instead of calling `handleExportExcel` directly
+- Pass park data, rows, and the `fetchBarcodesForRow` function to the dialog
+- Move export logic into the dialog component (or keep as callbacks passed in)
+
+### 3. Implementation Details
+
+**Metlen Standard export logic:**
+```text
+1. Fetch all rows for the park, sorted by naturalCompare
+2. For each row (in order):
+   a. Fetch barcodes ordered by order_in_row
+   b. Reset A/A counter to 1
+   c. For each barcode: push [counter++, row.name, "", barcode.code]
+3. Create worksheet with headers + data
+4. Set !cols for column widths
+5. Add Summary tab (same as Standard)
+6. Write workbook with 2 tabs: Summary, Barcodes
+```
+
+**Column width configuration:**
+```typescript
+ws['!cols'] = [
+  { wch: 6 },   // A/A
+  { wch: 20 },  // ROW NAME
+  { wch: 20 },  // STRING NAME
+  { wch: 30 },  // SERIAL NUMBER
+];
+```
+
+## Files
+
+| File | Action |
+|------|--------|
+| `src/components/parks/ExportDialog.tsx` | Create -- dialog with mode selection + both export implementations |
+| `src/components/parks/park-card.tsx` | Modify -- open dialog on export click instead of direct export |
+
