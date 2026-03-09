@@ -416,6 +416,15 @@ const ParkCard: React.FC<ParkCardProps> = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <ExportDialog
+      open={isExportDialogOpen}
+      onOpenChange={setIsExportDialogOpen}
+      park={park}
+      rows={rows || []}
+      progress={progress}
+      fetchBarcodesForRow={fetchBarcodesForRow}
+    />
   </>;
 };
 
