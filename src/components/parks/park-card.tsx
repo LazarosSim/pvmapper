@@ -51,12 +51,11 @@ const ParkCard: React.FC<ParkCardProps> = ({
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = React.useState(false);
 
   const [editName, setEditName] = React.useState(park.name);
   const [editExpectedBarcodes, setEditExpectedBarcodes] = React.useState(park.expectedBarcodes);
   const [validateBarcodeLength, setValidateBarcodeLength] = React.useState(park.validateBarcodeLength || false);
-
-  const [isExporting, setIsExporting] = useState(false);
 
   const {data: currentUser} = useCurrentUser()
   const {data: rows, isLoading: rowsLoading} = useRowsByParkId(park.id);
