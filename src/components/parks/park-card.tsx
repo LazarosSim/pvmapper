@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React from 'react';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
@@ -139,115 +139,7 @@ const ParkCard: React.FC<ParkCardProps> = ({
     });
   };
 
-  const sanitizeFileName = (name: string): string => {
-    return name.replace(/[\\/:*?"<>|]/g, '_');
-  };
-
-  const handleExportExcel = async () => {
-    if (isExporting) return;
-    
-    try {
-      setIsExporting(true);
-      toast.info('Starting export, please wait...');
-      
-      // Check if rows data is available
-      if (!rows || rows.length === 0) {
-        toast.error('No rows data available for export. Please try again later.');
-        setIsExporting(false);
-        return;
-      }
-      
-      const wb = XLSX.utils.book_new();
-
-      const usedNames = new Set<string>();
-      const worksheets: WorksheetEntry[] = [];
-
-      // Create a summary sheet first
-      const summaryData = [
-        ["Park Name", park.name], 
-        ["Created", new Date(park.createdAt).toLocaleString()], 
-        ["Total Rows", rows.length.toString()],
-        ["Total Barcodes", park.currentBarcodes.toString()],
-        ["Expected Barcodes", park.expectedBarcodes.toString()],
-        ["Completion", `${progress}%`]
-      ];
-
-      rows.forEach((row, index) => {
-        summaryData.push([
-          `Row ${index + 1}`, row.name, 
-          `Expected: ${row.expectedBarcodes || "N/A"}`, 
-          `Current: ${row.currentBarcodes || 0}`
-        ]);
-      });
-      
-      const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
-      const summaryName = ensureUniqueSheetName('Summary', usedNames);
-      worksheets.push({ originalName: 'Summary', sheetName: summaryName, type: 'summary', worksheet: summaryWs });
-
-      for (const row of rows) {
-        try {
-          const rowBarcodes = await fetchBarcodesForRow(row.id);
-          const rowData = [["Barcode"]];
-          if (rowBarcodes && rowBarcodes.length > 0) {
-            rowBarcodes.forEach(barcode => {
-              rowData.push([barcode.code || '']);
-            });
-          }
-          const ws = XLSX.utils.aoa_to_sheet(rowData);
-          const safeName = ensureUniqueSheetName(toSafeSheetName(row.name), usedNames);
-          worksheets.push({ originalName: row.name, sheetName: safeName, type: 'row', worksheet: ws });
-        } catch (rowError) {
-          console.error(`Error processing row ${row.name}:`, rowError);
-          const emptyRowData = [["Barcode"]];
-          const ws = XLSX.utils.aoa_to_sheet(emptyRowData);
-          const safeName = ensureUniqueSheetName(toSafeSheetName(row.name), usedNames);
-          worksheets.push({ originalName: row.name, sheetName: safeName, type: 'row', worksheet: ws });
-        }
-      }
-
-      const sorted = sortWorksheetEntries(worksheets);
-      sorted.forEach(({ sheetName, worksheet }) => {
-        XLSX.utils.book_append_sheet(wb, worksheet, sheetName);
-      });
-
-      const safeFileName = sanitizeFileName(`${park.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
-
-      const wbout = XLSX.write(wb, {
-        bookType: 'xlsx',
-        type: 'binary'
-      });
-
-      const buf = new ArrayBuffer(wbout.length);
-      const view = new Uint8Array(buf);
-      for (let i = 0; i < wbout.length; i++) {
-        view[i] = wbout.charCodeAt(i) & 0xFF;
-      }
-
-      const blob = new Blob([buf], {
-        type: 'application/octet-stream'
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = safeFileName;
-      document.body.appendChild(a);
-      a.click();
-
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        setIsExporting(false);
-        toast.success("Park data exported successfully");
-      }, 100);
-    } catch (error) {
-      console.error("Export failed:", error);
-      toast.error(`Failed to export data: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setIsExporting(false);
-    }
-  };
-
   const handleOpenPark = () => {
-    // Store selected park ID in localStorage for navigation syncing
     localStorage.setItem('selectedParkId', park.id);
     navigate(`/park/${park.id}`);
   };
@@ -258,7 +150,7 @@ const ParkCard: React.FC<ParkCardProps> = ({
 
   return <>
     <Card className={`mb-4 hover:shadow-md transition-shadow glass-card relative overflow-hidden ${park.archived ? 'border-muted' : ''}`}>
-      {/* Semi-transparent background image layer - increased opacity to 50% */}
+      {/* Semi-transparent background image layer */}
       <div 
         className={`absolute inset-0 bg-cover bg-center z-0 ${park.archived ? 'opacity-30' : 'opacity-50'}`}
         style={{ 
