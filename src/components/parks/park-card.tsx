@@ -253,7 +253,6 @@ const ParkCard: React.FC<ParkCardProps> = ({
     navigate(`/park/${park.id}`);
   };
 
-  const isManager = currentUser?.role === 'manager';
   const isDataLoading = rowsLoading || barcodesLoading;
   const canExport = !isDataLoading && rows && rows.length > 0;
 
