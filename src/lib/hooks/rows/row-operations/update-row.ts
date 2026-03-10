@@ -59,119 +59,25 @@ export const resetRow = async (
   rowId: string
 ) => {
   try {
-    // First check if we have any barcodes for this row directly from the database
-    // This ensures we get the most up-to-date information rather than relying on local state
-    const { data: rowBarcodesData, error: fetchError } = await supabase
-      .from('barcodes')
-      .select('*')
-      .eq('row_id', rowId);
-      
-    if (fetchError) {
-      console.error('Error fetching row barcodes:', fetchError);
-      toast.error(`Failed to check row barcodes: ${fetchError.message}`);
-      return;
-    }
-    
-    // Now use the data directly from the database to check if there are barcodes
-    if (!rowBarcodesData || rowBarcodesData.length === 0) {
-      toast.info('No barcodes to reset');
-      return;
-    }
-    
-    // Format the barcodes from the database to match our local state format
-    const rowBarcodes = rowBarcodesData.map(barcode => ({
-      id: barcode.id,
-      code: barcode.code,
-      rowId: barcode.row_id,
-      userId: barcode.user_id,
-      timestamp: barcode.timestamp,
-      orderInRow: barcode.order_in_row
-    }));
-    
-    // Group barcodes by user and date for adjustment
-    const userBarcodeCounts: {[key: string]: number} = {};
-    
-    // Track all affected users to update their total counts later
-    const affectedUsers = new Set<string>();
-    
-    // Format: userId_date -> count
-    rowBarcodes.forEach(barcode => {
-      const scanDate = new Date(barcode.timestamp).toISOString().split('T')[0];
-      const key = `${barcode.userId}_${scanDate}`;
-      
-      if (!userBarcodeCounts[key]) {
-        userBarcodeCounts[key] = 0;
-      }
-      userBarcodeCounts[key]++;
-      
-      // Add to affected users set
-      if (barcode.userId) {
-        affectedUsers.add(barcode.userId);
-      }
-    });
-    
-    // Delete all barcodes for this row
-    const { error } = await supabase
-      .from('barcodes')
-      .delete()
-      .eq('row_id', rowId);
-      
+    // Use server-side function to delete all barcodes efficiently
+    const { data, error } = await supabase.rpc('reset_row_barcodes', { p_row_id: rowId });
+
     if (error) {
       console.error('Error resetting row:', error);
       toast.error(`Failed to reset row: ${error.message}`);
-      return;
+      return false;
     }
-    
-    // Remove barcodes from state
+
+    const deletedCount = data as number;
+
+    // Remove barcodes from local state
     setBarcodes(prev => prev.filter(barcode => barcode.rowId !== rowId));
-    
-    // Adjust daily scans for each affected user and date
-    for (const [key, count] of Object.entries(userBarcodeCounts)) {
-      const [userId, date] = key.split('_');
-      
-      // Get current daily scan count
-      const { data: scanData } = await supabase
-        .from('daily_scans')
-        .select('id, count')
-        .eq('user_id', userId)
-        .eq('date', date)
-        .maybeSingle();
-        
-      if (scanData) {
-        // Subtract the count and allow negative values
-        const newCount = Math.max(scanData.count - count, -999999);  // Set a reasonable lower bound
-        
-        await supabase
-          .from('daily_scans')
-          .update({ count: newCount })
-          .eq('id', scanData.id);
-      }
+
+    if (deletedCount === 0) {
+      toast.info('No barcodes to reset');
+    } else {
+      toast.success(`Reset ${deletedCount} barcodes successfully`);
     }
-    
-    // Update total scans count for each affected user
-    for (const userId of affectedUsers) {
-      try {
-        const response = await fetch(
-          'https://ynslzmpfhmoghvcacwzd.supabase.co/functions/v1/update-user-total-scans',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-            },
-            body: JSON.stringify({ userId })
-          }
-        );
-        
-        if (!response.ok) {
-          console.error('Failed to update user total scans:', await response.text());
-        }
-      } catch (error) {
-        console.error('Error calling update-user-total-scans function:', error);
-      }
-    }
-    
-    toast.success(`Reset ${rowBarcodes.length} barcodes successfully`);
     return true;
   } catch (error: any) {
     console.error('Error in resetRow:', error.message);
