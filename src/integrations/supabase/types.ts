@@ -209,6 +209,7 @@ export type Database = {
           email: string
         }[]
       }
+      reset_row_barcodes: { Args: { p_row_id: string }; Returns: number }
       shift_order:
         | { Args: { id: string; index: number }; Returns: undefined }
         | { Args: { p_index: number; p_row_id: string }; Returns: number }
