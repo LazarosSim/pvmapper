@@ -1,7 +1,54 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Row } from '../../../types/db-types';
-import { getRowById } from '../row-utils';
+import { fetchAllPages } from '@/lib/supabase-paging';
+import { nextRowName, planSubRow } from '@/lib/row-naming';
+
+// Names are worked out from the park's rows on the server: the provider's local
+// `rows` list is no longer loaded, so it can't be used to number new rows.
+const fetchParkRowNames = (parkId: string) =>
+  fetchAllPages<{ name: string }>((from, to) =>
+    supabase.from('rows').select('name').eq('park_id', parkId).order('id').range(from, to)
+  ).then((rows) => rows.map((row) => row.name));
+
+const insertRow = async (
+  setRows: React.Dispatch<React.SetStateAction<Row[]>>,
+  parkId: string,
+  name: string,
+  expectedBarcodes: number | undefined,
+  label: 'row' | 'subrow'
+): Promise<Row | null> => {
+  const { data, error } = await supabase
+    .from('rows')
+    .insert([{
+      name,
+      park_id: parkId,
+      expected_barcodes: expectedBarcodes,
+      current_barcodes: 0 // Initialize with 0 barcodes
+    }])
+    .select();
+
+  if (error) {
+    console.error(`Error adding ${label}:`, error);
+    toast.error(`Failed to create ${label}: ${error.message}`);
+    return null;
+  }
+
+  if (!data || !data[0]) return null;
+
+  const newRow: Row = {
+    id: data[0].id,
+    name: data[0].name,
+    parkId: data[0].park_id,
+    createdAt: data[0].created_at,
+    expectedBarcodes: data[0].expected_barcodes,
+    currentBarcodes: data[0].current_barcodes || 0
+  };
+
+  setRows(prev => [newRow, ...prev]);
+  toast.success(label === 'row' ? 'Row added successfully' : 'Subrow added successfully');
+  return newRow;
+};
 
 /**
  * Add a new row
@@ -14,45 +61,10 @@ export const addRow = async (
   navigate: boolean = true,
   customName?: string  // New parameter for custom row naming
 ): Promise<Row | null> => {
-  // Get rows count for this park to create a sequential name
-  const parkRows = rows.filter(row => row.parkId === parkId);
-  
-  // Use custom name if provided, otherwise generate a sequential name
-  const rowName = customName || `Row ${parkRows.length + 1}`;
-  
   try {
-    const { data, error } = await supabase
-      .from('rows')
-      .insert([{ 
-        name: rowName,
-        park_id: parkId,
-        expected_barcodes: expectedBarcodes,
-        current_barcodes: 0 // Initialize with 0 barcodes
-      }])
-      .select();
-      
-    if (error) {
-      console.error('Error adding row:', error);
-      toast.error(`Failed to create row: ${error.message}`);
-      return null;
-    }
-    
-    if (data && data[0]) {
-      const newRow: Row = {
-        id: data[0].id,
-        name: data[0].name,
-        parkId: data[0].park_id,
-        createdAt: data[0].created_at,
-        expectedBarcodes: data[0].expected_barcodes,
-        currentBarcodes: data[0].current_barcodes || 0
-      };
-      
-      setRows(prev => [newRow, ...prev]);
-      toast.success('Row added successfully');
-      return newRow;
-    }
-    
-    return null;
+    // Use custom name if provided, otherwise the next free "Row N" in this park
+    const rowName = customName || nextRowName(await fetchParkRowNames(parkId));
+    return await insertRow(setRows, parkId, rowName, expectedBarcodes, 'row');
   } catch (error: any) {
     console.error('Error in addRow:', error.message);
     toast.error(`Failed to create row: ${error.message}`);
@@ -69,177 +81,54 @@ export const addSubRow = async (
   parentRowId: string,
   expectedBarcodes?: number
 ): Promise<Row | null> => {
-  // Get the original row
-  const originalRow = rows.find(row => row.id === parentRowId);
-  if (!originalRow) {
-    toast.error('Parent row not found');
-    return null;
-  }
-  
-  // Extract the base row name (get the row number)
-  const baseNameMatch = originalRow.name.match(/^Row\s+(\d+)(?:_[a-z])?$/i);
-  if (!baseNameMatch) {
-    toast.error('Unable to determine parent row base name');
-    return null;
-  }
-  
-  const rowNumber = baseNameMatch[1];
-  const parkId = originalRow.parkId;
-  
-  // Find all related rows with the same base number
-  const relatedRows = rows.filter(row => {
-    const match = row.name.match(/^Row\s+(\d+)(?:_([a-z]))?$/i);
-    return match && match[1] === rowNumber && row.parkId === parkId;
-  });
-  
-  // Check if we need to rename the original row (if it doesn't have a suffix yet)
-  const needsRenaming = originalRow.name === `Row ${rowNumber}`;
-  
-  // First, if the original row needs renaming, do that before adding a new one
-  if (needsRenaming) {
-    // Always rename to _a first
-    await updateRow(rows, setRows, originalRow.id, `Row ${rowNumber}_a`);
-    
-    // After renaming, the new row will be _b
-    const newRowName = `Row ${rowNumber}_b`;
-    
-    try {
-      const { data, error } = await supabase
-        .from('rows')
-        .insert([{ 
-          name: newRowName,
-          park_id: parkId,
-          expected_barcodes: expectedBarcodes,
-          current_barcodes: 0 // Initialize with 0 barcodes
-        }])
-        .select();
-        
-      if (error) {
-        console.error('Error adding subrow:', error);
-        toast.error(`Failed to create subrow: ${error.message}`);
-        return null;
-      }
-      
-      if (data && data[0]) {
-        const newRow: Row = {
-          id: data[0].id,
-          name: data[0].name,
-          parkId: data[0].park_id,
-          createdAt: data[0].created_at,
-          expectedBarcodes: data[0].expected_barcodes,
-          currentBarcodes: data[0].current_barcodes || 0
-        };
-        
-        setRows(prev => [newRow, ...prev]);
-        toast.success('Subrow added successfully');
-        return newRow;
-      }
-      
-      return null;
-    } catch (error: any) {
-      console.error('Error in addSubRow:', error.message);
-      toast.error(`Failed to create subrow: ${error.message}`);
+  try {
+    const { data: parent, error } = await supabase
+      .from('rows')
+      .select('id, name, park_id')
+      .eq('id', parentRowId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!parent) {
+      toast.error('Parent row not found');
       return null;
     }
-  } else {
-    // The original row already has a suffix, so just determine the next letter
-    const suffixes = relatedRows
-      .map(row => {
-        const match = row.name.match(/^Row\s+\d+_([a-z])$/i);
-        return match ? match[1].toLowerCase() : '';
-      })
-      .filter(Boolean);
-    
-    // Get the last letter and increment it
-    const lastLetter = String.fromCharCode(
-      Math.max(...suffixes.map(s => s.charCodeAt(0)))
-    );
-    const nextSuffix = String.fromCharCode(lastLetter.charCodeAt(0) + 1);
-    
-    // Create new row with the next suffix
-    const newRowName = `Row ${rowNumber}_${nextSuffix}`;
-    
-    try {
-      const { data, error } = await supabase
-        .from('rows')
-        .insert([{ 
-          name: newRowName,
-          park_id: parkId,
-          expected_barcodes: expectedBarcodes,
-          current_barcodes: 0 // Initialize with 0 barcodes
-        }])
-        .select();
-        
-      if (error) {
-        console.error('Error adding subrow:', error);
-        toast.error(`Failed to create subrow: ${error.message}`);
-        return null;
-      }
-      
-      if (data && data[0]) {
-        const newRow: Row = {
-          id: data[0].id,
-          name: data[0].name,
-          parkId: data[0].park_id,
-          createdAt: data[0].created_at,
-          expectedBarcodes: data[0].expected_barcodes,
-          currentBarcodes: data[0].current_barcodes || 0
-        };
-        
-        setRows(prev => [newRow, ...prev]);
-        toast.success('Subrow added successfully');
-        return newRow;
-      }
-      
-      return null;
-    } catch (error: any) {
-      console.error('Error in addSubRow:', error.message);
-      toast.error(`Failed to create subrow: ${error.message}`);
+
+    const plan = planSubRow(parent.name, await fetchParkRowNames(parent.park_id));
+    if ('error' in plan) {
+      toast.error(plan.error);
       return null;
     }
+
+    // "Row 5" is renamed to "Row 5_a" before "Row 5_b" is added
+    if (plan.renameParentTo) {
+      await updateRow(setRows, parent.id, plan.renameParentTo);
+    }
+
+    return await insertRow(setRows, parent.park_id, plan.newRowName, expectedBarcodes, 'subrow');
+  } catch (error: any) {
+    console.error('Error in addSubRow:', error.message);
+    toast.error(`Failed to create subrow: ${error.message}`);
+    return null;
   }
 };
 
 // Helper function for handling row updates
 // Defined here to avoid circular dependencies
 const updateRow = async (
-  rows: Row[],
   setRows: React.Dispatch<React.SetStateAction<Row[]>>,
-  rowId: string, 
-  name: string, 
-  expectedBarcodes?: number
+  rowId: string,
+  name: string
 ) => {
-  try {
-    const updateData: { name?: string; expected_barcodes?: number | null } = {};
-    
-    if (name !== undefined) {
-      updateData.name = name;
-    }
-    
-    if (expectedBarcodes !== undefined) {
-      updateData.expected_barcodes = expectedBarcodes;
-    }
-    
-    const { error } = await supabase
-      .from('rows')
-      .update(updateData)
-      .eq('id', rowId);
-      
-    if (error) {
-      console.error('Error updating row:', error);
-      toast.error(`Failed to update row: ${error.message}`);
-      return;
-    }
-    
-    setRows(prev => prev.map(row => 
-      row.id === rowId 
-        ? { ...row, name: name !== undefined ? name : row.name, expectedBarcodes: expectedBarcodes !== undefined ? expectedBarcodes : row.expectedBarcodes } 
-        : row
-    ));
-    
-    toast.success('Row updated successfully');
-  } catch (error: any) {
-    console.error('Error in updateRow:', error.message);
-    toast.error(`Failed to update row: ${error.message}`);
+  const { error } = await supabase
+    .from('rows')
+    .update({ name })
+    .eq('id', rowId);
+
+  if (error) {
+    console.error('Error updating row:', error);
+    throw new Error(`Failed to rename parent row: ${error.message}`);
   }
+
+  setRows(prev => prev.map(row => row.id === rowId ? { ...row, name } : row));
 };

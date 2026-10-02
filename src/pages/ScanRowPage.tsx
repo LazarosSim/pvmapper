@@ -21,14 +21,10 @@ import {
 import { SyncButton } from "@/components/offline/SyncButton";
 import { OfflineStatusBanner } from "@/components/offline/OfflineStatusBanner";
 
-// Audio notification for success/error
-const NOTIF_SOUND = "data:audio/wav;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAFAAAGUACFhYWFhYWFhYWFhYWFhYWFhYWFra2tra2tra2tra2tra2tra2traOjo6Ojo6Ojo6Ojo6Ojo6Ojo6P///////////////////////////////////////////wAAADJMQVNNRTMuOTlyAc0AAAAAAAAAABSAJAJAQgAAgAAAA+aieizgAAAAAAAAAAAAAAAAAAAA//uQZAAAApEGUFUGAAArIMoKoMAABZAZnW40AAClAzOtxpgALEwy1AAAAAEVf7kGQRmBmD3QEAgEDhnePhI/JH4iByB+SPxA/IH5gQB+IPzAQA+TAMDhOIPA/IEInjB4P4fn///jHJ+T/ngfgYAgEAgEAgEAgg5nwuZIuZw5QmCvG0Ooy0JtC2CnAp1vdSlLMuOQylYZl0LERgAAAAAAlMy5z3O+n//zTjN/9/+Z//O//9y5/8ud/z//5EHL/D+KDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDEppqampqampqampqampqampqampqampqampqampqamgAAA//tQZAAAAtAeUqsMAARfA7pVYYACCUCXPqggAEAAAP8AAAAATEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkYA/wAAB/gAAACAAAD/AAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=";
-
 const ScanRowPage = () => {
 
   const { rowId } = useParams<{ rowId: string }>();
   const {
-    currentUser,
     updateRow
   } = useDB();
 
@@ -42,8 +38,7 @@ const ScanRowPage = () => {
   // State for location capture - default to true
   const [captureLocation, setCaptureLocation] = useState(true);
 
-  // Reference to the audio element
-  const audioRef = useRef<HTMLAudioElement>(null);
+  // The scan input, so dialogs can hand focus back to it
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Function to focus the input field
@@ -63,7 +58,7 @@ const ScanRowPage = () => {
   // Merged barcodes (server + pending offline) - imported from hook
   const { mergedBarcodes: barcodes } = useMergedBarcodes(rowId, serverBarcodes);
 
-  // Sync state - used to block scanning during sync
+  // Sync state - shown on the card; scanning continues while a sync runs
   const { isSyncing } = useSync();
 
   // Persist selected row/park for convenience elsewhere (not for refresh routing)
@@ -78,10 +73,6 @@ const ScanRowPage = () => {
   useEffect(() => {
     focusInput();
   }, []);
-
-  if (!currentUser) {
-    return <Navigate to="/login" replace />;
-  }
 
   // If the URL doesn't have a rowId, we can't deep-link.
   if (!rowId) return <Navigate to="/scan" replace />;
@@ -182,9 +173,9 @@ const ScanRowPage = () => {
 
   const saveRowName = async () => {
     if (rowName.trim()) {
-      await updateRow(rowId, rowName);
+      // updateRow reports success or failure itself
+      await updateRow(rowId, rowName.trim());
       setIsEditingRowName(false);
-      toast.success("Row name updated successfully");
     } else {
       toast.error("Row name cannot be empty");
     }
@@ -233,16 +224,6 @@ const ScanRowPage = () => {
           </div>
         )}
         <Card className="glass-card relative overflow-hidden">
-          {/* Sync overlay */}
-          {isSyncing && (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
-              <div className="flex items-center gap-3 text-muted-foreground">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                <span className="text-sm font-medium">Syncing...</span>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">Please wait</p>
-            </div>
-          )}
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center">
@@ -251,6 +232,12 @@ const ScanRowPage = () => {
                   {row?.expectedBarcodes ? ` / ${row.expectedBarcodes}` : '/∞'}
                 </span>
               </div>
+              {isSyncing && (
+                <span className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  Syncing...
+                </span>
+              )}
             </CardTitle>
             <CardDescription>
               Scan or enter a barcode to add it to this row
@@ -260,11 +247,10 @@ const ScanRowPage = () => {
             <div className="pr-12 relative">
               <BarcodeScanInput
                 rowId={rowId}
-                focusInput={focusInput}
-                disabled={isSyncing}
+                inputRef={inputRef}
+                captureLocation={captureLocation}
               />
             </div>
-            <audio ref={audioRef} src={NOTIF_SOUND} />
             <RecentScans barcodes={latestBarcodes} />
           </CardContent>
         </Card>

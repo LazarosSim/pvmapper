@@ -11,15 +11,15 @@ const resetRow = async (rowId: string) => {
     if (!rowId.trim())
         throw new Error("Row ID is required");
 
-    const { count, error } = await supabase
-        .from('barcodes')
-        .delete({ count: "exact" })
-        .eq('row_id', rowId)
+    // Server-side delete: a client-side delete of a large row can time out
+    const { data: count, error } = await supabase.rpc('reset_row_barcodes', { p_row_id: rowId });
     if (error) {
         console.error("Error resetting row:", error);
         throw error;
     }
-    console.log("about to return " + count)
+
+    // Scans of this row not uploaded yet would otherwise come back after the reset
+    await removeQueuedMutationsByRow(rowId);
     return count;
 }
 

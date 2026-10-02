@@ -45,14 +45,15 @@ const useSoundEffects = () => {
   const playSuccessSound = () => {
     if (successSoundRef.current) {
       successSoundRef.current.currentTime = 0;
-      successSoundRef.current.play();
+      // play() rejects when the browser blocks audio; a missing beep must not break scanning
+      successSoundRef.current.play().catch(() => undefined);
     }
   };
 
   const playErrorSound = () => {
     if (errorSoundRef.current) {
       errorSoundRef.current.currentTime = 0;
-      errorSoundRef.current.play();
+      errorSoundRef.current.play().catch(() => undefined);
     }
   };
 

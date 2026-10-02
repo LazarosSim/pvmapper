@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Park, Row } from '@/lib/types/db-types';
 import { naturalCompare } from '@/lib/utils';
+import { fetchAllPages } from '@/lib/supabase-paging';
 
 const WORKSPACE_STORAGE_KEY = 'pvmapper:current-workspace';
 
@@ -61,13 +62,13 @@ const loadParkById = async (parkId: string): Promise<Park | null> => {
 
 // Helper to load rows by park ID
 const loadRowsByParkId = async (parkId: string): Promise<Row[]> => {
-  const { data, error } = await supabase
+  const data = await fetchAllPages((from, to) => supabase
     .from('rows')
     .select('id, name, createdAt:created_at, currentBarcodes:current_barcodes, expectedBarcodes:expected_barcodes, parkId:park_id, park:parks(name)')
     .eq('park_id', parkId)
-    .order('name', { ascending: true });
+    .order('id', { ascending: true })
+    .range(from, to));
 
-  if (error) throw error;
   return (data as Row[]).sort((a, b) => naturalCompare(a.name, b.name));
 };
 
@@ -210,21 +211,10 @@ export const useWorkspace = (): UseWorkspaceReturn => {
 
       console.log('[Workspace] Fetched rows:', rows.length);
 
-      // Prefetch individual row data (needed by ScanRowPage's useRow hook)
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        await queryClient.prefetchQuery({
-          queryKey: ['rows', 'single', row.id],
-          queryFn: async () => {
-            const { data, error } = await supabase
-              .from('rows')
-              .select('id, name, createdAt:created_at, currentBarcodes:current_barcodes, expectedBarcodes:expected_barcodes, parkId:park_id, park:parks(name)')
-              .eq('id', row.id)
-              .single();
-            if (error) throw error;
-            return data;
-          },
-        });
+      // Individual row data (needed by ScanRowPage's useRow hook) has the same shape
+      // as the rows just loaded, so it is cached from them instead of one request per row.
+      for (const row of rows) {
+        queryClient.setQueryData(['rows', 'single', row.id], row);
       }
 
       // Complete!

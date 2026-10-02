@@ -3,6 +3,28 @@ import {supabase} from '@/integrations/supabase/client';
 import {toast} from 'sonner';
 import type {User} from '../types/db-types';
 
+const PROFILE_CACHE_KEY = 'pvmapper:profile';
+
+// The last loaded profile is kept on the device so the app still knows who is
+// signed in (and their role) when it starts without a connection.
+const readCachedProfile = (userId: string): User | null => {
+  try {
+    const cached = JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY) || 'null') as User | null;
+    return cached?.id === userId ? cached : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedProfile = (user: User | null) => {
+  try {
+    if (user) localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(user));
+    else localStorage.removeItem(PROFILE_CACHE_KEY);
+  } catch {
+    // Storage full or unavailable: the profile is simply loaded again next time.
+  }
+};
+
 export const useUser = () => {
   const [currentUser, setCurrentUser] = useState<User | null | undefined>(undefined);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -19,6 +41,11 @@ export const useUser = () => {
         .single();
 
       if (error) {
+        const cached = readCachedProfile(userId);
+        if (cached) {
+          setCurrentUser(cached);
+          return cached;
+        }
         console.error('Error fetching user profile:', error);
         toast.error(`Failed to load profile: ${error.message}`);
         setCurrentUser(null);
@@ -33,6 +60,7 @@ export const useUser = () => {
           createdAt: data.created_at,
         };
         setCurrentUser(user);
+        writeCachedProfile(user);
         return user;
       }
       
@@ -40,8 +68,9 @@ export const useUser = () => {
       return null;
     } catch (error: any) {
       console.error('Error in fetchUserProfile:', error.message);
-      setCurrentUser(null);
-      return null;
+      const cached = readCachedProfile(userId);
+      setCurrentUser(cached);
+      return cached;
     } finally {
       setIsLoading(false);
     }
@@ -70,6 +99,7 @@ export const useUser = () => {
       
       // Clear the last route to prevent redirecting back after logout
       localStorage.removeItem('lastRoute');
+      writeCachedProfile(null);
       
       toast.success('Logged out successfully');
     } catch (error: any) {
@@ -77,6 +107,7 @@ export const useUser = () => {
       console.error('Error in logout:', error.message);
       // Still consider it a successful logout from the user's perspective
       localStorage.removeItem('lastRoute');
+      writeCachedProfile(null);
       toast.success('Logged out successfully');
     }
   };

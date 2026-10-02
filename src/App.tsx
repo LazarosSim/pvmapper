@@ -41,28 +41,6 @@ persistQueryClient({
   maxAge: Infinity
 })
 
-
-const _origFetch = window.fetch;
-window.fetch = (...args) => {
-  console.log('[PAGE fetch]', args[0], args[1]?.method || 'GET');
-  return _origFetch(...args);
-};
-
-// DEBUG: log every XHR
-const _origXhrOpen = XMLHttpRequest.prototype.open;
-XMLHttpRequest.prototype.open = function (method, url) {
-  console.log('[PAGE XHR]', method, url);
-  return _origXhrOpen.apply(this, arguments as any);
-};
-
-
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  navigator.serviceWorker
-    .register('/sw.js')
-    .then(() => console.log('SW registered'))
-    .catch(console.error);
-}
-
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>

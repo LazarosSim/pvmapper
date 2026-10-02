@@ -1,6 +1,7 @@
 import {supabase} from "@/integrations/supabase/client.ts";
 import {useQuery} from "@tanstack/react-query";
 import {naturalCompare} from "@/lib/utils";
+import {fetchAllPages} from "@/lib/supabase-paging";
 
 const loadRows = async () => {
     const {data, error} = await supabase
@@ -29,14 +30,13 @@ const loadRowById = async (rowId: string) => {
 }
 
 const loadRowsByParkId = async (parkId: string) => {
-    const {data, error} = await supabase
+    // Paged so parks with more than 1000 rows are loaded completely
+    const data = await fetchAllPages((from, to) => supabase
         .from('rows')
         .select('id, name, createdAt:created_at, currentBarcodes:current_barcodes, expectedBarcodes:expected_barcodes, parkId:park_id, park:parks(name)')
         .eq('park_id', parkId)
-        .order('name', {ascending: true})
-    if (error) {
-        throw error;
-    }
+        .order('id', {ascending: true})
+        .range(from, to))
     return data.sort((a, b) => naturalCompare(a.name, b.name));
 }
 

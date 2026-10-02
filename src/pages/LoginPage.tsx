@@ -3,13 +3,11 @@ import { Navigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useSupabase } from '@/lib/supabase-provider';
 import { useAuthForm } from '@/hooks/use-auth-form';
 import { LoginForm } from '@/components/auth/login-form';
 import { RegisterForm } from '@/components/auth/register-form';
 const LoginPage = () => {
-  const [creatingDemoAccounts, setCreatingDemoAccounts] = useState(false);
   const [backgroundLoaded, setBackgroundLoaded] = useState(false);
   const [backgroundError, setBackgroundError] = useState(false);
   const {
@@ -37,69 +35,6 @@ const LoginPage = () => {
       setShouldRedirect(true);
     }
   }, [isInitialized, user]);
-  // Removed auto-signOut that was destroying valid sessions on page refresh
-  const createDemoAccounts = async () => {
-    try {
-      setCreatingDemoAccounts(true);
-      const {
-        data: existingProfiles,
-        error: profileError
-      } = await supabase.from('profiles').select('username').or('username.eq.antrian,username.eq.lazaros').limit(2);
-      if (profileError) {
-        console.error("Error checking profiles:", profileError);
-        return;
-      }
-      if (existingProfiles && existingProfiles.length === 2) {
-        console.log("Demo accounts already exist, skipping creation");
-        return;
-      }
-      console.log("Setting up demo accounts...");
-      const createDemoUser = async (username: string, password: string, role: string) => {
-        try {
-          const email = `${username.toLowerCase()}@example.com`;
-          const {
-            data: existingUser
-          } = await supabase.from('profiles').select('username').eq('username', username).single();
-          if (existingUser) {
-            console.log(`${username} account already exists, skipping`);
-            return;
-          }
-          const {
-            error
-          } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                username,
-                role
-              }
-            }
-          });
-          if (error) {
-            console.error(`Error creating ${username} account:`, error);
-            throw error;
-          }
-          console.log(`${username} account created successfully`);
-        } catch (err) {
-          console.error(`Failed to create ${username} account:`, err);
-        }
-      };
-      await createDemoUser("antrian", "antrian1", "user");
-      await createDemoUser("lazaros", "lazaros2", "manager");
-      console.log("Demo accounts setup complete");
-    } catch (error) {
-      console.error("Error creating demo accounts:", error);
-    } finally {
-      setCreatingDemoAccounts(false);
-    }
-  };
-  useEffect(() => {
-    if (isInitialized) {
-      createDemoAccounts();
-    }
-  }, [isInitialized]);
-
   // Preload the background image
   useEffect(() => {
     const preloadImage = () => {

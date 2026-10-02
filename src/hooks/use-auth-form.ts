@@ -57,6 +57,8 @@ export const useAuthForm = () => {
         options: {
           data: {
             username: registerUsername,
+            // Ignored once supabase/pending/01_roles_and_approval.sql is applied:
+            // the database then makes every new account 'pending' until a manager approves it.
             role: 'user'
           }
         }

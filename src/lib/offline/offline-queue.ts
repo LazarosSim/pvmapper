@@ -263,6 +263,37 @@ export async function updateMutationStatus(
 }
 
 /**
+ * Put mutations left in 'syncing' back to 'pending'.
+ * A sync interrupted by closing the app leaves items in 'syncing', and sync only
+ * picks up 'pending' items, so without this they would never be uploaded.
+ * Re-uploading is safe: adds use their client-generated id and duplicates are skipped.
+ */
+export async function resetStuckMutations(): Promise<number> {
+  const db = await getDB();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    let reset = 0;
+
+    const request = store.openCursor();
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return;
+      const mutation = cursor.value as QueuedMutation;
+      if (mutation.status === 'syncing') {
+        cursor.update({ ...mutation, status: 'pending' });
+        reset++;
+      }
+      cursor.continue();
+    };
+
+    transaction.oncomplete = () => resolve(reset);
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+/**
  * Remove a single mutation from the queue
  */
 export async function removeFromQueue(id: string): Promise<void> {

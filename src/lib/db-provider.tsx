@@ -1,6 +1,10 @@
 import {createContext, useContext, useEffect, useState} from 'react';
+import {useQueryClient} from '@tanstack/react-query';
 import {useSupabase} from './supabase-provider';
 import {toast} from 'sonner';
+import {removeQueuedMutationsByRow} from './offline/offline-queue';
+import {rescueLegacyServiceWorkerQueue} from './offline/legacy-sw-rescue';
+import {supabaseRescueWriter} from './offline/legacy-sw-rescue-supabase';
 
 // Import types
 import type {Barcode, DBContextType, Park, Row, User} from './types/db-types';
@@ -22,6 +26,15 @@ const DBContext = createContext<DBContextType | undefined>(undefined);
 
 export function DBProvider({ children }: { children: React.ReactNode }) {
   const { user } = useSupabase();
+  const queryClient = useQueryClient();
+
+  // Row changes go straight to the server; refresh the cached lists the pages read from.
+  const refreshRowQueries = (rowId?: string) => {
+    queryClient.invalidateQueries({ queryKey: ['rows'] });
+    queryClient.invalidateQueries({ queryKey: ['parks'] });
+    queryClient.invalidateQueries({ queryKey: ['park'] });
+    if (rowId) queryClient.invalidateQueries({ queryKey: ['barcodes', 'row', rowId] });
+  };
   
   // Initialize user state and functions
   const { 
@@ -77,8 +90,10 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
           await fetchDailyScans(user.id);
         }
       } else {
-        // No logged in user
+        // No logged in user: drop cached server data so the next user never sees it.
+        // Unsynced scans are kept in the offline queue, not in this cache.
         if (isMounted) {
+          queryClient.clear();
           refetchUser();
           setParks([]);
           setRows([]);
@@ -89,10 +104,31 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     };
     
     loadUserProfile();
-    
+
     return () => {
       isMounted = false;
     };
+  }, [user?.id]);
+
+  // Upload scans stranded in the previous service worker's queue (see legacy-sw-rescue.ts)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const rescue = () => {
+      if (!navigator.onLine) return;
+      rescueLegacyServiceWorkerQueue(supabaseRescueWriter)
+        .then((rescued) => {
+          if (rescued > 0) {
+            queryClient.invalidateQueries({ queryKey: ['barcodes'] });
+            refreshRowQueries();
+          }
+        })
+        .catch((error) => console.error('[LegacyRescue] Failed:', error));
+    };
+
+    rescue();
+    window.addEventListener('online', rescue);
+    return () => window.removeEventListener('online', rescue);
   }, [user?.id]);
 
   // Create context value with all the functions and state
@@ -126,23 +162,40 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     // Rows
     rows,
     getRowsByParkId,
-    addRow: (parkId, expectedBarcodes, navigate, customName) =>
-      addRow(parkId, expectedBarcodes, navigate, customName),
-    deleteRow,
-    updateRow,
+    addRow: async (parkId, expectedBarcodes, navigate, customName) => {
+      const row = await addRow(parkId, expectedBarcodes, navigate, customName);
+      refreshRowQueries();
+      return row;
+    },
+    deleteRow: async (rowId) => {
+      // The user confirmed deleting the row and all of its barcodes, including ones
+      // not uploaded yet. Left in the queue they would fail to sync forever.
+      await removeQueuedMutationsByRow(rowId);
+      await deleteRow(rowId);
+      refreshRowQueries(rowId);
+    },
+    updateRow: async (rowId, name, expectedBarcodes) => {
+      await updateRow(rowId, name, expectedBarcodes);
+      refreshRowQueries(rowId);
+    },
     getRowById,
     resetRow: async (rowId) => {
       try {
         // Directly call the resetRow function that will now fetch from DB
-        return await resetRow(rowId);
+        const result = await resetRow(rowId);
+        refreshRowQueries(rowId);
+        return result;
       } catch (error) {
         console.error('Error in resetRow:', error);
         return Promise.reject(error);
       }
     },
     countBarcodesInRow,
-    addSubRow: (rowId, expectedBarcodes) => 
-      addSubRow(rowId, expectedBarcodes),
+    addSubRow: async (rowId, expectedBarcodes) => {
+      const row = await addSubRow(rowId, expectedBarcodes);
+      refreshRowQueries();
+      return row;
+    },
     
     // Barcodes
     barcodes,

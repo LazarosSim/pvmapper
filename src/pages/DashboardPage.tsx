@@ -5,7 +5,9 @@ import {useDB} from '@/lib/db-provider';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Progress} from '@/components/ui/progress';
 import {Calendar} from '@/components/ui/calendar';
-import {ArrowDownRight, ArrowUpRight, BarChart3, CalendarIcon, Layers, Loader2, Users} from 'lucide-react';
+import {ArrowDownRight, ArrowUpRight, BarChart3, CalendarIcon, Check, Layers, Loader2, UserPlus, Users} from 'lucide-react';
+import {Button} from '@/components/ui/button';
+import {toast} from 'sonner';
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
 import {endOfMonth, format, startOfMonth} from 'date-fns';
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,} from "@/components/ui/tooltip";
@@ -14,6 +16,7 @@ import {ParkProgress} from "@/components/parks/ParkProgress.tsx";
 import {useParkStats} from "@/hooks/parks";
 import {useUserStats} from "@/hooks/use-user-stats.tsx";
 import {useCurrentUser} from "@/hooks/use-user.tsx";
+import {useApproveUser, usePendingUsers} from "@/hooks/use-pending-users";
 
 const DashboardPage = () => {
   const {
@@ -30,6 +33,8 @@ const DashboardPage = () => {
   const {data: parks} = useParkStats();
   const {data: userStats} = useUserStats();
   const {data: currentUser} = useCurrentUser();
+  const {data: pendingUsers} = usePendingUsers(currentUser?.role === 'manager');
+  const {mutate: approveUser, isPending: isApproving, variables: approvingUserId} = useApproveUser();
 
 
   // Redirect if not authenticated or not a manager
@@ -200,6 +205,45 @@ const DashboardPage = () => {
           </TabsContent>
           
           <TabsContent value="users" className="space-y-4 pt-2">
+            {pendingUsers && pendingUsers.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <UserPlus className="mr-2 h-5 w-5" />
+                    Waiting for approval
+                  </CardTitle>
+                  <CardDescription>
+                    These accounts can't see or change any data until you approve them.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {pendingUsers.map(user => (
+                    <div key={user.id} className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="font-medium">{user.username}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Signed up {format(new Date(user.createdAt), 'MMM d, yyyy')}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        disabled={isApproving && approvingUserId === user.id}
+                        onClick={() => approveUser(user.id, {
+                          onSuccess: () => toast.success(`${user.username} approved`),
+                          onError: (error) => toast.error(`Could not approve ${user.username}: ${error.message}`),
+                        })}
+                      >
+                        {isApproving && approvingUserId === user.id
+                          ? <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                          : <Check className="mr-1 h-4 w-4" />}
+                        Approve
+                      </Button>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">

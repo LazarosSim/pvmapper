@@ -3,7 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { useDB } from '@/lib/db-provider';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSupabase } from '@/lib/supabase-provider';
-import { Loader } from 'lucide-react';
+import { Clock, Loader, LogOut } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -11,7 +12,7 @@ interface AuthGuardProps {
 }
 
 const AuthGuard: React.FC<AuthGuardProps> = ({ children, requireManager = false }) => {
-  const { currentUser, isDBLoading } = useDB();
+  const { currentUser, isDBLoading, logout } = useDB();
   const { user, isInitialized } = useSupabase();
   const navigate = useNavigate();
   const location = useLocation();
@@ -62,6 +63,32 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, requireManager = false 
         <div className="text-center space-y-2">
           <Loader className="h-8 w-8 animate-spin mx-auto text-primary" />
           <p className="text-sm text-muted-foreground">Verifying access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // New accounts wait for a manager's approval before they can see or change any data
+  if (authChecked && currentUser?.role === 'pending') {
+    return (
+      <div className="flex items-center justify-center min-h-screen p-4">
+        <div className="max-w-sm text-center space-y-4">
+          <Clock className="h-10 w-10 mx-auto text-primary" />
+          <h1 className="text-xl font-semibold">Waiting for approval</h1>
+          <p className="text-sm text-muted-foreground">
+            Your account <strong>{currentUser.username}</strong> was created. A manager needs to
+            approve it before you can start scanning.
+          </p>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              await logout();
+              navigate('/login');
+            }}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Log out
+          </Button>
         </div>
       </div>
     );

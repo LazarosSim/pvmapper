@@ -24,6 +24,8 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
       "@typescript-eslint/no-unused-vars": "off",
+      // Mostly in the legacy data layer that Phase 4 of docs/improvement-plan.md removes
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   }
 );
