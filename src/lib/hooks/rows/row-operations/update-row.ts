@@ -44,7 +44,8 @@ export const updateRow = async (
     ));
     
     toast.success('Row updated successfully');
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Error in updateRow:', error.message);
     toast.error(`Failed to update row: ${error.message}`);
   }
@@ -79,7 +80,8 @@ export const resetRow = async (
       toast.success(`Reset ${deletedCount} barcodes successfully`);
     }
     return true;
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Error in resetRow:', error.message);
     toast.error(`Failed to reset row: ${error.message}`);
     return false;
@@ -125,7 +127,8 @@ export const deleteRow = async (
     setRows(prev => prev.filter(row => row.id !== rowId));
     
     toast.success('Row deleted successfully');
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Error in deleteRow:', error.message);
     toast.error(`Failed to delete row: ${error.message}`);
   }

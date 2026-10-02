@@ -65,7 +65,8 @@ export const addRow = async (
     // Use custom name if provided, otherwise the next free "Row N" in this park
     const rowName = customName || nextRowName(await fetchParkRowNames(parkId));
     return await insertRow(setRows, parkId, rowName, expectedBarcodes, 'row');
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Error in addRow:', error.message);
     toast.error(`Failed to create row: ${error.message}`);
     return null;
@@ -106,7 +107,8 @@ export const addSubRow = async (
     }
 
     return await insertRow(setRows, parent.park_id, plan.newRowName, expectedBarcodes, 'subrow');
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Error in addSubRow:', error.message);
     toast.error(`Failed to create subrow: ${error.message}`);
     return null;

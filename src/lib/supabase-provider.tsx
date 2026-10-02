@@ -73,7 +73,8 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
           toast.error(error.message);
           throw error;
         }
-      } catch (error: any) {
+      } catch (caught) {
+        const error = caught as Error;
         console.error("SignIn error:", error);
         toast.error(error.message || 'Failed to sign in');
         throw error;
@@ -88,7 +89,8 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
           toast.error(error.message);
           throw error;
         }
-      } catch (error: any) {
+      } catch (caught) {
+        const error = caught as Error;
         // If it's a session not found error, treat as success
         if (error?.message?.includes('session_not_found') || error?.message?.includes('Auth session missing')) {
           return; // Silently succeed

@@ -31,7 +31,7 @@ export const useUser = () => {
   const [users, setUsers] = useState<User[]>([]);
 
   // Fetch user profile data from the database
-  const fetchUserProfile = async (userId: string): Promise<User> => {
+  const fetchUserProfile = async (userId: string): Promise<User | null> => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -66,7 +66,8 @@ export const useUser = () => {
       
       setCurrentUser(null);
       return null;
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as Error;
       console.error('Error in fetchUserProfile:', error.message);
       const cached = readCachedProfile(userId);
       setCurrentUser(cached);
@@ -102,7 +103,8 @@ export const useUser = () => {
       writeCachedProfile(null);
       
       toast.success('Logged out successfully');
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as Error;
       // Handle network errors or other issues gracefully
       console.error('Error in logout:', error.message);
       // Still consider it a successful logout from the user's perspective

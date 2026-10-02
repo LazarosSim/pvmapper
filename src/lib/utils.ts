@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import type { WorkSheet } from 'xlsx';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -69,7 +70,7 @@ export interface WorksheetEntry {
   originalName: string;
   sheetName: string;
   type: 'summary' | 'row';
-  worksheet: any;
+  worksheet: WorkSheet;
 }
 
 /**

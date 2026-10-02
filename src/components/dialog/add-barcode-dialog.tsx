@@ -8,12 +8,13 @@ import {Checkbox} from '@/components/ui/checkbox';
 import {useSupabase} from '@/lib/supabase-provider';
 import {addBarcodeToRow} from '@/lib/local/repo';
 import {useRow} from '@/lib/local/hooks';
+import type {BarcodeData} from '@/lib/local/db';
 
 interface AddBarcodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rowId: string;
-  onBarcodeAdded?: (barcode: any) => void;
+  onBarcodeAdded?: (barcode: BarcodeData) => void;
   captureLocation: boolean;
   setCaptureLocation: (capture: boolean) => void;
 }

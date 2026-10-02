@@ -33,7 +33,7 @@ const CreateParkDialog: React.FC<CreateParkDialogProps> = ({ open, onOpenChange 
   });
   
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
-    console.log('create-park-dialog: handleSubmit', values);
+    if (!currentUser) return;
     const result = await addPark({
       name: values.name,
       expectedBarcodes: values.expectedBarcodes,

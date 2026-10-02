@@ -123,6 +123,8 @@ function toOutboxEntry(m: QueuedMutation): OutboxEntry | null {
 // Old React Query cache
 // ---------------------------------------------------------------------------
 
+// Whatever the old cache held; every field is checked before use
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Raw = Record<string, any>;
 
 interface CachedData {

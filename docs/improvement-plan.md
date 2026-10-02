@@ -116,8 +116,8 @@ Broken features
       paging work, no NaN/over-100% bars, today vs yesterday comparison, Greek dates
 
 ### Phase 6 — Keep it healthy
-- [ ] Strict TypeScript; `no-explicit-any` back to an error
-- [ ] README and contributor notes
+- [x] Strict TypeScript; `no-explicit-any` back to an error
+- [x] README and contributor notes
 
 ## Live database findings (2026-10-02)
 

@@ -31,7 +31,8 @@ export const useAuthForm = () => {
         toast.success(`Welcome back, ${loginUsername}!`);
         navigate('/');
       }
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as Error;
       console.error("Login error:", error);
       toast.error("Login failed: " + error.message);
     } finally {
@@ -75,7 +76,8 @@ export const useAuthForm = () => {
         const loginTab = document.querySelector('[data-value="login"]') as HTMLElement;
         if (loginTab) loginTab.click();
       }
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as Error;
       console.error("Registration error:", error);
       toast.error("Registration failed: " + error.message);
     } finally {

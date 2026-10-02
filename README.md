@@ -1,115 +1,68 @@
-# PV Mapper - Solar Park Management Application
+# PV Mapper
 
-## Project Overview
+XP Energy's app for recording the solar-panel barcodes of a park, row by row. Crews scan with
+a phone (hardware scanner or typing), offline as well as online; managers follow progress on
+the dashboard and export each park to Excel.
 
-PV Mapper is a web application for managing and monitoring photovoltaic (solar) parks. It allows users to:
+**Lovable project**: https://lovable.dev/projects/72d1b4e5-834d-476c-8cb7-831a0cf3013c
 
-- Track and manage multiple solar parks
-- Organize and monitor rows of solar panels within parks
-- Perform scanning and inspection of parks and rows
-- View detailed information about parks and rows
-- Access a management dashboard (for manager users)
+## How it works
 
-**Project URL**: https://lovable.dev/projects/72d1b4e5-834d-476c-8cb7-831a0cf3013c
+- **The phone keeps its own copy** of every active park (parks, rows, barcodes) in IndexedDB
+  (`src/lib/local/db.ts`, Dexie). Every screen reads from it, so the app behaves the same with
+  or without signal. Archived parks are read from the server when online.
+- **Every change goes to the copy and to an outbox** in one step (`src/lib/local/repo.ts`).
+  Scans have fixed ids, so uploading again never creates duplicates.
+- **Sync** (`src/lib/local/sync.ts`) uploads the outbox in batches and downloads only rows whose
+  `version` changed. It runs on start, on reconnect, when the app comes back to the front,
+  shortly after a change, and every minute; one sync at a time across tabs. Changes the server
+  refuses are set aside and shown in the sync chip in the header, never dropped.
+- **The service worker** (`vite-plugin-pwa`, generated at build time) caches only the app
+  itself, so it opens without a connection after one online visit. It never caches Supabase
+  data.
+- **First start of a new version** moves anything left by the previous offline system into
+  the outbox (`src/lib/local/legacy-migration.ts`, `src/lib/offline/legacy-sw-rescue.ts`).
 
-## Setup Instructions
+Rows themselves (add, rename, delete) and parks are changed on the server, so they need a
+connection; barcodes can be added, edited, inserted, deleted and reset offline.
 
-### Prerequisites
+## Getting started
 
-- Node.js (v16 or higher) & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-- Supabase account (for backend services)
+Requires Node 18+.
 
-### Installation
+```sh
+npm install
+npm run dev        # http://localhost:8080
+```
 
-1. Clone the repository:
-   ```sh
-   git clone <YOUR_GIT_URL>
-   ```
+The Supabase project URL and public key are in `src/integrations/supabase/client.ts`.
 
-2. Navigate to the project directory:
-   ```sh
-   cd pvmapper
-   ```
+| Script | What it does |
+|---|---|
+| `npm run dev` | Development server |
+| `npm run build` | Production build (adds the service worker) |
+| `npm run preview` | Serve the production build |
+| `npm test` | Unit and component tests (Vitest, fake IndexedDB) |
+| `npm run typecheck` | Strict TypeScript check |
+| `npm run lint` | ESLint |
 
-3. Install dependencies:
-   ```sh
-   npm install
-   ```
+CI runs lint, type check, tests and build on every pull request (`.github/workflows/ci.yml`).
 
-4. Set up environment variables:
-   Create a `.env` file in the root directory with the following variables:
-   ```
-   VITE_SUPABASE_URL=your_supabase_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   ```
+## Database
 
-5. Start the development server:
-   ```sh
-   npm run dev
-   ```
+- Changes live in `supabase/migrations/` and match the live database.
+- `supabase/pending/` holds changes written but not applied yet (security rules, a trigger
+  cleanup); see its README.
+- After a schema change, regenerate `src/integrations/supabase/types.ts`.
+- Statistics count the barcodes that currently exist, by date in Greece (`daily_user_scans`,
+  `user_stats` views).
 
-6. Open your browser and navigate to `http://localhost:5173`
+## Contributing
 
-## Usage Guide
-
-### Authentication
-
-- Access the application at `http://localhost:5173`
-- If not logged in, you'll be redirected to the login page
-- Log in with your credentials
-
-### Main Features
-
-1. **Home Page** - View a list of all solar parks
-2. **Park Detail** - View detailed information about a specific park and its rows
-3. **Row Detail** - View detailed information about a specific row
-4. **Scan** - Access scanning functionality for parks and rows
-5. **Profile** - View and edit your user profile
-6. **Dashboard** - Manager-only view for overall system management
-
-### User Roles
-
-- **Regular Users**: Can view parks, rows, and perform scans
-- **Managers**: Have additional access to the dashboard and management features
-
-## Project Structure
-
-- `/src` - Main source code
-  - `/components` - Reusable UI components
-  - `/hooks` - Custom React hooks
-  - `/integrations` - External service integrations
-  - `/lib` - Utility functions and providers
-  - `/pages` - Application pages/routes
-- `/public` - Static assets
-- `/supabase` - Supabase configuration
-
-## Available Scripts
-
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run build:dev` - Build for development
-- `npm run lint` - Run ESLint
-- `npm run preview` - Preview production build
-
-## Technologies Used
-
-This project is built with:
-
-- Vite - Build tool and development server
-- TypeScript - Type-safe JavaScript
-- React - UI library
-- React Router - For navigation
-- shadcn-ui - UI component library
-- Tailwind CSS - Utility-first CSS framework
-- Supabase - Backend services (auth, database)
-- React Query - Data fetching and state management
-
-## Deployment
-
-Simply open [Lovable](https://lovable.dev/projects/72d1b4e5-834d-476c-8cb7-831a0cf3013c) and click on Share -> Publish.
-
-## Custom Domain
-
-To connect a custom domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+- Keep every feature in `docs/feature-checklist.md` working; check them before merging.
+- `docs/improvement-plan.md` records the decisions and what is done.
+- Screens read through the hooks in `src/lib/local/hooks.ts` and write through
+  `src/lib/local/repo.ts`; don't call Supabase for barcodes from components.
+- TypeScript is strict and `any` is an error.
+- Deploy from Lovable (Share → Publish). The Lovable editor script is only included in
+  development builds.

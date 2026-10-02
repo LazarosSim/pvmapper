@@ -34,7 +34,8 @@ import {
 
 const RowDetail = () => {
 
-  const { rowId } = useParams<{ rowId: string }>();
+  // The route always has a row id
+  const rowId = useParams<{ rowId: string }>().rowId!;
   const { updateRow } = useDB();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isInsertDialogOpen, setIsInsertDialogOpen] = useState(false);
