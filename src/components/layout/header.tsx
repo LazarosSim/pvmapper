@@ -27,6 +27,7 @@ interface HeaderProps {
   setCaptureLocation?: (value: boolean) => void;
   onReset?: () => void;
   onRename?: () => void;
+  compact?: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -38,7 +39,8 @@ const Header: React.FC<HeaderProps> = ({
   captureLocation = false,
   setCaptureLocation,
   onReset,
-  onRename
+  onRename,
+  compact = false,
 }) => {
   const navigate = useNavigate();
   const [isEditingRowName, setIsEditingRowName] = useState(false);
@@ -84,20 +86,20 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 w-full bg-gradient-to-r from-xpenergy-primary to-xpenergy-secondary text-white py-4 px-4 flex items-center z-10 shadow-md">
-      <div className="flex-1 flex items-center">
+    <header className={`sticky top-0 w-full bg-gradient-to-r from-xpenergy-primary to-xpenergy-secondary text-white ${compact ? 'py-1 px-1' : 'py-4 px-4'} flex items-center z-10 shadow-md`}>
+      <div className="flex-1 min-w-0 flex items-center">
         {showBack && (
           <Button
             variant="ghost"
             size="icon"
             onClick={handleBackClick}
-            className="mr-2 text-white hover:bg-xpenergy-primary/20 hover:text-white/90"
+            className={`${compact ? 'mr-1' : 'mr-2'} shrink-0 text-white hover:bg-xpenergy-primary/20 hover:text-white/90`}
           >
             <ArrowLeft className="h-6 w-6" />
           </Button>
         )}
-        <div className="flex items-center">
-          <img
+        <div className="flex min-w-0 items-center">
+          {!compact && <img
             src="/xplogo.png"
             alt="XP Energy Logo"
             className="h-10 mr-3"
@@ -106,13 +108,13 @@ const Header: React.FC<HeaderProps> = ({
               img.src = '/placeholder.svg';
               console.error('Failed to load XP Energy logo');
             }}
-          />
+          />}
           {titleAction ? titleAction : <h1 className="text-xl font-semibold font-montserrat">{title}</h1>}
         </div>
       </div>
 
       {/* Global Settings Gear Icon */}
-      <div className="ml-auto flex items-center gap-2">
+      <div className={`ml-auto flex shrink-0 items-center ${compact ? 'gap-0' : 'gap-2'}`}>
         <SyncStatus />
         <Button
           variant="ghost"

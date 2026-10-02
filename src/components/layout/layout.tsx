@@ -15,6 +15,8 @@ interface LayoutProps {
   setCaptureLocation?: (value: boolean) => void;
   onReset?: () => void;
   onRename?: () => void;
+  /** Thin header, no logos: for the scan screen, where space matters */
+  compact?: boolean;
 }
 
 const Layout: React.FC<LayoutProps> = ({ 
@@ -27,7 +29,8 @@ const Layout: React.FC<LayoutProps> = ({
   captureLocation,
   setCaptureLocation,
   onReset,
-  onRename
+  onRename,
+  compact = false,
 }) => {
   // Convert non-string titles to string to ensure compatibility
   const titleString = typeof title === 'string' 
@@ -48,11 +51,12 @@ const Layout: React.FC<LayoutProps> = ({
         setCaptureLocation={setCaptureLocation}
         onReset={onReset}
         onRename={onRename}
+        compact={compact}
       />
-      <main className="flex-1 p-4 pb-20 overflow-y-auto bg-gradient-to-b from-[#D6EFFF] to-[#B3DEFF]">
+      <main className={`flex-1 ${compact ? 'p-2' : 'p-4'} pb-20 overflow-y-auto bg-gradient-to-b from-[#D6EFFF] to-[#B3DEFF]`}>
         {children}
       </main>
-      <XPLogo />
+      {!compact && <XPLogo />}
       <BottomNav />
     </div>
   );

@@ -2,7 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {toast} from 'sonner';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
-import {ArrowRight, X} from 'lucide-react';
+import {ArrowRight, Keyboard, X} from 'lucide-react';
 import useSoundEffects from '@/hooks/use-sound-effects';
 import {useSupabase} from "@/lib/supabase-provider";
 import {hasValidLength, isDuplicateCode, normalizeCode} from '@/lib/scan-rules';
@@ -86,6 +86,50 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
 
   const focusInput = () => inputRef.current?.focus();
 
+  // Codes come from the hardware scanner, so the on-screen keyboard stays hidden; the
+  // keyboard button shows it for typing one code by hand.
+  const [typing, setTyping] = useState(false);
+  const reopening = useRef(false);
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!typing || !input) return;
+    // A focused field only shows the keyboard once it is focused again
+    reopening.current = true;
+    input.blur();
+    input.focus();
+    reopening.current = false;
+  }, [typing, inputRef]);
+
+  // The scanner types into whatever has focus, so the field keeps it: a touch elsewhere on
+  // the screen, or a scan while something else has focus, puts it back. Dialogs, menus and
+  // other fields keep their focus.
+  useEffect(() => {
+    const isEditable = (el: Element | null) =>
+      el instanceof HTMLElement && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
+    const overlayOpen = () => !!document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]');
+    const refocus = () => {
+      const input = inputRef.current;
+      if (!input || document.activeElement === input) return;
+      if (isEditable(document.activeElement) || overlayOpen()) return;
+      input.focus({ preventScroll: true });
+    };
+    const afterTouch = () => setTimeout(refocus, 0);
+    const beforeKey = (e: KeyboardEvent) => {
+      if (e.key.length === 1 || e.key === 'Enter') refocus();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refocus();
+    };
+    document.addEventListener('pointerup', afterTouch, true);
+    document.addEventListener('keydown', beforeKey, true);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      document.removeEventListener('pointerup', afterTouch, true);
+      document.removeEventListener('keydown', beforeKey, true);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [inputRef]);
+
   const reject = (message: string) => {
     playErrorSound();
     toast.error(message);
@@ -160,6 +204,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   const submitInput = () => {
     queueScan(barcodeInput);
     setBarcodeInput('');
+    setTyping(false);
     focusInput();
   };
 
@@ -183,14 +228,36 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
           placeholder="Scan or enter barcode"
           className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30 pr-16"
           autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          inputMode={typing ? 'text' : 'none'}
+          onBlur={() => {
+            if (!reopening.current) setTyping(false);
+          }}
           autoFocus
         />
-        <Button type="submit" disabled={!barcodeInput.trim()} className="absolute right-0 top-0 bg-inventory-primary hover:bg-inventory-primary/90 h-full px-3 text-sm">
-          <span className="flex items-center">
-            <span className="hidden sm:inline mr-1">Add</span>
-            <ArrowRight className="h-4 w-4" />
-          </span>
-        </Button>
+        {typing ? (
+          <Button type="submit" disabled={!barcodeInput.trim()} onMouseDown={e => e.preventDefault()} className="absolute right-0 top-0 bg-inventory-primary hover:bg-inventory-primary/90 h-full px-3 text-sm">
+            <span className="flex items-center">
+              <span className="hidden sm:inline mr-1">Add</span>
+              <ArrowRight className="h-4 w-4" />
+            </span>
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            tabIndex={-1}
+            onMouseDown={e => e.preventDefault()}
+            onClick={() => setTyping(true)}
+            variant="ghost"
+            title="Type a code"
+            aria-label="Type a code"
+            className="absolute right-0 top-0 h-full px-3 text-muted-foreground"
+          >
+            <Keyboard className="h-5 w-5" />
+          </Button>
+        )}
       </div>
 
       <div className="absolute right-0 top-0 flex h-full">

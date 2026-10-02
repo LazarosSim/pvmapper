@@ -14,6 +14,7 @@ import ResetRowDialog from '@/components/scan/ResetRowDialog';
 import { useNextRow, usePark, useRow, useRowBarcodes } from '@/lib/local/hooks';
 import { resetRow as resetLocalRow } from '@/lib/local/repo';
 import { OfflineStatusBanner } from "@/components/offline/OfflineStatusBanner";
+import { abbreviateName } from '@/lib/utils';
 
 const ScanRowPage = () => {
 
@@ -116,8 +117,13 @@ const ScanRowPage = () => {
     );
   }
 
-  // Create breadcrumb format
-  const breadcrumb = `${row.parkName} / ${row.name}`;
+  // Thin header: park abbreviated, row in full
+  const headerTitle = (
+    <div className="flex min-w-0 items-baseline gap-1.5 leading-tight" title={`${row.parkName} / ${row.name}`}>
+      <span className="shrink-0 text-xs font-medium text-white/80">{abbreviateName(row.parkName)}</span>
+      <span className="truncate text-base font-semibold">{row.name}</span>
+    </div>
+  );
 
   const handleReset = async () => {
     setIsResetDialogOpen(false);
@@ -163,7 +169,9 @@ const ScanRowPage = () => {
     <AuthGuard>
       <OfflineStatusBanner />
       <Layout
-        title={breadcrumb || 'Scan Barcode'}
+        title={`${row.parkName} / ${row.name}`}
+        titleAction={headerTitle}
+        compact
         showBack
         showSettings={true}
         rowId={rowId}
@@ -196,8 +204,8 @@ const ScanRowPage = () => {
           </div>
         )}
         <Card className="glass-card relative overflow-hidden">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between gap-2">
+          <CardHeader className="p-3">
+            <CardTitle className="flex items-center justify-between gap-2 text-xl">
               <span className={`flex items-center gap-1 ${isComplete ? 'text-green-700' : ''}`}>
                 <span>
                   Scanned: <span className="font-bold">{scanCount}</span>
@@ -214,7 +222,7 @@ const ScanRowPage = () => {
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 p-3 pt-0">
             <div className="pr-12 relative">
               <BarcodeScanInput
                 key={rowId}

@@ -83,3 +83,15 @@ export function sortWorksheetEntries(entries: WorksheetEntry[]): WorksheetEntry[
     return naturalCompare(a.originalName, b.originalName);
   });
 }
+
+/** Short form of a park name for tight spaces: short names stay as they are, longer ones
+ *  become initials, with numbers kept whole ("Kalamaki Solar Park 2" -> "KSP2"). */
+export function abbreviateName(name: string, max = 10): string {
+  const trimmed = name.trim();
+  if (trimmed.length <= max) return trimmed;
+  return trimmed
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((word) => (/^\d+$/.test(word) ? word : word[0].toUpperCase()))
+    .join('');
+}

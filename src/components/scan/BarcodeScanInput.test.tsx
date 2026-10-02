@@ -151,11 +151,12 @@ describe('BarcodeScanInput', () => {
     expect(codes[1]).toBe('NEXT');
   });
 
-  it('adds a scan with the Add button as well as with Enter', async () => {
+  it('adds a typed code with the Add button as well as with Enter', async () => {
     await seed();
     const user = userEvent.setup();
     const input = await renderInput();
 
+    await user.click(screen.getByRole('button', { name: 'Type a code' }));
     await user.type(input, 'TAPPED');
     await user.click(screen.getByRole('button', { name: /add$/i }));
 
@@ -217,5 +218,41 @@ describe('BarcodeScanInput', () => {
     expect(sounds.playErrorSound).toHaveBeenCalledTimes(1);
     expect(sounds.playSuccessSound).not.toHaveBeenCalled();
     expect(await db.outbox.count()).toBe(0);
+  });
+
+  it('keeps the on-screen keyboard hidden until the keyboard button is pressed', async () => {
+    await seed();
+    const user = userEvent.setup();
+    const input = await renderInput();
+    expect(input.getAttribute('inputmode')).toBe('none');
+
+    await user.click(screen.getByRole('button', { name: 'Type a code' }));
+    expect(input.getAttribute('inputmode')).toBe('text');
+    expect(document.activeElement).toBe(input);
+
+    await user.type(input, 'TYPED{Enter}');
+    expect(input.getAttribute('inputmode')).toBe('none');
+    await waitFor(async () => expect((await saved()).map((b) => b.code)).toEqual(['TYPED']));
+  });
+
+  it('takes focus back after a touch elsewhere, so the next scan lands in the field', async () => {
+    await seed();
+    const input = await renderInput();
+    input.blur();
+    expect(document.activeElement).toBe(document.body);
+
+    fireEvent.pointerUp(document.body);
+    await waitFor(() => expect(document.activeElement).toBe(input));
+  });
+
+  it('a scan typed while focus is elsewhere still lands in the field', async () => {
+    await seed();
+    const user = userEvent.setup();
+    const input = await renderInput();
+    input.blur();
+
+    await user.keyboard('LOST{Enter}');
+
+    await waitFor(async () => expect((await saved()).map((b) => b.code)).toEqual(['LOST']));
   });
 });
