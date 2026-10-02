@@ -106,8 +106,8 @@ Broken features
 
 ### Phase 5 — Field usability
 - [x] Scan screen: progress bar, "Row complete → Next row", vibration, beep and buzz made on
-      the phone (work offline), inline confirmation, park-wide duplicate warning, GPS requested
-      when an empty row opens (a scan waits at most 2 s for it)
+      the phone (work offline), inline confirmation, park-wide duplicate warning
+- [ ] GPS improvements (look up the location without the first scan waiting) — deferred by the owner
 - [x] One sync status chip in the header with details, Sync now and refused changes
 - [x] Barcode search in the bottom menu; searches the phone's copy offline, adds archived parks online
 - [x] Row detail edits, inserts, deletes and resets work offline

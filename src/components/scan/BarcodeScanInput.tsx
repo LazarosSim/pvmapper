@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useRef, useState} from 'react';
 import {toast} from 'sonner';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -18,14 +18,9 @@ interface BarcodeScanInputProps {
   rowId: string;
   inputRef: React.RefObject<HTMLInputElement>;
   captureLocation: boolean;
-  /** The row has no barcodes yet: start looking for GPS before the first scan */
-  rowIsEmpty?: boolean;
 }
 
 type Location = { latitude: number; longitude: number };
-
-// How long the first scan of a row waits for a GPS fix that is still on its way
-const GPS_WAIT_MS = 2000;
 
 const getLocation = () =>
   new Promise<Location | null>((resolve) => {
@@ -33,12 +28,9 @@ const getLocation = () =>
     navigator.geolocation.getCurrentPosition(
       (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
       () => resolve(null),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
   });
-
-const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T) =>
-  Promise.race([promise, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
 
 type LastResult = { ok: boolean; text: string; gps?: boolean };
 
@@ -46,7 +38,6 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   rowId,
   inputRef,
   captureLocation,
-  rowIsEmpty = false,
 }) => {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [last, setLast] = useState<LastResult | null>(null);
@@ -65,20 +56,6 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
 
   const focusInput = () => inputRef.current?.focus();
 
-  // GPS for the first barcode of a row is requested as soon as the empty row opens, so
-  // the scan rarely waits for it; a scan never waits more than GPS_WAIT_MS.
-  const pendingLocation = useRef<Promise<Location | null> | null>(null);
-  useEffect(() => {
-    pendingLocation.current = captureLocation && rowIsEmpty ? getLocation() : null;
-  }, [captureLocation, rowIsEmpty, rowId]);
-
-  const captureGPSLocation = (): Promise<Location | null> => {
-    const early = pendingLocation.current;
-    pendingLocation.current = null;
-    // A request started on opening has had time already; a fresh one gets a little longer
-    return early ? withTimeout(early, GPS_WAIT_MS, null) : withTimeout(getLocation(), 5000, null);
-  };
-
   const reject = (message: string) => {
     playErrorSound();
     toast.error(message);
@@ -95,7 +72,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
     // Capture GPS location only for the first barcode in the row, when location capture is enabled
     let location = null;
     if (check.isFirstInRow && captureRef.current) {
-      location = await captureGPSLocation();
+      location = await getLocation();
       if (!location) {
         // The scan is saved anyway
         toast.warning('No GPS location for this row. Check that location is on.');

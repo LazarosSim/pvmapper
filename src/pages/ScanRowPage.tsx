@@ -234,7 +234,6 @@ const ScanRowPage = () => {
                 rowId={rowId}
                 inputRef={inputRef}
                 captureLocation={captureLocation}
-                rowIsEmpty={scanCount === 0}
               />
             </div>
             <RecentScans barcodes={latestBarcodes} />
