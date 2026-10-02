@@ -9,9 +9,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Edit, Trash2, MoreVertical, FolderOpen, Plus, Cloud } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useDB, Row } from '@/lib/db-provider';
+import { useDB } from '@/lib/db-provider';
+import type { RowSummary } from '@/lib/local/hooks';
 import { formatDistanceToNow } from 'date-fns';
-import { useOfflineAdjustedCounts } from '@/hooks/use-offline-counts';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,14 +34,13 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
 interface RowCardProps {
-  row: Row;
+  row: RowSummary;
   onOpen?: () => void; // Made optional to maintain backward compatibility
 }
 
 const RowCard: React.FC<RowCardProps> = ({ row, onOpen }) => {
   const navigate = useNavigate();
-  const { countBarcodesInRow, deleteRow, updateRow, addSubRow, isManager } = useDB();
-  const { getRowAdjustment } = useOfflineAdjustedCounts();
+  const { deleteRow, updateRow, addSubRow, isManager } = useDB();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
   const [editName, setEditName] = React.useState(row.name);
@@ -49,9 +48,7 @@ const RowCard: React.FC<RowCardProps> = ({ row, onOpen }) => {
     row.expectedBarcodes !== undefined && row.expectedBarcodes !== null ? String(row.expectedBarcodes) : ''
   );
   
-  // Use the currentBarcodes + offline adjustment for accurate display
-  const offlineAdjustment = getRowAdjustment(row.id);
-  const barcodeCount = (row.currentBarcodes || 0) + offlineAdjustment;
+  const barcodeCount = row.barcodeCount;
   const createdAt = formatDistanceToNow(new Date(row.createdAt), { addSuffix: true });
   
   const handleEdit = () => {
@@ -150,8 +147,8 @@ const RowCard: React.FC<RowCardProps> = ({ row, onOpen }) => {
               <span className="text-sm font-medium">
                 {barcodeCount} {row.expectedBarcodes ? `/ ${row.expectedBarcodes}` : ''} Barcodes
               </span>
-              {offlineAdjustment !== 0 && (
-                <span title={`${offlineAdjustment > 0 ? '+' : ''}${offlineAdjustment} pending`}>
+              {row.pendingCount > 0 && (
+                <span title={`${row.pendingCount} not uploaded yet`}>
                   <Cloud className="h-3 w-3 text-amber-500" />
                 </span>
               )}

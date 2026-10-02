@@ -41,7 +41,7 @@ The 6 active parks hold about 7,300 barcodes (largest: 4,340), so the on-phone c
 - [x] CI on every pull request: lint, type check, tests, build (`.github/workflows/ci.yml`)
 - [x] Live database schema and security rules reviewed (findings below)
 - [x] Feature checklist (`docs/feature-checklist.md`)
-- [ ] Database backup before applying `supabase/pending/` (owner)
+- [ ] Database backup before applying database changes (owner)
 
 ### Phase 1 — Urgent fixes
 Security
@@ -49,9 +49,8 @@ Security
 - [x] "Waiting for approval" screen for pending accounts; managers approve from Dashboard → Users
 - [x] Debug logging of every network request removed
 - [x] Lovable editor script only in development builds
-- [ ] Database rules: `supabase/pending/01_security.sql` (needs approval to apply)
-- [ ] Change the passwords of `lazaros` and `antrian` (owner)
-- [ ] Decide about the four accounts created on 2026-05-18 (owner)
+- [ ] Database rules: `supabase/pending/01_security.sql` — deferred by the owner (internal app)
+- [ ] Passwords of `lazaros` and `antrian`, the four 2026-05-18 accounts — deferred by the owner
 
 Data safety
 - [x] Service worker generated at build time (`vite-plugin-pwa`); caches only the app itself,
@@ -83,32 +82,35 @@ Broken features
 - [x] "Prepare for offline" no longer makes one request per row
 
 ### Phase 2 — Database groundwork
-- [ ] Indexes and duplicate trigger removal: `supabase/pending/02_performance.sql`
-- [ ] Row version number, bumped by trigger when a row's barcodes change
-- [ ] Statistics from existing barcodes, by Greek date (Europe/Athens)
-- [ ] Atomic "insert barcode at position" function
-- [ ] Duplicate report (codes in several rows, repeated positions); report only
+- [x] Indexes on `barcodes(row_id, order_in_row)`, `barcodes(user_id, timestamp)`, `rows(park_id)` (applied)
+- [ ] Apply `supabase/migrations/20261002033000_performance_indexes.sql` and `20261002033100_row_versions_and_stats.sql` (written; the apply was cancelled at the confirmation prompt twice) — **required before deploying Phase 3**
+- [x] Row version number, bumped by trigger when a row or its barcodes change (in the migration above)
+- [x] Statistics from existing barcodes, by Greek date (`daily_user_scans`, `user_stats`; in the migration above)
+- [x] Atomic, retry-safe `insert_barcode_at` (in the migration above)
+- [x] Duplicate report (codes in several rows, repeated positions); see findings below
 
 ### Phase 3 — Offline-first core
-- [ ] On-device database (Dexie): parks, rows, barcodes, outbox
-- [ ] Sync engine: batched upload, changed-rows download, automatic triggers, set-aside failures
-- [ ] Move queued items from the old queue on first run
-- [ ] Pages read from the local copy; remove Prepare-for-offline, merging, polling and
-      localStorage cache persistence
-- [ ] Browser test: scan offline, reload, reconnect, check the server
+- [x] On-device database (Dexie): parks, rows, barcodes, outbox (`src/lib/local/db.ts`)
+- [x] Sync engine: batched upload, changed-rows download, automatic triggers, set-aside failures (`src/lib/local/sync.ts`)
+- [x] First run moves the old queue and the old cached data into the new store (`src/lib/local/legacy-migration.ts`)
+- [x] Pages read from the local copy; Prepare-for-offline, merging, polling and
+      localStorage cache persistence removed
+- [x] Browser test: scan offline, reload, reconnect, check the server (passes against a fake Supabase)
 
 ### Phase 4 — Consolidate and slim down
-- [ ] Remove the old data layer (`DBProvider`, `src/lib/hooks`); one set of types
-- [ ] Export from the local copy after a sync; warn about unsent scans; identical files (golden test)
-- [ ] Load Excel and chart code on demand; split pages
-- [ ] Delete unused pages, hooks and packages
+- [x] Old data layer removed; `DBProvider` keeps only the user and online row actions
+- [ ] One set of types (`src/types`, `src/lib/types` still both exist)
+- [x] Export from the local copy after a sync (server for archived parks); warns about unsent scans; layout locked by tests
+- [x] Excel and dashboard code loaded on demand (main bundle 446 → 253 KB gzipped)
+- [x] Unused pages, hooks and packages deleted
 
 ### Phase 5 — Field usability
 - [ ] Scan screen: progress, "Row complete → Next row", vibration, bundled sounds,
       inline confirmation, park-wide duplicate warning, GPS in the background
-- [ ] One sync status chip; no overlapping buttons
-- [ ] Barcode search reachable and working offline
-- [ ] Row detail usable offline and on a phone
+- [x] One sync status chip in the header with details, Sync now and refused changes
+- [ ] Barcode search reachable (route added at `/search`; no menu link yet) and working offline
+- [x] Row detail edits, inserts, deletes and resets work offline
+- [ ] Row detail layout for phones
 - [ ] Dashboard fixes
 
 ### Phase 6 — Keep it healthy

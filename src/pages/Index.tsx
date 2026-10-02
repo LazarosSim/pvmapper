@@ -5,20 +5,21 @@ import { Button } from '@/components/ui/button';
 import { Archive, Plus } from 'lucide-react';
 import CreateParkDialog from '@/components/dialog/create-park-dialog';
 import { Input } from '@/components/ui/input';
-import { useParkStats } from '@/hooks/parks';
 import { useCurrentUser } from "@/hooks/use-user.tsx";
 import { useAppSettings } from '@/hooks/use-app-settings';
+import { useParks, useSyncSummary } from '@/lib/local/hooks';
 
 const Index = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { showArchived } = useAppSettings();
 
-  const { data: parks, isLoading: parksLoading, error: parksError } = useParkStats(showArchived);
+  const parks = useParks();
+  const { hasLocalData, online, lastError } = useSyncSummary();
 
-  const filteredParks = parks ? parks.filter(park =>
+  const filteredParks = (parks ?? []).filter(park =>
     park.name.toLowerCase().includes(searchQuery.toLowerCase())
-  ) : [];
+  );
 
   // Separate active and archived parks for display
   const activeParks = filteredParks.filter(p => !p.archived);
@@ -27,6 +28,8 @@ const Index = () => {
   const { data: currentUser } = useCurrentUser()
   const isUserManager = currentUser?.role === 'manager';
 
+  // First start on this phone: nothing to show until the first download finishes
+  const isFirstDownload = parks === undefined || (!hasLocalData && online && !lastError);
 
   return (
     <Layout title={
@@ -51,14 +54,16 @@ const Index = () => {
 
         {/* Active Parks */}
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-          {parksLoading ? (
+          {isFirstDownload ? (
             <div className="text-center py-8 col-span-full">
               <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
-              <p className="text-muted-foreground">Loading parks...</p>
+              <p className="text-muted-foreground">Downloading parks to this phone...</p>
             </div>
-          ) : parksError ? (
+          ) : !hasLocalData ? (
             <div className="text-center py-8 col-span-full glass-card rounded-lg p-8 animate-fade-in">
-              <p className="text-destructive mb-4">Failed to load parks. Please try again.</p>
+              <p className="text-destructive mb-4">
+                {online ? 'Failed to load parks. Please try again.' : 'Connect once to download the parks to this phone.'}
+              </p>
             </div>
           ) : activeParks.length > 0 ? (
             activeParks.map(park => (

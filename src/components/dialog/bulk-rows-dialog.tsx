@@ -38,7 +38,7 @@ interface RowPreview {
 }
 
 const BulkRowsDialog = ({ open, onOpenChange, parkId }: BulkRowsDialogProps) => {
-  const { addRow, rows } = useDB();
+  const { addRow } = useDB();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<"single" | "bulk">("single");

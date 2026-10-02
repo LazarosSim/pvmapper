@@ -11,10 +11,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { FolderOpen, Loader2 } from 'lucide-react';
-import { useParkStats } from '@/hooks/parks';
+import { useParks } from '@/lib/local/hooks';
 
 const ScanPage = () => {
-  const { data: parks, isLoading } = useParkStats();
+  const allParks = useParks();
+  const isLoading = allParks === undefined;
+  // Only active parks are scanned
+  const parks = allParks?.filter(p => !p.archived);
   const navigate = useNavigate();
   // Set captureLocation to true by default
   const [captureLocation, setCaptureLocation] = useState(true);

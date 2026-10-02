@@ -29,18 +29,16 @@ import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {toast} from 'sonner';
 import {Checkbox} from '@/components/ui/checkbox';
-import {Barcode} from '@/lib/types/db-types';
-import {Park} from "@/types/types.ts";
+import {useQuery} from '@tanstack/react-query';
 import {useDeletePark, useUpdatePark, useArchivePark, useUnarchivePark} from "@/hooks/parks";
 import {useCurrentUser} from "@/hooks/use-user.tsx";
-import {useRowsByParkId} from "@/hooks/use-row-queries.tsx";
-import {useParkBarcodes} from "@/hooks/use-barcodes-queries.tsx";
 import {supabase} from '@/integrations/supabase/client';
-import {useOfflineAdjustedCounts} from '@/hooks/use-offline-counts';
+import {syncNow} from '@/lib/local/sync';
+import type {ParkSummary} from '@/lib/local/hooks';
 import ExportDialog from './ExportDialog';
 
 interface ParkCardProps {
-  park: Park;
+  park: ParkSummary;
 }
 
 const ParkCard: React.FC<ParkCardProps> = ({
@@ -57,71 +55,44 @@ const ParkCard: React.FC<ParkCardProps> = ({
   const [validateBarcodeLength, setValidateBarcodeLength] = React.useState(park.validateBarcodeLength || false);
 
   const {data: currentUser} = useCurrentUser()
-  const {data: rows, isLoading: rowsLoading} = useRowsByParkId(park.id);
-  const {data: barcodes, isLoading: barcodesLoading} = useParkBarcodes(park.id);
   const {mutate: updatePark} = useUpdatePark();
   const {mutate: deletePark} = useDeletePark();
   const {mutate: archivePark} = useArchivePark();
   const {mutate: unarchivePark} = useUnarchivePark();
 
-  // Offline-aware counter adjustments (must be after rows hook)
-  const { getParkAdjustment } = useOfflineAdjustedCounts();
-  const rowIds = (rows || []).map(r => r.id);
-  const parkOfflineAdjustment = getParkAdjustment(rowIds);
+  // Archived parks are not kept on the phone: their row count comes from the server
+  const {data: archivedRowCount} = useQuery({
+    queryKey: ['server', 'rowCount', park.id],
+    enabled: park.rowCount === null,
+    queryFn: async () => {
+      const {count, error} = await supabase.from('rows').select('id', {count: 'exact', head: true}).eq('park_id', park.id);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
 
   // Guard against null/0 expected barcodes causing Infinity/NaN and breaking rendering
   const expectedBarcodesSafe = Number.isFinite(park.expectedBarcodes) ? park.expectedBarcodes : 0;
-  const currentBarcodesSafe = (Number.isFinite(park.currentBarcodes) ? park.currentBarcodes : 0) + parkOfflineAdjustment;
+  const currentBarcodesSafe = park.barcodeCount;
   const progressValue = expectedBarcodesSafe > 0 ? (currentBarcodesSafe / expectedBarcodesSafe) * 100 : 0;
   const progress = Number.isFinite(progressValue) ? progressValue.toFixed(2) : '0.00';
 
-  const rowCount = rows?.length || 0;
+  const rowCount = park.rowCount ?? archivedRowCount ?? 0;
 
   const createdAt = formatDistanceToNow(new Date(park?.createdAt), {
     addSuffix: true
   });
 
-  // Function to fetch barcodes for a specific row directly from the database
-  const fetchBarcodesForRow = async (rowId: string): Promise<Barcode[]> => {
-    try {
-      const { data, error } = await supabase
-        .from('barcodes')
-        .select('*')
-        .eq('row_id', rowId)
-        .order('order_in_row', {ascending: true});
-
-      if (error) {
-        console.error('Error fetching barcodes for row:', error);
-        throw error;
-      }
-
-      if (!data || data.length === 0) {
-        return [];
-      }
-
-      return data.map(barcode => ({
-        id: barcode.id,
-        code: barcode.code,
-        rowId: barcode.row_id,
-        userId: barcode.user_id,
-        timestamp: barcode.timestamp,
-        orderInRow: barcode.order_in_row,
-        latitude: barcode.latitude,
-        longitude: barcode.longitude
-      }));
-    } catch (error) {
-      console.error('Error in fetchBarcodesForRow:', error);
-      return [];
-    }
-  };
+  // Park changes go to the server; the phone's copy is refreshed right after
+  const refreshLocal = {onSettled: () => { syncNow().catch(() => undefined); }};
 
   const handleEdit = () => {
-    updatePark({id: park.id, name: editName, expectedBarcodes: editExpectedBarcodes, validateBarcodeLength});
+    updatePark({id: park.id, name: editName, expectedBarcodes: editExpectedBarcodes, validateBarcodeLength}, refreshLocal);
     setIsEditDialogOpen(false);
   };
 
   const handleDelete = () => {
-    deletePark(park.id);
+    deletePark(park.id, refreshLocal);
     setIsDeleteDialogOpen(false);
   };
 
@@ -129,6 +100,7 @@ const ParkCard: React.FC<ParkCardProps> = ({
     archivePark(park.id, {
       onSuccess: () => toast.success(`${park.name} has been archived`),
       onError: () => toast.error('Failed to archive park'),
+      ...refreshLocal,
     });
   };
 
@@ -136,6 +108,7 @@ const ParkCard: React.FC<ParkCardProps> = ({
     unarchivePark(park.id, {
       onSuccess: () => toast.success(`${park.name} has been restored`),
       onError: () => toast.error('Failed to restore park'),
+      ...refreshLocal,
     });
   };
 
@@ -145,8 +118,7 @@ const ParkCard: React.FC<ParkCardProps> = ({
   };
 
   const isManager = currentUser?.role === 'manager';
-  const isDataLoading = rowsLoading || barcodesLoading;
-  const canExport = !isDataLoading && rows && rows.length > 0;
+  const canExport = rowCount > 0;
 
   return <>
     <Card className={`mb-4 hover:shadow-md transition-shadow glass-card relative overflow-hidden ${park.archived ? 'border-muted' : ''}`}>
@@ -237,12 +209,11 @@ const ParkCard: React.FC<ParkCardProps> = ({
             <span className="text-sm font-medium">{rowCount} Rows</span>
             <span className="mx-2 text-muted-foreground">•</span>
             <span className="text-sm font-medium">{currentBarcodesSafe} Barcodes</span>
-            {parkOfflineAdjustment !== 0 && (
-              <span title={`${parkOfflineAdjustment > 0 ? '+' : ''}${parkOfflineAdjustment} pending`}>
+            {park.pendingCount > 0 && (
+              <span title={`${park.pendingCount} not uploaded yet`}>
                 <Cloud className="h-3 w-3 text-amber-500 ml-1" />
               </span>
             )}
-            {isDataLoading && <span className="mx-2 text-muted-foreground text-xs">(Loading...)</span>}
           </div>
           <Button variant="outline" size="sm" onClick={handleOpenPark} className="bg-inventory-secondary/10 text-inventory-secondary hover:bg-inventory-secondary/20 border-inventory-secondary/30">
             <FolderOpen className="mr-2 h-4 w-4" />
@@ -313,9 +284,6 @@ const ParkCard: React.FC<ParkCardProps> = ({
       open={isExportDialogOpen}
       onOpenChange={setIsExportDialogOpen}
       park={park}
-      rows={rows || []}
-      progress={progress}
-      fetchBarcodesForRow={fetchBarcodesForRow}
     />
   </>;
 };

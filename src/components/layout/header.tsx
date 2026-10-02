@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useDB } from '@/lib/db-provider';
 import { Switch } from '@/components/ui/switch';
 import { SettingsDialog } from '@/components/settings/SettingsDialog';
+import { SyncStatus } from '@/components/offline/SyncStatus';
 
 interface HeaderProps {
   title: string;
@@ -112,6 +113,7 @@ const Header: React.FC<HeaderProps> = ({
 
       {/* Global Settings Gear Icon */}
       <div className="ml-auto flex items-center gap-2">
+        <SyncStatus />
         <Button
           variant="ghost"
           size="icon"

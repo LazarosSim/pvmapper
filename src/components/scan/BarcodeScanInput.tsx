@@ -4,13 +4,15 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {ArrowRight, Loader2, X} from 'lucide-react';
 import useSoundEffects from '@/hooks/use-sound-effects';
-import {useDB} from '@/lib/db-provider';
-import {useRow} from "@/hooks/use-row-queries.tsx";
-import {useParkById} from "@/hooks/parks";
-import {useRowBarcodes} from "@/hooks/use-barcodes-queries.tsx";
-import {useOfflineAddBarcode, useMergedBarcodes} from "@/hooks/use-offline-barcodes";
 import {useSupabase} from "@/lib/supabase-provider";
-import {hasValidLength, isDuplicateCode, nextOrderInRow, normalizeCode} from '@/lib/scan-rules';
+import {normalizeCode} from '@/lib/scan-rules';
+import {addScan, checkScan} from '@/lib/local/repo';
+
+const REJECTED: Record<'duplicate' | 'length' | 'unknown-row', string> = {
+  duplicate: 'Duplicate barcode detected',
+  length: 'Barcode must be between 19 and 26 digits',
+  'unknown-row': 'This row is not on this phone yet. Connect once to download it.',
+};
 
 interface BarcodeScanInputProps {
   rowId: string;
@@ -26,33 +28,15 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   const [barcodeInput, setBarcodeInput] = useState('');
   const [scansInProgress, setScansInProgress] = useState(0);
   const {
-    getParkById,
-  } = useDB();
-  const {
     playSuccessSound,
     playErrorSound
   } = useSoundEffects();
   const { user } = useSupabase();
 
-  const {data: row} = useRow(rowId);
-  // Cached with the park list, so length validation also applies when the app starts offline
-  const {data: park} = useParkById(row?.parkId);
-
-  // Server barcodes
-  const {data: serverBarcodes} = useRowBarcodes(rowId);
-
-  // Merged barcodes (server + pending offline)
-  const {mergedBarcodes: barcodes} = useMergedBarcodes(rowId, serverBarcodes);
-
-  // Offline-first add barcode
-  const {addBarcode} = useOfflineAddBarcode({rowId, userId: user?.id});
-
-  // Scans are processed one at a time, in the order they were made, and may run after
-  // the render that queued them: they read the latest values through this ref.
-  const latest = useRef({ barcodes, row, park, captureLocation });
-  latest.current = { barcodes, row, park, captureLocation };
-  // Barcodes saved here that may not have reached `barcodes` yet
-  const recentAdds = useRef<{ id: string; code: string; orderInRow: number }[]>([]);
+  // Scans are processed one at a time, in the order they were made; the phone's
+  // database applies the rules and picks the position inside one transaction.
+  const captureRef = useRef(captureLocation);
+  captureRef.current = captureLocation;
   const scanQueue = useRef<Promise<void>>(Promise.resolve());
 
   const focusInput = () => inputRef.current?.focus();
@@ -92,40 +76,16 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   };
 
   const processScan = async (scannedCode: string, isPlaceholder: boolean) => {
-    const { barcodes, row, park, captureLocation } = latest.current;
-    const known = barcodes ?? [];
-    const knownIds = new Set(known.map(b => b.id));
-    recentAdds.current = recentAdds.current.filter(add => !knownIds.has(add.id));
-    const rowBarcodes = [
-      ...known.map(b => ({ code: b.code, orderInRow: b.orderInRow })),
-      ...recentAdds.current,
-    ];
-
-    const timestamp = new Date().toISOString();
-    // Placeholders get a unique code so they never count as duplicates
-    const code = isPlaceholder ? `X_PLACEHOLDER_${timestamp}` : scannedCode;
-
-    if (!isPlaceholder) {
-      // Apply validation if required by the park
-      const validateLength = park?.validateBarcodeLength
-        ?? (row ? getParkById(row.parkId)?.validateBarcodeLength : false);
-      if (validateLength && !hasValidLength(code)) {
-        playErrorSound();
-        toast.error('Barcode must be between 19 and 26 digits');
-        return;
-      }
-
-      if (isDuplicateCode(code, rowBarcodes.map(b => b.code))) {
-        playErrorSound();
-        toast.error('Duplicate barcode detected');
-        return;
-      }
+    const check = await checkScan(rowId, scannedCode, isPlaceholder);
+    if (check.ok === false) {
+      playErrorSound();
+      toast.error(REJECTED[(check as { reason: keyof typeof REJECTED }).reason]);
+      return;
     }
 
     // Capture GPS location only for the first barcode in the row, when location capture is enabled
-    const isFirstBarcode = rowBarcodes.length === 0;
     let location = null;
-    if (isFirstBarcode && captureLocation) {
+    if (check.isFirstInRow && captureRef.current) {
       location = await captureGPSLocation();
       if (!location) {
         // Allow the user to continue even if location capture fails
@@ -133,17 +93,19 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       }
     }
 
-    const orderInRow = nextOrderInRow(rowBarcodes.map(b => b.orderInRow));
-
-    // Use offline-first addBarcode
-    const mutation = await addBarcode(
-      code,
-      orderInRow,
-      timestamp,
-      location?.latitude,
-      location?.longitude
-    );
-    recentAdds.current.push({ id: mutation.id, code, orderInRow });
+    const result = await addScan({
+      rowId,
+      code: scannedCode,
+      userId: user?.id ?? '',
+      isPlaceholder,
+      latitude: location?.latitude,
+      longitude: location?.longitude,
+    });
+    if (result.ok === false) {
+      playErrorSound();
+      toast.error(REJECTED[(result as { reason: keyof typeof REJECTED }).reason]);
+      return;
+    }
 
     playSuccessSound();
     const label = isPlaceholder ? 'Placeholder' : 'Barcode';
@@ -151,6 +113,9 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       toast.success(`${label} added with GPS location: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`);
     } else {
       toast.success(isPlaceholder ? 'Placeholder added' : 'Barcode added successfully');
+    }
+    if (result.alsoInRows.length > 0) {
+      toast.warning(`${result.barcode.code} is also in ${result.alsoInRows.join(', ')}`);
     }
   };
 

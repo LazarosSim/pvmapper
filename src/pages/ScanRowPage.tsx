@@ -11,14 +11,8 @@ import AuthGuard from '@/components/auth/auth-guard';
 import BarcodeScanInput from '@/components/scan/BarcodeScanInput';
 import RecentScans from '@/components/scan/RecentScans';
 import ResetRowDialog from '@/components/scan/ResetRowDialog';
-import { useRow } from "@/hooks/use-row-queries.tsx";
-import {
-  useResetRowBarcodes,
-  useRowBarcodes,
-  useMergedBarcodes,
-  useSync,
-} from "@/hooks/use-barcodes";
-import { SyncButton } from "@/components/offline/SyncButton";
+import { useRow, useRowBarcodes, useSyncSummary } from '@/lib/local/hooks';
+import { resetRow as resetLocalRow } from '@/lib/local/repo';
 import { OfflineStatusBanner } from "@/components/offline/OfflineStatusBanner";
 
 const ScanRowPage = () => {
@@ -49,24 +43,21 @@ const ScanRowPage = () => {
   };
 
 
-  const { data: row, isLoading, isError } = useRow(rowId);
-  const { mutate: resetRow } = useResetRowBarcodes(rowId);
-
-  // Server barcodes
-  const { data: serverBarcodes } = useRowBarcodes(rowId);
-
-  // Merged barcodes (server + pending offline) - imported from hook
-  const { mergedBarcodes: barcodes } = useMergedBarcodes(rowId, serverBarcodes);
+  const { row: localOrServerRow, isLocal } = useRow(rowId);
+  const barcodes = useRowBarcodes(rowId, isLocal);
+  const isLoading = localOrServerRow === undefined;
+  // Scanning works on the phone's copy of active parks
+  const row = isLocal ? localOrServerRow : null;
 
   // Sync state - shown on the card; scanning continues while a sync runs
-  const { isSyncing } = useSync();
+  const { syncing: isSyncing } = useSyncSummary();
 
   // Persist selected row/park for convenience elsewhere (not for refresh routing)
   useEffect(() => {
     if (rowId) localStorage.setItem('selectedRowId', rowId);
   }, [rowId]);
 
-  const latestBarcodes = barcodes?.slice(-10).reverse();
+  const latestBarcodes = barcodes?.slice(-10).reverse().map(b => ({ ...b, isPending: b.pending === 1 }));
   const scanCount = Math.max(barcodes?.length || 0, 0);
 
   // Focus the input when the component mounts
@@ -77,39 +68,12 @@ const ScanRowPage = () => {
   // If the URL doesn't have a rowId, we can't deep-link.
   if (!rowId) return <Navigate to="/scan" replace />;
 
-  // IMPORTANT: On refresh, the DB provider's in-memory rows list may be empty briefly.
-  // Do NOT redirect away from /scan/row/:rowId while the row query is still loading.
   if (isLoading) {
     return (
       <AuthGuard>
         <Layout title="Loading row..." showBack>
           <div className="flex items-center justify-center py-8">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          </div>
-        </Layout>
-      </AuthGuard>
-    );
-  }
-
-  // If error and row not in cache, show error UI instead of redirecting
-  // This allows users to see what went wrong when offline
-  if (isError && !row) {
-    return (
-      <AuthGuard>
-        <Layout title="Error Loading Row" showBack>
-          <div className="flex flex-col items-center justify-center py-8 space-y-4">
-            <div className="text-destructive text-center">
-              <p className="font-medium">Failed to load row data</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                This row may not be cached for offline use.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Please ensure you've prefetched this park as a workspace while online.
-              </p>
-            </div>
-            <Button onClick={() => window.history.back()} variant="outline">
-              Go Back
-            </Button>
           </div>
         </Layout>
       </AuthGuard>
@@ -125,10 +89,10 @@ const ScanRowPage = () => {
             <div className="text-destructive text-center">
               <p className="font-medium">Row not found</p>
               <p className="text-sm text-muted-foreground mt-2">
-                Unable to load row details.
+                This row is not on this phone. Only rows of active parks can be scanned.
               </p>
               <p className="text-sm text-muted-foreground">
-                If you are offline, ensure this workspace was fully downloaded.
+                If it was just added, connect once so the phone can download it.
               </p>
             </div>
             <Button onClick={() => window.history.back()} variant="outline">
@@ -141,26 +105,22 @@ const ScanRowPage = () => {
   }
 
   // Create breadcrumb format
-  const breadcrumb = row ? `${row.park.name} / ${row?.name}` : row?.name;
+  const breadcrumb = `${row.parkName} / ${row.name}`;
 
   const handleReset = async () => {
-    setIsResetDialogOpen(true);
-    resetRow(rowId, {
-      onSuccess: (affectedBarcodes) => {
-        if (!affectedBarcodes || affectedBarcodes === 0) {
-          toast.info("Row is already empty");
-        } else {
-          toast.success("Successfully reset " + affectedBarcodes + " barcode" + (affectedBarcodes > 1 ? "s" : ""));
-        }
-      },
-      onError: (error) => {
-        console.error("Error resetting row:", error);
-        toast.error("Failed to reset row");
-      },
-      onSettled: () => {
-        setIsResetDialogOpen(false);
+    setIsResetDialogOpen(false);
+    try {
+      const affectedBarcodes = await resetLocalRow(rowId);
+      if (!affectedBarcodes) {
+        toast.info("Row is already empty");
+      } else {
+        toast.success("Successfully reset " + affectedBarcodes + " barcode" + (affectedBarcodes > 1 ? "s" : ""));
       }
-    });
+    } catch (error) {
+      console.error("Error resetting row:", error);
+      toast.error("Failed to reset row");
+    }
+    focusInput();
   };
 
 
@@ -262,8 +222,6 @@ const ScanRowPage = () => {
           onCancel={() => focusInput()}
         />
 
-        {/* Floating sync button */}
-        <SyncButton />
       </Layout>
     </AuthGuard>
   );

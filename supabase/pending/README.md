@@ -11,7 +11,6 @@ timestamped name so the repository matches the database.
 | File | What it does | Data changed |
 |---|---|---|
 | `01_security.sql` | Sign-ups become pending until a manager approves them; users can't change their own role; data is no longer readable without logging in; only approved users read or change data; parks are managed by managers; `reset_row_barcodes` no longer callable by anyone | None (roles of existing accounts are kept) |
-| `02_performance.sql` | Adds missing indexes and removes two duplicate count triggers | None |
 
 ## Before applying
 

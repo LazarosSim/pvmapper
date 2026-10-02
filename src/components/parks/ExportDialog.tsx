@@ -12,137 +12,21 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Loader2, FileSpreadsheet, Table2 } from 'lucide-react';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
-import { Park } from '@/types/types';
-import { Barcode } from '@/lib/types/db-types';
-import { naturalCompare, toSafeSheetName, ensureUniqueSheetName, sortWorksheetEntries, type WorksheetEntry } from '@/lib/utils';
+import { buildWorkbook, exportFileName, loadParkExportData, type ExportMode, type ExportPark } from '@/lib/park-export';
 
 interface ExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  park: Park;
-  rows: { id: string; name: string; expectedBarcodes: number | null; currentBarcodes: number | null }[];
-  progress: string;
-  fetchBarcodesForRow: (rowId: string) => Promise<Barcode[]>;
+  park: ExportPark;
 }
-
-type ExportMode = 'standard' | 'metlen';
 
 const ExportDialog: React.FC<ExportDialogProps> = ({
   open,
   onOpenChange,
   park,
-  rows,
-  progress,
-  fetchBarcodesForRow,
 }) => {
   const [mode, setMode] = useState<ExportMode>('standard');
   const [isExporting, setIsExporting] = useState(false);
-
-  const sanitizeFileName = (name: string): string => {
-    return name.replace(/[\\/:*?"<>|]/g, '_');
-  };
-
-  const buildSummarySheet = () => {
-    const summaryData = [
-      ['Park Name', park.name],
-      ['Created', new Date(park.createdAt).toLocaleString()],
-      ['Total Rows', rows.length.toString()],
-      ['Total Barcodes', park.currentBarcodes.toString()],
-      ['Expected Barcodes', park.expectedBarcodes.toString()],
-      ['Completion', `${progress}%`],
-    ];
-
-    rows.forEach((row, index) => {
-      summaryData.push([
-        `Row ${index + 1}`,
-        row.name,
-        `Expected: ${row.expectedBarcodes || 'N/A'}`,
-        `Current: ${row.currentBarcodes || 0}`,
-      ]);
-    });
-
-    return XLSX.utils.aoa_to_sheet(summaryData);
-  };
-
-  const sortedRows = [...rows].sort((a, b) => naturalCompare(a.name, b.name));
-
-  const handleStandardExport = async () => {
-    const wb = XLSX.utils.book_new();
-    const usedNames = new Set<string>();
-    const worksheets: WorksheetEntry[] = [];
-
-    const summaryWs = buildSummarySheet();
-    const summaryName = ensureUniqueSheetName('Summary', usedNames);
-    worksheets.push({ originalName: 'Summary', sheetName: summaryName, type: 'summary', worksheet: summaryWs });
-
-    for (const row of sortedRows) {
-      try {
-        const rowBarcodes = await fetchBarcodesForRow(row.id);
-        const rowData = [['Barcode']];
-        if (rowBarcodes && rowBarcodes.length > 0) {
-          rowBarcodes.forEach((barcode) => {
-            rowData.push([barcode.code || '']);
-          });
-        }
-        const ws = XLSX.utils.aoa_to_sheet(rowData);
-        const safeName = ensureUniqueSheetName(toSafeSheetName(row.name), usedNames);
-        worksheets.push({ originalName: row.name, sheetName: safeName, type: 'row', worksheet: ws });
-      } catch (rowError) {
-        console.error(`Error processing row ${row.name}:`, rowError);
-        const ws = XLSX.utils.aoa_to_sheet([['Barcode']]);
-        const safeName = ensureUniqueSheetName(toSafeSheetName(row.name), usedNames);
-        worksheets.push({ originalName: row.name, sheetName: safeName, type: 'row', worksheet: ws });
-      }
-    }
-
-    const sorted = sortWorksheetEntries(worksheets);
-    sorted.forEach(({ sheetName, worksheet }) => {
-      XLSX.utils.book_append_sheet(wb, worksheet, sheetName);
-    });
-
-    return wb;
-  };
-
-  const handleMetlenExport = async () => {
-    const wb = XLSX.utils.book_new();
-
-    // Summary tab
-    const summaryWs = buildSummarySheet();
-    XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
-
-    // Barcodes tab — all barcodes in one sheet
-    const barcodesData: (string | number)[][] = [['A/A', 'ROW NAME', 'STRING NAME', 'SERIAL NUMBER']];
-
-    for (const row of sortedRows) {
-      try {
-        const rowBarcodes = await fetchBarcodesForRow(row.id);
-        if (rowBarcodes && rowBarcodes.length > 0) {
-          rowBarcodes.forEach((barcode, index) => {
-            barcodesData.push([
-              index + 1,       // A/A — resets per row
-              row.name,        // ROW NAME
-              '',              // STRING NAME (empty)
-              barcode.code || '', // SERIAL NUMBER
-            ]);
-          });
-        }
-      } catch (rowError) {
-        console.error(`Error processing row ${row.name}:`, rowError);
-      }
-    }
-
-    const barcodesWs = XLSX.utils.aoa_to_sheet(barcodesData);
-    barcodesWs['!cols'] = [
-      { wch: 6 },   // A/A
-      { wch: 25 },  // ROW NAME
-      { wch: 20 },  // STRING NAME
-      { wch: 35 },  // SERIAL NUMBER
-    ];
-    XLSX.utils.book_append_sheet(wb, barcodesWs, 'Barcodes');
-
-    return wb;
-  };
 
   const handleExport = async () => {
     if (isExporting) return;
@@ -151,43 +35,24 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
       setIsExporting(true);
       toast.info('Starting export, please wait...');
 
-      if (!rows || rows.length === 0) {
+      // The Excel library is large: loaded only when exporting
+      const [XLSX, data] = await Promise.all([import('xlsx'), loadParkExportData(park)]);
+
+      if (data.rows.length === 0) {
         toast.error('No rows data available for export.');
-        setIsExporting(false);
         return;
       }
-
-      const wb = mode === 'standard' ? await handleStandardExport() : await handleMetlenExport();
-
-      const safeFileName = sanitizeFileName(
-        `${park.name}_${mode === 'metlen' ? 'Metlen_' : ''}${new Date().toISOString().split('T')[0]}.xlsx`
-      );
-
-      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
-      const buf = new ArrayBuffer(wbout.length);
-      const view = new Uint8Array(buf);
-      for (let i = 0; i < wbout.length; i++) {
-        view[i] = wbout.charCodeAt(i) & 0xff;
+      if (data.unsentCount > 0) {
+        toast.warning(`${data.unsentCount} scan${data.unsentCount > 1 ? 's are' : ' is'} not uploaded yet; the file includes them.`);
       }
 
-      const blob = new Blob([buf], { type: 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = safeFileName;
-      document.body.appendChild(a);
-      a.click();
-
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        setIsExporting(false);
-        onOpenChange(false);
-        toast.success('Park data exported successfully');
-      }, 100);
+      XLSX.writeFile(buildWorkbook(XLSX, mode, park, data), exportFileName(park, mode));
+      onOpenChange(false);
+      toast.success('Park data exported successfully');
     } catch (error) {
       console.error('Export failed:', error);
       toast.error(`Failed to export: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
       setIsExporting(false);
     }
   };

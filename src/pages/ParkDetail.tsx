@@ -8,7 +8,7 @@ import { Plus, List, Loader2 } from 'lucide-react';
 import { naturalCompare } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import BulkRowsDialog from '@/components/dialog/bulk-rows-dialog';
-import type { Row } from '@/lib/types/db-types';
+import { useParkRows, usePark, type RowSummary } from '@/lib/local/hooks';
 import {
   Dialog,
   DialogContent,
@@ -23,14 +23,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useRowsByParkId } from '@/hooks/use-row-queries';
-import { useParkStats } from '@/hooks/parks';
 
 const ParkDetail = () => {
   const { parkId } = useParams<{ parkId: string }>();
   const { addRow, isManager } = useDB();
-  const { data: parks, isLoading: parksLoading } = useParkStats();
-  const { data: rows, isLoading: rowsLoading } = useRowsByParkId(parkId || '');
+  const park = usePark(parkId);
+  const { rows, isLoading: rowsLoading } = useParkRows(parkId);
+  const parksLoading = park === undefined;
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddRowDialogOpen, setIsAddRowDialogOpen] = useState(false);
   const [expectedBarcodes, setExpectedBarcodes] = useState<string>('');
@@ -57,17 +56,11 @@ const ParkDetail = () => {
     );
   }
 
-  if (!parkId || !parks?.some(p => p.id === parkId)) {
-    // Try to get remembered park from localStorage
-    const rememberedParkId = localStorage.getItem('selectedParkId');
-    if (rememberedParkId && parks?.some(p => p.id === rememberedParkId)) {
-      return <Navigate to={`/park/${rememberedParkId}`} replace />;
-    }
+  if (!parkId || !park) {
     return <Navigate to="/" replace />;
   }
 
-  const park = parks?.find(p => p.id === parkId);
-  
+
   const filteredRows = (rows || []).filter(row => 
     row.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -94,7 +87,7 @@ const ParkDetail = () => {
   };
 
   const groupRows = () => {
-    const grouped: { [key: string]: Row[] } = {};
+    const grouped: { [key: string]: RowSummary[] } = {};
     
     filteredRows.forEach(row => {
       const match = row.name.match(/^Row\s+([\d.]+)/i);

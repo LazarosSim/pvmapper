@@ -1,16 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
-import { initOfflineDB, resetStuckMutations } from './lib/offline/offline-queue'
-
-// Initialize offline database on app start. Mutations left in "syncing" by an
-// interrupted sync are put back to "pending" so they are uploaded again.
-initOfflineDB()
-  .then(() => resetStuckMutations())
-  .then((count) => {
-    if (count > 0) console.log(`[App] Recovered ${count} interrupted sync item(s)`);
-  })
-  .catch((err) => console.error('[App] Failed to initialize offline DB:', err));
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   navigator.serviceWorker

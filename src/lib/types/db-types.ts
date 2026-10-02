@@ -74,44 +74,12 @@ export type DBContextType = {
   currentUser: User | null | undefined;
   isDBLoading: boolean;
   refetchUser: () => Promise<void>;
-  
-  // Parks
-  parks: Park[];
-  addPark: (name: string, expectedBarcodes: number, validateBarcodeLength?: boolean) => Promise<boolean>;
-  deletePark: (parkId: string) => Promise<void>;
-  updatePark: (parkId: string, name: string, expectedBarcodes: number, validateBarcodeLength: boolean) => Promise<void>;
-  getParkById: (parkId: string) => Park | undefined;
-  getParkProgress: (parkId: string) => Progress;
-  
-  // Rows
-  rows: Row[];
-  getRowsByParkId: (parkId: string) => Row[];
-  addRow: (parkId: string, expectedBarcodes?: number, navigate?: boolean, customName?: string) => Promise<Row | null>;
-  deleteRow: (rowId: string) => Promise<void>;
-  updateRow: (rowId: string, name: string, expectedBarcodes?: number) => Promise<void>;
-  getRowById: (rowId: string) => Row | undefined;
-  resetRow: (rowId: string) => Promise<boolean | void>;
-  countBarcodesInRow: (rowId: string) => number;
-  addSubRow: (rowId: string, expectedBarcodes?: number) => Promise<Row | null>;
-  
-  // Barcodes
-  barcodes: Barcode[];
-  deleteBarcode: (barcodeId: string) => Promise<void>;
-  updateBarcode: (barcodeId: string, code: string) => Promise<void>;
-  searchBarcodes: (query: string) => Barcode[];
-  countBarcodesInPark: (parkId: string) => number;
-  
-  // User management
-  users: User[];
   logout: () => Promise<void>;
-  
-  // User stats
-  getScansForDateRange: (startDate: Date, endDate: Date) => Promise<{date: string, count: number}[]>;
-  
-  // Data management
-  importData: (jsonData: string) => boolean;
-  exportData: () => string;
-
-  // Helper function
   isManager: () => boolean;
+
+  // Row actions that need the server
+  addRow: (parkId: string, expectedBarcodes?: number, navigate?: boolean, customName?: string) => Promise<Row | null>;
+  addSubRow: (rowId: string, expectedBarcodes?: number) => Promise<Row | null>;
+  updateRow: (rowId: string, name: string, expectedBarcodes?: number) => Promise<void>;
+  deleteRow: (rowId: string) => Promise<void>;
 };

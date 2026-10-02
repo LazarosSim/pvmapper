@@ -6,29 +6,23 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, } from "@/components/ui/card";
 import { ArrowDown, FolderOpen, Loader2, Plus, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import type { Row } from '@/lib/types/db-types';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
-import { useParkBarcodes } from "@/hooks/use-barcodes-queries.tsx";
-import { useParkStats } from "@/hooks/parks";
-import { useRowsByParkId } from "@/hooks/use-row-queries";
-import { useOfflineAdjustedCounts } from '@/hooks/use-offline-counts';
+import { useParkRows, usePark, type RowSummary } from '@/lib/local/hooks';
 import { naturalCompare } from '@/lib/utils';
 
 const ScanParkPage = () => {
   const { parkId } = useParams<{ parkId: string }>();
   const { addRow, addSubRow, isManager } = useDB();
-  const { getRowAdjustment } = useOfflineAdjustedCounts();
-  const { data: parks, isLoading: parksLoading } = useParkStats();
-  const { data: rows, isLoading: rowsLoading } = useRowsByParkId(parkId || '');
+  const park = usePark(parkId);
+  const { rows, isLoading: rowsLoading } = useParkRows(parkId);
+  const parksLoading = park === undefined;
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddSubRowDialogOpen, setIsAddSubRowDialogOpen] = useState(false);
   const [selectedParentRowId, setSelectedParentRowId] = useState<string | null>(null);
   const [expectedBarcodes, setExpectedBarcodes] = useState<string>('');
-
-  const { data: barcodes } = useParkBarcodes(parkId);
 
   if (parksLoading || rowsLoading) {
     return (
@@ -51,8 +45,6 @@ const ScanParkPage = () => {
       </Layout>
     );
   }
-
-  const park = parks?.find(p => p.id === parkId);
 
   // Show error if park not found after loading completes
   if (!parksLoading && !park) {
@@ -118,7 +110,7 @@ const ScanParkPage = () => {
 
   // Group rows by their base number for display
   const groupRows = () => {
-    const grouped: { [key: string]: { rows: Row[] } } = {};
+    const grouped: { [key: string]: { rows: RowSummary[] } } = {};
 
     filteredRows.forEach(row => {
       const match = row.name.match(/^Row\s+([\d.]+)/i);
@@ -175,7 +167,7 @@ const ScanParkPage = () => {
                           <div className="flex justify-between items-center">
                             <CardTitle className="text-lg font-semibold">{row.name}</CardTitle>
                             <span className="text-sm text-muted-foreground">
-                              {(row.currentBarcodes || 0) + getRowAdjustment(row.id)} {row.expectedBarcodes ? `/ ${row.expectedBarcodes}` : ''} barcodes
+                              {row.barcodeCount} {row.expectedBarcodes ? `/ ${row.expectedBarcodes}` : ''} barcodes
                             </span>
                           </div>
                           <CardDescription>

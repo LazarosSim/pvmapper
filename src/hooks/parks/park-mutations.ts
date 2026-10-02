@@ -1,5 +1,11 @@
 import { useMutation, useQueryClient, onlineManager } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { syncNow } from '@/lib/local/sync';
+
+// Park changes go straight to the server; the phone's copy is refreshed afterwards
+const refreshLocalCopy = () => {
+  syncNow().catch(() => undefined);
+};
 
 // ============= Mutation Functions =============
 
@@ -143,6 +149,7 @@ export const useAddPark = () => {
     onSettled: () => {
       // Always invalidate to refetch fresh data
       queryClient.invalidateQueries({ queryKey: ['parks'] });
+      refreshLocalCopy();
     },
   });
 };
@@ -161,6 +168,7 @@ export const useUpdatePark = () => {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['parks'] });
+      refreshLocalCopy();
     },
   });
 };
@@ -179,6 +187,7 @@ export const useDeletePark = () => {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['parks'] });
+      refreshLocalCopy();
     },
   });
 };
@@ -194,6 +203,7 @@ export const useArchivePark = () => {
     mutationKey: ['parks', 'archive'],
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['parks'] });
+      refreshLocalCopy();
     },
   });
 };
@@ -209,6 +219,7 @@ export const useUnarchivePark = () => {
     mutationKey: ['parks', 'unarchive'],
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['parks'] });
+      refreshLocalCopy();
     },
   });
 };

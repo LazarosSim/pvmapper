@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Barcode, useDB } from '@/lib/db-provider';
+import { useDB } from '@/lib/db-provider';
+import { useSupabase } from '@/lib/supabase-provider';
 import Layout from '@/components/layout/layout';
-import { useNetworkStatus } from '@/hooks/use-network-status';
 import { Button } from '@/components/ui/button';
 import { ArrowDown, Check, Cloud, CloudOff, Edit, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import AddBarcodeDialog from '@/components/dialog/add-barcode-dialog';
@@ -21,17 +21,8 @@ import {
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Label } from '@/components/ui/label';
-import {
-  useAddBarcodeToRow,
-  useDeleteRowBarcode,
-  useResetRowBarcodes,
-  useRowBarcodes,
-  useUpdateRowBarcode,
-  useMergedBarcodes,
-  useOfflineUpdateBarcode,
-  type MergedBarcode,
-} from "@/hooks/use-barcodes";
-import { useRow } from "@/hooks/use-row-queries.tsx";
+import { useRow, useRowBarcodes, type RowBarcode } from '@/lib/local/hooks';
+import { deleteBarcode, insertBarcodeAfter, resetRow, updateBarcode } from '@/lib/local/repo';
 import {
   Pagination,
   PaginationContent,
@@ -49,7 +40,7 @@ const RowDetail = () => {
   const { updateRow } = useDB();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isInsertDialogOpen, setIsInsertDialogOpen] = useState(false);
-  const [insertAfterBarcode, setInsertAfterBarcode] = useState<MergedBarcode | null>(null);
+  const [insertAfterBarcode, setInsertAfterBarcode] = useState<RowBarcode | null>(null);
   const [insertCode, setInsertCode] = useState('');
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -59,33 +50,20 @@ const RowDetail = () => {
   const [isInserting, setIsInserting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [captureLocation, setCaptureLocation] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string, code: string } | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50);
 
-  const { data: row, isLoading, isError } = useRow(rowId);
-  const { mutate: addBarcode } = useAddBarcodeToRow(rowId);
-  const { mutate: resetRow, data: affectedRows } = useResetRowBarcodes(rowId);
-  const { mutate: updateBarcode } = useUpdateRowBarcode(rowId);
-  const { mutate: deleteBarcode } = useDeleteRowBarcode(rowId);
+  const { user } = useSupabase();
+  const { row, isLocal } = useRow(rowId);
+  const barcodes = useRowBarcodes(rowId, isLocal) ?? [];
 
-  // Use server barcodes + merged with pending offline changes
-  const { data: serverBarcodes } = useRowBarcodes(rowId);
-  const { mergedBarcodes: barcodes } = useMergedBarcodes(rowId, serverBarcodes);
-
-  // Offline update hook for pending barcodes
-  const { updateBarcode: offlineUpdateBarcode } = useOfflineUpdateBarcode({ rowId });
-  const { isOnline } = useNetworkStatus();
-
-  if (isError) {
-    toast.error("Failed to fetch row data");
-  }
-
-  const park = row ? row.park : undefined;
+  const park = row ? { name: row.parkName } : undefined;
 
   const indexedBarcodes = barcodes?.map((barcode, index) => (
-    { barcode: barcode as MergedBarcode, index: index + 1 }));
+    { barcode, index: index + 1 }));
   const filteredBarcodes = indexedBarcodes?.filter(item =>
     item.barcode.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -99,63 +77,57 @@ const RowDetail = () => {
 
   const handleReset = async () => {
     setIsResetting(true);
-    resetRow(rowId, {
-      onSuccess: (affectedRows) => {
-        if (!affectedRows || affectedRows === 0) {
-          toast.info("Row is already empty");
-        } else {
-          toast.success("Successfully reset " + affectedRows + " row" + (affectedRows > 1 ? "s" : ""));
-        }
-      },
-      onError: (error) => {
-        console.error("Error resetting row:", error);
-        toast.error("Failed to reset row");
-      },
-      onSettled: () => {
-        setIsResetDialogOpen(false);
-        setIsResetting(false);
+    try {
+      const affected = await resetRow(rowId);
+      if (!affected) {
+        toast.info("Row is already empty");
+      } else {
+        toast.success("Successfully reset " + affected + " barcode" + (affected > 1 ? "s" : ""));
       }
-    });
+    } catch (error) {
+      console.error("Error resetting row:", error);
+      toast.error("Failed to reset row");
+    } finally {
+      setIsResetDialogOpen(false);
+      setIsResetting(false);
+    }
   };
 
-  const handleDeleteBarcode = async (id: string, code: string) => {
-    if (confirm("Are you sure you want to delete barcode \"" + code + "\"?")) {
-      deleteBarcode(id, {
-        onSuccess: (barcode) => {
-          toast.success("Successfully deleted barcode " + barcode.code);
-        },
-        onError: (error) => {
-          console.error("Unable to delete barcode", error);
-          toast.error("Unable to delete barcode");
-        }
-      });
-    }
-  }
+  const handleDeleteBarcode = (id: string, code: string) => {
+    setDeleteTarget({ id, code });
+  };
 
+  const confirmDeleteBarcode = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteBarcode(rowId, deleteTarget.id);
+      toast.success("Successfully deleted barcode " + deleteTarget.code);
+    } catch (error) {
+      console.error("Unable to delete barcode", error);
+      toast.error("Unable to delete barcode");
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
 
   const handleEditBarcode = (id: string, code: string) => {
     setEditingBarcode({ id, code });
   };
 
-  const saveEditedBarcode = async (barcode: MergedBarcode) => {
-    if (editingBarcode) {
-      // If offline OR pending barcode, use offline update for optimistic UI
-      if (!isOnline || barcode.isPending) {
-        await offlineUpdateBarcode(
-          editingBarcode.id,
-          barcode.code,
-          editingBarcode.code,
-          new Date().toISOString()
-        );
-        toast.success("Barcode updated" + (!isOnline ? " (will sync when online)" : " (will sync later)"));
-      } else {
-        // Online and synced barcode - use regular update
-        const result = updateBarcode({ id: editingBarcode.id, code: editingBarcode.code });
-        if (result !== undefined && result !== null) {
-          toast.success("Barcode updated successfully");
-        }
-      }
+  const saveEditedBarcode = async () => {
+    if (!editingBarcode) return;
+    if (!editingBarcode.code.trim()) {
+      toast.error("Barcode cannot be empty");
+      return;
+    }
+    try {
+      // Saved on the phone and uploaded by sync, online or offline
+      await updateBarcode(rowId, editingBarcode.id, editingBarcode.code);
+      toast.success("Barcode updated");
       setEditingBarcode(null);
+    } catch (error) {
+      console.error("Error updating barcode:", error);
+      toast.error("Failed to update barcode");
     }
   };
 
@@ -182,18 +154,10 @@ const RowDetail = () => {
     }
   };
 
-  const handleInsertBarcode = async (barcode: MergedBarcode) => {
+  const handleInsertBarcode = async (barcode: RowBarcode) => {
     setIsInserting(true);
-
-    const index = barcodes.findIndex((item) => barcode.id === item.id);
-    const orderInRow = index + 1;
-
     try {
-      addBarcode({
-        code: insertCode.trim(),
-        orderInRow,
-        isLast: false
-      });
+      await insertBarcodeAfter(barcode, insertCode, user?.id ?? '');
       toast.success("Barcode inserted successfully");
     } catch (error) {
       console.error("Error inserting barcode:", error);
@@ -222,7 +186,10 @@ const RowDetail = () => {
           <Input
             placeholder="Search barcodes..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             className="flex-1 mr-2 bg-white/80 backdrop-blur-sm border border-inventory-secondary/30"
           />
         </div>
@@ -242,31 +209,22 @@ const RowDetail = () => {
                 </TableHeader>
                 <TableBody>
                   {currentBarcodes.map(({ barcode, index }) => {
-                    // Determine sync status
-                    const isPending = barcode.isPending;
-                    const isDeleting = barcode.isDeleting;
-                    const hasUpdate = barcode.pendingCode && barcode.pendingCode !== barcode.code;
+                    const isPending = barcode.pending === 1;
 
                     return (
-                      <TableRow key={barcode.id} className={isDeleting ? 'opacity-50' : ''}>
+                      <TableRow key={barcode.id}>
                         <TableCell>
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger>
-                                {isDeleting ? (
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                ) : hasUpdate ? (
-                                  <Pencil className="h-4 w-4 text-amber-500" />
-                                ) : isPending ? (
+                                {isPending ? (
                                   <CloudOff className="h-4 w-4 text-amber-500" />
                                 ) : (
                                   <Cloud className="h-4 w-4 text-green-500" />
                                 )}
                               </TooltipTrigger>
                               <TooltipContent>
-                                {isDeleting ? 'Pending deletion' :
-                                  hasUpdate ? 'Pending update' :
-                                    isPending ? 'Not synced' : 'Synced'}
+                                {isPending ? 'Not uploaded yet' : 'Synced'}
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -281,7 +239,7 @@ const RowDetail = () => {
                                 className="w-full"
                                 autoFocus
                               />
-                              <Button variant="ghost" size="icon" onClick={() => saveEditedBarcode(barcode)} className="text-inventory-secondary">
+                              <Button variant="ghost" size="icon" onClick={saveEditedBarcode} className="text-inventory-secondary">
                                 <Check className="h-4 w-4" />
                               </Button>
                               <Button variant="ghost" size="icon" onClick={cancelEditBarcode} className="text-red-500">
@@ -289,9 +247,7 @@ const RowDetail = () => {
                               </Button>
                             </div>
                           ) : (
-                            <span className={isDeleting ? 'line-through' : ''}>
-                              {barcode.code}
-                            </span>
+                            <span>{barcode.code}</span>
                           )}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
@@ -427,6 +383,23 @@ const RowDetail = () => {
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : null}
                 Reset Row
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete barcode?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Barcode "{deleteTarget?.code}" will be removed from this row.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeleteBarcode} className="bg-destructive text-destructive-foreground">
+                Delete
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

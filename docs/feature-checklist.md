@@ -47,7 +47,8 @@ them working; check them before merging a phase.
 - [ ] App opens with no connection (after one online visit)
 - [ ] Scans saved offline and uploaded with Sync
 - [ ] Pending count and sync progress
-- [ ] Prepare a park for offline use (replaced by automatic copies in Phase 3)
+- [ ] All active parks available offline automatically (replaces "Prepare for offline")
+- [ ] Sync chip: waiting count, Sync now, refused changes can be retried or discarded
 
 ## Statistics
 - [ ] Profile: daily and total scans

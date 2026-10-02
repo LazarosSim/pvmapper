@@ -2,11 +2,12 @@ import React, {useState} from 'react';
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,} from "@/components/ui/dialog";
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
-import {useDB} from '@/lib/db-provider';
 import {MapPin} from 'lucide-react';
 import {toast} from 'sonner';
 import {Checkbox} from '@/components/ui/checkbox';
-import {useAddBarcodeToRow, useRowBarcodes} from "@/hooks/use-barcodes";
+import {useSupabase} from '@/lib/supabase-provider';
+import {addBarcodeToRow} from '@/lib/local/repo';
+import {useRow} from '@/lib/local/hooks';
 
 interface AddBarcodeDialogProps {
   open: boolean;
@@ -26,27 +27,21 @@ const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({
   setCaptureLocation
 }) => {
   const [code, setCode] = useState('');
-  const { countBarcodesInRow, getRowById } = useDB();
+  const { user } = useSupabase();
+  const { row } = useRow(rowId);
 
   // Check if this is the first barcode in the row
-  const row = getRowById(rowId);
-  const isFirstBarcode = row?.currentBarcodes === 0;
+  const isFirstBarcode = row?.barcodeCount === 0;
 
-  const {mutate: addBarcode} = useAddBarcodeToRow(rowId);
-  const {data: barcodes} = useRowBarcodes(rowId);
-  
   const handleSubmit = async () => {
-    console.log('add-barcode-dialog: handleSubmit');
+    if (!code.trim()) return;
     try {
-      addBarcode({
-        code: code,
-        orderInRow: barcodes.length,
-        isLast: true
-      });
+      await addBarcodeToRow(rowId, code, user?.id ?? '');
+      toast.success('Barcode added');
       setCode('');
       onOpenChange(false);
-    }catch (e) {
-      console.log(e);
+    } catch (e) {
+      console.error(e);
       toast.error("Failed to add barcode");
     }
   };
@@ -93,7 +88,7 @@ const AddBarcodeDialog: React.FC<AddBarcodeDialogProps> = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit}>
+          <Button onClick={handleSubmit} disabled={!code.trim()}>
             Add Barcode
           </Button>
         </DialogFooter>

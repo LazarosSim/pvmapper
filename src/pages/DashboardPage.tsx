@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import Layout from '@/components/layout/layout';
-import {useDB} from '@/lib/db-provider';
+import {supabase} from '@/integrations/supabase/client';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Progress} from '@/components/ui/progress';
 import {Calendar} from '@/components/ui/calendar';
@@ -18,10 +18,25 @@ import {useUserStats} from "@/hooks/use-user-stats.tsx";
 import {useCurrentUser} from "@/hooks/use-user.tsx";
 import {useApproveUser, usePendingUsers} from "@/hooks/use-pending-users";
 
+// Scans per Greek date in a range, counting the barcodes that currently exist
+const getScansForDateRange = async (startDate: Date, endDate: Date): Promise<{date: string, count: number}[]> => {
+  const { data, error } = await supabase
+    .from('daily_user_scans' as never)
+    .select('day, scans')
+    .gte('day', format(startDate, 'yyyy-MM-dd'))
+    .lte('day', format(endDate, 'yyyy-MM-dd'));
+  if (error) {
+    console.error('Error fetching daily scans:', error);
+    return [];
+  }
+  const countByDate: {[date: string]: number} = {};
+  for (const row of (data ?? []) as unknown as {day: string, scans: number}[]) {
+    countByDate[row.day] = (countByDate[row.day] ?? 0) + Number(row.scans);
+  }
+  return Object.entries(countByDate).map(([date, count]) => ({ date, count }));
+};
+
 const DashboardPage = () => {
-  const {
-    getScansForDateRange,
-  } = useDB();
   const navigate = useNavigate();
   const [selectedTab, setSelectedTab] = useState('overview');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
@@ -79,7 +94,7 @@ const DashboardPage = () => {
     };
     
     loadCalendarData();
-  }, [selectedDate, currentUser, getScansForDateRange]);
+  }, [selectedDate, currentUser]);
 
 
   if (!currentUser || currentUser.role !== 'manager') {
