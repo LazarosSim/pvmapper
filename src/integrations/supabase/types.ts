@@ -141,6 +141,7 @@ export type Database = {
           id: string
           name: string
           park_id: string
+          version: number
         }
         Insert: {
           created_at?: string
@@ -149,6 +150,7 @@ export type Database = {
           id?: string
           name: string
           park_id: string
+          version?: number
         }
         Update: {
           created_at?: string
@@ -157,6 +159,7 @@ export type Database = {
           id?: string
           name?: string
           park_id?: string
+          version?: number
         }
         Relationships: [
           {
@@ -177,6 +180,15 @@ export type Database = {
       }
     }
     Views: {
+      daily_user_scans: {
+        Row: {
+          day: string | null
+          scans: number | null
+          user_id: string | null
+          username: string | null
+        }
+        Relationships: []
+      }
       park_stats: {
         Row: {
           archived: boolean | null
@@ -208,6 +220,19 @@ export type Database = {
         Returns: {
           email: string
         }[]
+      }
+      insert_barcode_at: {
+        Args: {
+          p_code: string
+          p_id: string
+          p_latitude?: number
+          p_longitude?: number
+          p_position: number
+          p_row_id: string
+          p_timestamp?: string
+          p_user_id: string
+        }
+        Returns: undefined
       }
       reset_row_barcodes: { Args: { p_row_id: string }; Returns: number }
       shift_order:

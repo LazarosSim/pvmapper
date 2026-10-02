@@ -1,4 +1,4 @@
--- Row versions for the phones' offline copies, a single row-count trigger, inserting a
+-- Row versions for the phones' offline copies, row counts kept right on edits too, inserting a
 -- barcode at a position in one step, and statistics from existing barcodes by Greek date.
 -- No data changes.
 
@@ -16,15 +16,15 @@ begin
 end;
 $$;
 
-drop trigger if exists bump_row_version on public.rows;
 create trigger bump_row_version
   before update on public.rows
   for each row execute function public.bump_row_version();
 
--- 2. One trigger keeps rows.current_barcodes right (which also bumps the version) on insert,
---    update and delete. It replaces three triggers that recounted inserts and deletes twice
---    and ignored edits.
-create or replace function public.refresh_row_after_barcode_change()
+-- 2. The row-count function also handles edits (a barcode moved to another row), and an
+--    AFTER UPDATE trigger runs it, so edits bump the row's version too. The existing insert
+--    and delete triggers stay (see supabase/pending/02_trigger_cleanup.sql); a recount is
+--    cheap now that barcodes(row_id) is indexed.
+create or replace function public.update_row_barcode_count()
 returns trigger
 language plpgsql
 security definer
@@ -43,12 +43,9 @@ begin
 end;
 $$;
 
-drop trigger if exists trigger_update_row_barcode_count on public.barcodes;
-drop trigger if exists update_row_barcode_count_after_insert on public.barcodes;
-drop trigger if exists update_row_barcode_count_after_delete on public.barcodes;
-create trigger refresh_row_after_barcode_change
-  after insert or update or delete on public.barcodes
-  for each row execute function public.refresh_row_after_barcode_change();
+create trigger update_row_barcode_count_after_update
+  after update on public.barcodes
+  for each row execute function public.update_row_barcode_count();
 
 -- 3. Insert a barcode at a position in one step (was: shift, then insert, as two requests).
 --    Safe to retry: a barcode that already exists is neither inserted nor shifted again.

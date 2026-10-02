@@ -83,7 +83,7 @@ Broken features
 
 ### Phase 2 — Database groundwork
 - [x] Indexes on `barcodes(row_id, order_in_row)`, `barcodes(user_id, timestamp)`, `rows(park_id)` (applied)
-- [ ] Apply `supabase/migrations/20261002033000_performance_indexes.sql` and `20261002033100_row_versions_and_stats.sql` (written; the apply was cancelled at the confirmation prompt twice) — **required before deploying Phase 3**
+- [x] `20261002033000_performance_indexes.sql` and `20261002033100_row_versions_and_stats.sql` applied (additive only; dropping the duplicate count triggers is optional, in `supabase/pending/02_trigger_cleanup.sql`)
 - [x] Row version number, bumped by trigger when a row or its barcodes change (in the migration above)
 - [x] Statistics from existing barcodes, by Greek date (`daily_user_scans`, `user_stats`; in the migration above)
 - [x] Atomic, retry-safe `insert_barcode_at` (in the migration above)

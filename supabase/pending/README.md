@@ -11,6 +11,7 @@ timestamped name so the repository matches the database.
 | File | What it does | Data changed |
 |---|---|---|
 | `01_security.sql` | Sign-ups become pending until a manager approves them; users can't change their own role; data is no longer readable without logging in; only approved users read or change data; parks are managed by managers; `reset_row_barcodes` no longer callable by anyone | None (roles of existing accounts are kept) |
+| `02_trigger_cleanup.sql` | Drops two duplicate row-count triggers (each scan recounts its row twice) and one unused function | None |
 
 ## Before applying
 

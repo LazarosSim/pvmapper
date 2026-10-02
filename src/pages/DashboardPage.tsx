@@ -21,7 +21,7 @@ import {useApproveUser, usePendingUsers} from "@/hooks/use-pending-users";
 // Scans per Greek date in a range, counting the barcodes that currently exist
 const getScansForDateRange = async (startDate: Date, endDate: Date): Promise<{date: string, count: number}[]> => {
   const { data, error } = await supabase
-    .from('daily_user_scans' as never)
+    .from('daily_user_scans')
     .select('day, scans')
     .gte('day', format(startDate, 'yyyy-MM-dd'))
     .lte('day', format(endDate, 'yyyy-MM-dd'));
@@ -30,7 +30,7 @@ const getScansForDateRange = async (startDate: Date, endDate: Date): Promise<{da
     return [];
   }
   const countByDate: {[date: string]: number} = {};
-  for (const row of (data ?? []) as unknown as {day: string, scans: number}[]) {
+  for (const row of data ?? []) {
     countByDate[row.day] = (countByDate[row.day] ?? 0) + Number(row.scans);
   }
   return Object.entries(countByDate).map(([date, count]) => ({ date, count }));

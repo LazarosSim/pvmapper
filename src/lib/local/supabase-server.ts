@@ -130,16 +130,16 @@ export const supabaseServer: ServerApi = {
 
   async insertBarcodeAt(b) {
     await run(
-      supabase.rpc('insert_barcode_at' as never, {
+      supabase.rpc('insert_barcode_at', {
         p_id: b.id,
         p_row_id: b.rowId,
         p_position: b.orderInRow,
         p_code: b.code,
         p_user_id: b.userId,
         p_timestamp: b.timestamp,
-        p_latitude: b.latitude ?? null,
-        p_longitude: b.longitude ?? null,
-      } as never)
+        p_latitude: b.latitude ?? undefined,
+        p_longitude: b.longitude ?? undefined,
+      })
     );
   },
 
