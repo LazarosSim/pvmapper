@@ -1,33 +1,10 @@
-import {useQuery} from '@tanstack/react-query'
-import {supabase} from '@/integrations/supabase/client'
-import {mapUser, User} from "@/types/types.ts";
+import {useDB} from '@/lib/db-provider';
 
-
+/**
+ * The signed-in user's profile. It comes from DBProvider, which keeps the last profile
+ * on the device, so roles still work when the app starts without a connection.
+ */
 export function useCurrentUser() {
-    return useQuery({
-        queryKey: ['user-profile'],
-        queryFn: loadCurrentUser,
-        networkMode: 'offlineFirst',
-    });
-}
-
-const loadCurrentUser = async (): Promise<User> => {
-    const userResponse = await supabase.auth.getUser();
-    if (userResponse.error) {
-        throw userResponse.error;
-    }
-    const userId = userResponse.data.user.id;
-
-    const user = await supabase
-        .from('profiles')
-        .select('id, username, role, created_at')
-        .eq('id', userId)
-        .single();
-    if (user.error) {
-        throw user.error;
-    }
-    if (!user.data) {
-        throw new Error('User not found');
-    }
-    return mapUser(user.data);
+  const {currentUser} = useDB();
+  return {data: currentUser ?? undefined};
 }

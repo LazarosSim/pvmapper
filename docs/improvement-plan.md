@@ -99,19 +99,21 @@ Broken features
 
 ### Phase 4 — Consolidate and slim down
 - [x] Old data layer removed; `DBProvider` keeps only the user and online row actions
-- [ ] One set of types (`src/types`, `src/lib/types` still both exist)
+- [x] One set of types (`src/lib/types`) and one current-user source (`useDB`, kept on the device)
 - [x] Export from the local copy after a sync (server for archived parks); warns about unsent scans; layout locked by tests
 - [x] Excel and dashboard code loaded on demand (main bundle 446 → 253 KB gzipped)
 - [x] Unused pages, hooks and packages deleted
 
 ### Phase 5 — Field usability
-- [ ] Scan screen: progress, "Row complete → Next row", vibration, bundled sounds,
-      inline confirmation, park-wide duplicate warning, GPS in the background
+- [x] Scan screen: progress bar, "Row complete → Next row", vibration, beep and buzz made on
+      the phone (work offline), inline confirmation, park-wide duplicate warning, GPS requested
+      when an empty row opens (a scan waits at most 2 s for it)
 - [x] One sync status chip in the header with details, Sync now and refused changes
-- [ ] Barcode search reachable (route added at `/search`; no menu link yet) and working offline
+- [x] Barcode search in the bottom menu; searches the phone's copy offline, adds archived parks online
 - [x] Row detail edits, inserts, deletes and resets work offline
-- [ ] Row detail layout for phones
-- [ ] Dashboard fixes
+- [x] Row detail layout for phones (compact list instead of a five-column table)
+- [x] Dashboard: selected day shows that day's numbers per user, calendar day selection and month
+      paging work, no NaN/over-100% bars, today vs yesterday comparison, Greek dates
 
 ### Phase 6 — Keep it healthy
 - [ ] Strict TypeScript; `no-explicit-any` back to an error

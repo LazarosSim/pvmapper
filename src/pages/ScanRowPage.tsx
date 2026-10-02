@@ -1,17 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
 import { useDB } from '@/lib/db-provider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Check, X } from "lucide-react";
+import { ArrowRight, Check, CheckCircle2, X } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { toast } from 'sonner';
 import AuthGuard from '@/components/auth/auth-guard';
 import BarcodeScanInput from '@/components/scan/BarcodeScanInput';
 import RecentScans from '@/components/scan/RecentScans';
 import ResetRowDialog from '@/components/scan/ResetRowDialog';
-import { useRow, useRowBarcodes, useSyncSummary } from '@/lib/local/hooks';
+import { useParkRows, useRow, useRowBarcodes, useSyncSummary } from '@/lib/local/hooks';
 import { resetRow as resetLocalRow } from '@/lib/local/repo';
 import { OfflineStatusBanner } from "@/components/offline/OfflineStatusBanner";
 
@@ -49,6 +50,10 @@ const ScanRowPage = () => {
   // Scanning works on the phone's copy of active parks
   const row = isLocal ? localOrServerRow : null;
 
+  // The row after this one in the park, for "Next row" when this one is complete
+  const { rows: parkRows } = useParkRows(row?.parkId);
+  const nextRow = parkRows ? parkRows[parkRows.findIndex(r => r.id === rowId) + 1] : undefined;
+
   // Sync state - shown on the card; scanning continues while a sync runs
   const { syncing: isSyncing } = useSyncSummary();
 
@@ -58,7 +63,9 @@ const ScanRowPage = () => {
   }, [rowId]);
 
   const latestBarcodes = barcodes?.slice(-10).reverse().map(b => ({ ...b, isPending: b.pending === 1 }));
-  const scanCount = Math.max(barcodes?.length || 0, 0);
+  const scanCount = barcodes?.length ?? 0;
+  const expected = row?.expectedBarcodes ?? 0;
+  const isComplete = expected > 0 && scanCount >= expected;
 
   // Focus the input when the component mounts
   useEffect(() => {
@@ -189,7 +196,7 @@ const ScanRowPage = () => {
               <div className="flex items-center">
                 <span>
                   Scanned: <span className="font-bold">{scanCount}</span>
-                  {row?.expectedBarcodes ? ` / ${row.expectedBarcodes}` : '/∞'}
+                  {expected > 0 ? ` / ${expected}` : ''}
                 </span>
               </div>
               {isSyncing && (
@@ -199,16 +206,35 @@ const ScanRowPage = () => {
                 </span>
               )}
             </CardTitle>
+            {expected > 0 && (
+              <Progress value={Math.min(100, (scanCount / expected) * 100)} className="h-2" />
+            )}
             <CardDescription>
               Scan or enter a barcode to add it to this row
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {isComplete && (
+              <div className="flex items-center justify-between gap-2 rounded-md border border-green-300 bg-green-50 p-3 text-green-800">
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <CheckCircle2 className="h-5 w-5 shrink-0" />
+                  {scanCount > expected ? `Row complete (+${scanCount - expected} over)` : 'Row complete'}
+                </span>
+                {nextRow && (
+                  <Button asChild size="sm" className="shrink-0">
+                    <Link to={`/scan/row/${nextRow.id}`} replace>
+                      {nextRow.name} <ArrowRight className="ml-1 h-4 w-4" />
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            )}
             <div className="pr-12 relative">
               <BarcodeScanInput
                 rowId={rowId}
                 inputRef={inputRef}
                 captureLocation={captureLocation}
+                rowIsEmpty={scanCount === 0}
               />
             </div>
             <RecentScans barcodes={latestBarcodes} />

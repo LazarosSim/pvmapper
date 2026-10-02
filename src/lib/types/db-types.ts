@@ -44,31 +44,6 @@ export type Barcode = {
   longitude?: number;
 };
 
-// Progress type for tracking completion
-export type Progress = {
-  completed: number;
-  total: number;
-  percentage: number;
-};
-
-// Daily scan statistics
-export type DailyScanStat = {
-  date: string;
-  count: number;
-  userId: string;
-  username?: string;
-}
-
-// User statistics
-export type UserStat = {
-  userId: string;
-  username: string;
-  totalScans: number;
-  dailyScans: number;
-  daysActive: number;
-  averageScansPerDay: number;
-};
-
 // Database context type definition
 export type DBContextType = {
   currentUser: User | null | undefined;

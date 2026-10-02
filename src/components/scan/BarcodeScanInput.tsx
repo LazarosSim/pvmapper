@@ -1,8 +1,8 @@
-import React, {useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {toast} from 'sonner';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
-import {ArrowRight, Loader2, X} from 'lucide-react';
+import {ArrowRight, CheckCircle2, Loader2, MapPin, X, XCircle} from 'lucide-react';
 import useSoundEffects from '@/hooks/use-sound-effects';
 import {useSupabase} from "@/lib/supabase-provider";
 import {normalizeCode} from '@/lib/scan-rules';
@@ -18,14 +18,38 @@ interface BarcodeScanInputProps {
   rowId: string;
   inputRef: React.RefObject<HTMLInputElement>;
   captureLocation: boolean;
+  /** The row has no barcodes yet: start looking for GPS before the first scan */
+  rowIsEmpty?: boolean;
 }
+
+type Location = { latitude: number; longitude: number };
+
+// How long the first scan of a row waits for a GPS fix that is still on its way
+const GPS_WAIT_MS = 2000;
+
+const getLocation = () =>
+  new Promise<Location | null>((resolve) => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+    );
+  });
+
+const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T) =>
+  Promise.race([promise, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
+
+type LastResult = { ok: boolean; text: string; gps?: boolean };
 
 const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   rowId,
   inputRef,
   captureLocation,
+  rowIsEmpty = false,
 }) => {
   const [barcodeInput, setBarcodeInput] = useState('');
+  const [last, setLast] = useState<LastResult | null>(null);
   const [scansInProgress, setScansInProgress] = useState(0);
   const {
     playSuccessSound,
@@ -41,45 +65,30 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
 
   const focusInput = () => inputRef.current?.focus();
 
-  const captureGPSLocation = async (): Promise<{
-    latitude: number;
-    longitude: number;
-  } | null> => {
-    const toastId = toast.loading("Capturing GPS location...");
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        if (!navigator.geolocation) {
-          toast.error("Geolocation is not supported by this browser");
-          reject("Geolocation not supported");
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 5000,
-          maximumAge: 0
-        });
-      });
+  // GPS for the first barcode of a row is requested as soon as the empty row opens, so
+  // the scan rarely waits for it; a scan never waits more than GPS_WAIT_MS.
+  const pendingLocation = useRef<Promise<Location | null> | null>(null);
+  useEffect(() => {
+    pendingLocation.current = captureLocation && rowIsEmpty ? getLocation() : null;
+  }, [captureLocation, rowIsEmpty, rowId]);
 
-      toast.dismiss(toastId);
-      toast.success("GPS location captured successfully");
+  const captureGPSLocation = (): Promise<Location | null> => {
+    const early = pendingLocation.current;
+    pendingLocation.current = null;
+    // A request started on opening has had time already; a fresh one gets a little longer
+    return early ? withTimeout(early, GPS_WAIT_MS, null) : withTimeout(getLocation(), 5000, null);
+  };
 
-      return {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude
-      };
-    } catch (error) {
-      console.error("Error getting location:", error);
-      toast.dismiss(toastId);
-      toast.error("Unable to get GPS location. Please ensure location services are enabled.");
-      return null;
-    }
+  const reject = (message: string) => {
+    playErrorSound();
+    toast.error(message);
+    setLast({ ok: false, text: message });
   };
 
   const processScan = async (scannedCode: string, isPlaceholder: boolean) => {
     const check = await checkScan(rowId, scannedCode, isPlaceholder);
     if (check.ok === false) {
-      playErrorSound();
-      toast.error(REJECTED[(check as { reason: keyof typeof REJECTED }).reason]);
+      reject(REJECTED[(check as { reason: keyof typeof REJECTED }).reason]);
       return;
     }
 
@@ -88,8 +97,8 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
     if (check.isFirstInRow && captureRef.current) {
       location = await captureGPSLocation();
       if (!location) {
-        // Allow the user to continue even if location capture fails
-        toast.warning(`GPS location capture failed, but proceeding with ${isPlaceholder ? 'placeholder' : 'barcode registration'}`);
+        // The scan is saved anyway
+        toast.warning('No GPS location for this row. Check that location is on.');
       }
     }
 
@@ -102,18 +111,12 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       longitude: location?.longitude,
     });
     if (result.ok === false) {
-      playErrorSound();
-      toast.error(REJECTED[(result as { reason: keyof typeof REJECTED }).reason]);
+      reject(REJECTED[(result as { reason: keyof typeof REJECTED }).reason]);
       return;
     }
 
     playSuccessSound();
-    const label = isPlaceholder ? 'Placeholder' : 'Barcode';
-    if (location) {
-      toast.success(`${label} added with GPS location: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`);
-    } else {
-      toast.success(isPlaceholder ? 'Placeholder added' : 'Barcode added successfully');
-    }
+    setLast({ ok: true, text: isPlaceholder ? 'Placeholder added' : `${scannedCode} added`, gps: !!location });
     if (result.alsoInRows.length > 0) {
       toast.warning(`${result.barcode.code} is also in ${result.alsoInRows.join(', ')}`);
     }
@@ -130,8 +133,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
       .then(() => processScan(code, isPlaceholder))
       .catch((error) => {
         console.error(isPlaceholder ? "Error adding placeholder:" : "Error registering barcode:", error);
-        playErrorSound();
-        toast.error(isPlaceholder ? "Failed to add placeholder" : "Failed to add barcode");
+        reject(isPlaceholder ? "Failed to add placeholder" : "Failed to add barcode");
       })
       .finally(() => {
         setScansInProgress(count => count - 1);
@@ -191,6 +193,17 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
           <X className="h-4 w-4" />
         </Button>
       </div>
+
+      {last && (
+        <p
+          role="status"
+          className={`mt-2 flex items-center gap-2 text-sm font-medium ${last.ok ? 'text-green-700' : 'text-destructive'}`}
+        >
+          {last.ok ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
+          <span className="truncate">{last.text}</span>
+          {last.gps && <MapPin className="h-4 w-4 shrink-0" aria-label="with GPS location" />}
+        </p>
+      )}
     </form>;
 };
 

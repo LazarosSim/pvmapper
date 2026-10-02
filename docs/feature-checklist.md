@@ -32,7 +32,8 @@ them working; check them before merging a phase.
 - [ ] Duplicate rejected within the row (ignoring case and spaces)
 - [ ] Placeholder for a missing/unreadable panel
 - [ ] GPS saved with the first barcode of a row when enabled
-- [ ] Success and error sounds
+- [ ] Success and error sounds, vibration, inline confirmation under the input
+- [ ] Progress bar; "Row complete" with a button to the next row
 - [ ] Last 10 scans with sync status
 - [ ] Counter "Scanned: n / expected"
 
@@ -49,6 +50,9 @@ them working; check them before merging a phase.
 - [ ] Pending count and sync progress
 - [ ] All active parks available offline automatically (replaces "Prepare for offline")
 - [ ] Sync chip: waiting count, Sync now, refused changes can be retried or discarded
+
+## Search
+- [ ] Search barcodes from the bottom menu (offline: active parks on the phone)
 
 ## Statistics
 - [ ] Profile: daily and total scans

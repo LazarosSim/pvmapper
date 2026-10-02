@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { ArrowDown, Check, Cloud, CloudOff, Edit, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import AddBarcodeDialog from '@/components/dialog/add-barcode-dialog';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +30,6 @@ import {
   PaginationNext,
   PaginationPrevious
 } from "@/components/ui/pagination.tsx";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 
 const RowDetail = () => {
@@ -196,102 +194,84 @@ const RowDetail = () => {
 
         {barcodes && barcodes.length > 0 ? (
           <>
-            <div className="rounded-md border glass-card overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">Sync</TableHead>
-                    <TableHead className="w-16">No.</TableHead>
-                    <TableHead>Barcode</TableHead>
-                    <TableHead className="w-40">Timestamp</TableHead>
-                    <TableHead className="w-28">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {currentBarcodes.map(({ barcode, index }) => {
-                    const isPending = barcode.pending === 1;
+            <ul className="rounded-md border glass-card divide-y">
+              {currentBarcodes.map(({ barcode, index }) => {
+                const isPending = barcode.pending === 1;
+                const isEditing = editingBarcode?.id === barcode.id;
 
-                    return (
-                      <TableRow key={barcode.id}>
-                        <TableCell>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger>
-                                {isPending ? (
-                                  <CloudOff className="h-4 w-4 text-amber-500" />
-                                ) : (
-                                  <Cloud className="h-4 w-4 text-green-500" />
-                                )}
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {isPending ? 'Not uploaded yet' : 'Synced'}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </TableCell>
-                        <TableCell className="font-medium">{index}</TableCell>
-                        <TableCell>
-                          {editingBarcode && editingBarcode.id === barcode.id ? (
-                            <div className="flex items-center space-x-2">
-                              <Input
-                                value={editingBarcode.code}
-                                onChange={(e) => setEditingBarcode({ ...editingBarcode, code: e.target.value })}
-                                className="w-full"
-                                autoFocus
-                              />
-                              <Button variant="ghost" size="icon" onClick={saveEditedBarcode} className="text-inventory-secondary">
-                                <Check className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={cancelEditBarcode} className="text-red-500">
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <span>{barcode.code}</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {new Date(barcode.timestamp).toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEditBarcode(barcode.id, barcode.code)}
-                              className="h-8 w-8 text-inventory-secondary"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setInsertAfterBarcode(barcode);
-                                setIsInsertDialogOpen(true);
-                              }}
-                              className="h-8 w-8 text-inventory-primary"
-                            >
-                              <ArrowDown className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                handleDeleteBarcode(barcode.id, barcode.code);
-                              }}
-                              className="h-8 w-8 text-red-500 hover:text-red-800"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                return (
+                  <li key={barcode.id} className="flex items-center gap-2 px-3 py-2">
+                    <span className="w-8 shrink-0 text-right text-sm font-medium text-muted-foreground">{index}</span>
+                    {isEditing ? (
+                      <div className="flex flex-1 items-center gap-1 min-w-0">
+                        <Input
+                          value={editingBarcode.code}
+                          onChange={(e) => setEditingBarcode({ ...editingBarcode, code: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveEditedBarcode();
+                            if (e.key === 'Escape') cancelEditBarcode();
+                          }}
+                          className="h-9 flex-1 min-w-0"
+                          autoFocus
+                        />
+                        <Button variant="ghost" size="icon" onClick={saveEditedBarcode} className="h-9 w-9 shrink-0 text-inventory-secondary" aria-label="Save">
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={cancelEditBarcode} className="h-9 w-9 shrink-0 text-red-500" aria-label="Cancel">
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-mono text-sm break-all">{barcode.code}</p>
+                          <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                            {isPending ? (
+                              <CloudOff className="h-3 w-3 text-amber-500" aria-label="Not uploaded yet" />
+                            ) : (
+                              <Cloud className="h-3 w-3 text-green-500" aria-label="Synced" />
+                            )}
+                            {new Date(barcode.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditBarcode(barcode.id, barcode.code)}
+                            className="h-9 w-9 text-inventory-secondary"
+                            aria-label="Edit"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setInsertAfterBarcode(barcode);
+                              setIsInsertDialogOpen(true);
+                            }}
+                            className="h-9 w-9 text-inventory-primary"
+                            aria-label="Insert after"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteBarcode(barcode.id, barcode.code)}
+                            className="h-9 w-9 text-red-500 hover:text-red-800"
+                            aria-label="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
             {/* Pagination */}
             {totalPages > 1 && (
               <Pagination className="mt-4">

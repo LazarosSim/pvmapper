@@ -1,61 +1,64 @@
+import { useCallback, useRef } from 'react';
 
-import { useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+/**
+ * Scan feedback: a short beep and buzz made by the phone itself (nothing to download,
+ * so they also work offline), plus vibration where the phone supports it.
+ */
+type Tone = { frequency: number; duration: number; type: OscillatorType };
+
+const SUCCESS: Tone[] = [{ frequency: 1760, duration: 0.08, type: 'sine' }];
+const ERROR: Tone[] = [
+  { frequency: 220, duration: 0.15, type: 'square' },
+  { frequency: 180, duration: 0.2, type: 'square' },
+];
+
+const vibrate = (pattern: number | number[]) => {
+  try {
+    navigator.vibrate?.(pattern);
+  } catch {
+    // Not supported: sound only
+  }
+};
 
 const useSoundEffects = () => {
-  const successSoundRef = useRef<HTMLAudioElement | null>(null);
-  const errorSoundRef = useRef<HTMLAudioElement | null>(null);
+  const contextRef = useRef<AudioContext | null>(null);
 
-  useEffect(() => {
-    const loadSounds = async () => {
-      try {
-        const { data: successData } = await supabase.storage
-          .from('sounds')
-          .download('sm64_camera_click.wav');
-        
-        const { data: errorData } = await supabase.storage
-          .from('sounds')
-          .download('sm64_camera_buzz.wav');
+  const play = useCallback((tones: Tone[], volume: number) => {
+    try {
+      const AudioContextClass =
+        window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const context = (contextRef.current ??= new AudioContextClass());
+      // Browsers start audio suspended until the user has interacted with the page
+      if (context.state === 'suspended') context.resume().catch(() => undefined);
 
-        if (successData && errorData) {
-          const successUrl = URL.createObjectURL(successData);
-          const errorUrl = URL.createObjectURL(errorData);
-          
-          successSoundRef.current = new Audio(successUrl);
-          errorSoundRef.current = new Audio(errorUrl);
-        }
-      } catch (error) {
-        console.error('Error loading sounds:', error);
+      let start = context.currentTime;
+      for (const tone of tones) {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = tone.type;
+        oscillator.frequency.value = tone.frequency;
+        gain.gain.setValueAtTime(volume, start);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + tone.duration);
+        oscillator.connect(gain).connect(context.destination);
+        oscillator.start(start);
+        oscillator.stop(start + tone.duration);
+        start += tone.duration + 0.03;
       }
-    };
-
-    loadSounds();
-
-    // Cleanup
-    return () => {
-      if (successSoundRef.current) {
-        URL.revokeObjectURL(successSoundRef.current.src);
-      }
-      if (errorSoundRef.current) {
-        URL.revokeObjectURL(errorSoundRef.current.src);
-      }
-    };
+    } catch {
+      // A missing beep must never break scanning
+    }
   }, []);
 
-  const playSuccessSound = () => {
-    if (successSoundRef.current) {
-      successSoundRef.current.currentTime = 0;
-      // play() rejects when the browser blocks audio; a missing beep must not break scanning
-      successSoundRef.current.play().catch(() => undefined);
-    }
-  };
+  const playSuccessSound = useCallback(() => {
+    play(SUCCESS, 0.3);
+    vibrate(40);
+  }, [play]);
 
-  const playErrorSound = () => {
-    if (errorSoundRef.current) {
-      errorSoundRef.current.currentTime = 0;
-      errorSoundRef.current.play().catch(() => undefined);
-    }
-  };
+  const playErrorSound = useCallback(() => {
+    play(ERROR, 0.25);
+    vibrate([120, 60, 120]);
+  }, [play]);
 
   return { playSuccessSound, playErrorSound };
 };

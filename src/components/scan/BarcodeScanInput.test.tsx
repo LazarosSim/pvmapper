@@ -39,9 +39,9 @@ const seed = async ({ validateLength = false, existing = [] as string[] } = {}) 
   })));
 };
 
-const renderInput = (captureLocation = false) => {
+const renderInput = (captureLocation = false, rowIsEmpty = false) => {
   const inputRef = createRef<HTMLInputElement>();
-  render(<BarcodeScanInput rowId="row-1" inputRef={inputRef} captureLocation={captureLocation} />);
+  render(<BarcodeScanInput rowId="row-1" inputRef={inputRef} captureLocation={captureLocation} rowIsEmpty={rowIsEmpty} />);
   return screen.getByPlaceholderText('Scan or enter barcode') as HTMLInputElement;
 };
 
@@ -171,5 +171,46 @@ describe('BarcodeScanInput', () => {
     const [first, second] = await saved();
     expect(first).toMatchObject({ code: 'FIRST', latitude: 39.36, longitude: 22.94 });
     expect(second.latitude).toBeNull();
+  });
+
+  it('asks for GPS when an empty row opens, and the first scan uses that fix', async () => {
+    await seed();
+    const getCurrentPosition = vi.fn((resolve: PositionCallback) =>
+      resolve({ coords: { latitude: 1, longitude: 2 } } as GeolocationPosition)
+    );
+    Object.defineProperty(navigator, 'geolocation', { value: { getCurrentPosition }, configurable: true });
+    const user = userEvent.setup();
+    const input = renderInput(true, true);
+    expect(getCurrentPosition).toHaveBeenCalledTimes(1);
+
+    await user.type(input, 'FIRST{Enter}');
+
+    await waitFor(async () => expect(await saved()).toHaveLength(1));
+    expect(getCurrentPosition).toHaveBeenCalledTimes(1);
+    expect((await saved())[0]).toMatchObject({ latitude: 1, longitude: 2 });
+    expect((await screen.findByRole('status')).textContent).toContain('FIRST added');
+  });
+
+  it('saves the first scan without GPS when no fix arrives in time', async () => {
+    await seed();
+    Object.defineProperty(navigator, 'geolocation', { value: { getCurrentPosition: vi.fn() }, configurable: true });
+    const user = userEvent.setup();
+    const input = renderInput(true, true);
+
+    await user.type(input, 'FIRST{Enter}');
+
+    await waitFor(async () => expect(await saved()).toHaveLength(1), { timeout: 4000 });
+    expect((await saved())[0].latitude).toBeNull();
+    expect(toast.warning).toHaveBeenCalled();
+  });
+
+  it('shows a rejected scan next to the input', async () => {
+    await seed({ existing: ['SAME'] });
+    const user = userEvent.setup();
+    const input = renderInput();
+
+    await user.type(input, 'same{Enter}');
+
+    expect((await screen.findByRole('status')).textContent).toContain('Duplicate barcode detected');
   });
 });

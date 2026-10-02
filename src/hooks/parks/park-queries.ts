@@ -1,6 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Park } from '@/types/types';
+
+// A park with its scanned and expected totals, as the dashboard shows it
+export type ParkStats = {
+  id: string;
+  name: string;
+  createdAt: Date;
+  createdBy: string;
+  expectedBarcodes: number;
+  currentBarcodes: number;
+  validateBarcodeLength: boolean;
+  archived: boolean;
+  archivedAt: Date | null;
+};
 
 // Type for the raw data from park_stats view (with nullable fields)
 type RawParkStats = {
@@ -16,10 +28,9 @@ type RawParkStats = {
 };
 
 // Safe mapper that handles nullable fields from the view
-const mapParkFromStats = (raw: RawParkStats): Park | null => {
+const mapParkFromStats = (raw: RawParkStats): ParkStats | null => {
   // Skip rows with null id or name (invalid data)
   if (!raw.id || !raw.name) {
-    console.warn('Skipping park with null id or name:', raw);
     return null;
   }
 
@@ -40,8 +51,7 @@ const mapParkFromStats = (raw: RawParkStats): Park | null => {
  * Fetches park statistics from the park_stats view
  * @param includeArchived - Whether to include archived parks
  */
-const loadParkStats = async (includeArchived: boolean = false): Promise<Park[]> => {
-  console.log('[loadParkStats] Fetching parks, includeArchived:', includeArchived);
+const loadParkStats = async (includeArchived: boolean = false): Promise<ParkStats[]> => {
   
   let query = supabase
     .from('park_stats')
@@ -58,41 +68,13 @@ const loadParkStats = async (includeArchived: boolean = false): Promise<Park[]> 
     console.error('[loadParkStats] Error:', error);
     throw error;
   }
-
-  console.log('[loadParkStats] Raw data received:', data?.length, 'parks');
   
   // Map and filter out any null results (invalid rows)
   const parks = (data || [])
     .map((rawPark) => mapParkFromStats(rawPark as RawParkStats))
-    .filter((park): park is Park => park !== null);
-
-  console.log('[loadParkStats] Mapped parks:', parks.map(p => ({ id: p.id, name: p.name, archived: p.archived })));
+    .filter((park): park is ParkStats => park !== null);
   
   return parks;
-};
-
-/**
- * Fetches a single park by ID
- */
-const loadParkById = async (parkId: string): Promise<Park | null> => {
-  console.log('[loadParkById] Fetching park:', parkId);
-  
-  const { data, error } = await supabase
-    .from('park_stats')
-    .select('id, name, expected_barcodes, current_barcodes, created_at, created_by, validate_barcode_length, archived, archived_at')
-    .eq('id', parkId)
-    .single();
-
-  if (error) {
-    if (error.code === 'PGRST116') {
-      console.log('[loadParkById] Park not found:', parkId);
-      return null;
-    }
-    console.error('[loadParkById] Error:', error);
-    throw error;
-  }
-
-  return mapParkFromStats(data as RawParkStats);
 };
 
 /**
@@ -106,18 +88,5 @@ export const useParkStats = (includeArchived: boolean = false) => {
     networkMode: 'offlineFirst',
     staleTime: 30000, // 30 seconds
     refetchOnMount: 'always', // Always check for fresh data on mount
-  });
-};
-
-/**
- * React Query hook for fetching a single park by ID
- */
-export const useParkById = (parkId: string | undefined) => {
-  return useQuery({
-    queryKey: ['park', parkId],
-    queryFn: () => loadParkById(parkId!),
-    enabled: !!parkId,
-    networkMode: 'offlineFirst',
-    staleTime: 30000,
   });
 };

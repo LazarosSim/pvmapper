@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Barcode, Loader2 } from 'lucide-react';
+import { Barcode, CloudOff, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useSearchBarcodes } from '@/hooks/use-search-barcodes';
 
@@ -12,7 +12,7 @@ const SearchPage = () => {
   const [query, setQuery] = useState<string>("");
   const navigate = useNavigate();
   
-  const { data: results, isLoading, error } = useSearchBarcodes(query);
+  const { data: results, isLoading, isSearchingServer, onlyThisPhone } = useSearchBarcodes(query);
 
   return (
     <Layout title="Search">
@@ -22,6 +22,7 @@ const SearchPage = () => {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search barcodes..."
           className="w-full"
+          autoFocus
         />
         {query.length > 0 && query.length < 3 && (
           <p className="text-xs text-muted-foreground mt-1">Enter at least 3 characters</p>
@@ -34,15 +35,19 @@ const SearchPage = () => {
         </div>
       )}
 
-      {error && (
-        <div className="text-center py-8">
-          <p className="text-destructive">Error searching barcodes</p>
-        </div>
+      {onlyThisPhone && (
+        <p className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
+          <CloudOff className="h-4 w-4" />
+          Offline: searching the active parks on this phone only
+        </p>
       )}
 
       {results && results.length > 0 ? (
         <div>
-          <h2 className="text-lg font-semibold mb-4">Results ({results.length})</h2>
+          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            Results ({results.length})
+            {isSearchingServer && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+          </h2>
           {results.map((result) => (
             <Card key={result.id} className="mb-4 hover:shadow-md transition-shadow">
               <CardHeader className="pb-2">
@@ -57,6 +62,7 @@ const SearchPage = () => {
                 </p>
                 <p className="text-sm text-muted-foreground mb-3">
                   Added: {format(new Date(result.timestamp), 'MMM d, yyyy h:mm a')}
+                  {result.pending && ' · not uploaded yet'}
                 </p>
                 <div className="flex justify-end">
                   <Button 
@@ -71,7 +77,7 @@ const SearchPage = () => {
             </Card>
           ))}
         </div>
-      ) : query.length >= 3 && !isLoading ? (
+      ) : query.trim().length >= 3 && !isLoading && !isSearchingServer ? (
         <div className="text-center py-8">
           <p className="text-muted-foreground">No barcodes found matching "{query}"</p>
         </div>

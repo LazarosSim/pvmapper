@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart2, Home, ScanBarcode, User } from 'lucide-react';
+import { BarChart2, Home, ScanBarcode, Search, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDB } from '@/lib/db-provider';
 
@@ -27,6 +27,12 @@ const BottomNav = () => {
       label: 'Scan',
       icon: <ScanBarcode className="h-5 w-5" />,
       active: location.pathname.startsWith('/scan')
+    },
+    {
+      href: '/search',
+      label: 'Search',
+      icon: <Search className="h-5 w-5" />,
+      active: location.pathname === '/search'
     },
     {
       href: '/profile',

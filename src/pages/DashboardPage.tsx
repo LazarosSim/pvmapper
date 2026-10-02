@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import Layout from '@/components/layout/layout';
 import {supabase} from '@/integrations/supabase/client';
@@ -9,48 +9,123 @@ import {ArrowDownRight, ArrowUpRight, BarChart3, CalendarIcon, Check, Layers, Lo
 import {Button} from '@/components/ui/button';
 import {toast} from 'sonner';
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
-import {endOfMonth, format, startOfMonth} from 'date-fns';
+import {endOfMonth, format, isSameMonth, parseISO, startOfMonth, subDays} from 'date-fns';
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,} from "@/components/ui/tooltip";
-import {Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis} from 'recharts';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip as ChartTooltip,
+  XAxis,
+  YAxis
+} from 'recharts';
+import {keepPreviousData, useQuery} from '@tanstack/react-query';
+import type {DayContentProps} from 'react-day-picker';
 import {ParkProgress} from "@/components/parks/ParkProgress.tsx";
 import {useParkStats} from "@/hooks/parks";
 import {useUserStats} from "@/hooks/use-user-stats.tsx";
 import {useCurrentUser} from "@/hooks/use-user.tsx";
 import {useApproveUser, usePendingUsers} from "@/hooks/use-pending-users";
 
-// Scans per Greek date in a range, counting the barcodes that currently exist
-const getScansForDateRange = async (startDate: Date, endDate: Date): Promise<{date: string, count: number}[]> => {
+// Today's date in Greece as 'yyyy-MM-dd', the same calendar the daily_user_scans view uses
+const greekToday = (): string =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Athens' }).format(new Date());
+
+// Percentage of part in whole; null when there is nothing to compare against
+const percentOf = (part: number, whole: number): number | null =>
+  whole > 0 ? (part / whole) * 100 : null;
+
+// Scans per Greek date in a range ('yyyy-MM-dd' -> count), counting the barcodes that currently exist
+const getScansForDateRange = async (startDay: string, endDay: string): Promise<{[date: string]: number}> => {
   const { data, error } = await supabase
     .from('daily_user_scans')
     .select('day, scans')
-    .gte('day', format(startDate, 'yyyy-MM-dd'))
-    .lte('day', format(endDate, 'yyyy-MM-dd'));
-  if (error) {
-    console.error('Error fetching daily scans:', error);
-    return [];
-  }
+    .gte('day', startDay)
+    .lte('day', endDay);
+  if (error) throw error;
   const countByDate: {[date: string]: number} = {};
   for (const row of data ?? []) {
-    countByDate[row.day] = (countByDate[row.day] ?? 0) + Number(row.scans);
+    if (!row.day) continue;
+    countByDate[row.day] = (countByDate[row.day] ?? 0) + Number(row.scans ?? 0);
   }
-  return Object.entries(countByDate).map(([date, count]) => ({ date, count }));
+  return countByDate;
+};
+
+// Per-user scans on one Greek date, biggest first
+const getUserScansForDay = async (day: string): Promise<{username: string, scans: number}[]> => {
+  const { data, error } = await supabase
+    .from('daily_user_scans')
+    .select('username, scans')
+    .eq('day', day);
+  if (error) throw error;
+  return (data ?? [])
+    .map(row => ({ username: row.username ?? 'Unknown', scans: Number(row.scans ?? 0) }))
+    .filter(row => row.scans > 0)
+    .sort((a, b) => b.scans - a.scans);
+};
+
+const useDailyUserScans = (day: string | undefined, enabled: boolean) => useQuery({
+  queryKey: ['server', 'daily-user-scans', day],
+  queryFn: () => getUserScansForDay(day!),
+  enabled: enabled && !!day,
+});
+
+// Daily trend data for one month
+const generateMonthlyTrend = (monthStart: Date, data: {[key: string]: number}) => {
+  const result: {date: string, scans: number}[] = [];
+  const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), day);
+    const dateStr = format(date, 'yyyy-MM-dd');
+    result.push({
+      date: format(date, 'MMM dd'),
+      scans: data[dateStr] || 0
+    });
+  }
+
+  return result;
 };
 
 const DashboardPage = () => {
   const navigate = useNavigate();
   const [selectedTab, setSelectedTab] = useState('overview');
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [isLoadingStats, setIsLoadingStats] = useState(false);
-  const [isLoadingCalendar, setIsLoadingCalendar] = useState(false);
-  const [calendarData, setCalendarData] = useState<{[key: string]: number}>({});
-  const [monthlyData, setMonthlyData] = useState<any[]>([]);
+  // "Today" is the Greek date; as a local Date it is midnight of that calendar day
+  const todayStr = greekToday();
+  const today = parseISO(todayStr);
+  const yesterdayStr = format(subDays(today, 1), 'yyyy-MM-dd');
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(today);
+  const [displayMonth, setDisplayMonth] = useState<Date>(startOfMonth(today));
 
   const {data: parks} = useParkStats();
   const {data: userStats} = useUserStats();
   const {data: currentUser} = useCurrentUser();
   const {data: pendingUsers} = usePendingUsers(currentUser?.role === 'manager');
   const {mutate: approveUser, isPending: isApproving, variables: approvingUserId} = useApproveUser();
+  const isManager = currentUser?.role === 'manager';
 
+  // Scans per day for the month the calendar shows
+  const monthKey = format(displayMonth, 'yyyy-MM');
+  const {data: calendarData = {}, isLoading: isLoadingCalendar} = useQuery({
+    queryKey: ['server', 'daily-scans-range', monthKey],
+    queryFn: () => getScansForDateRange(
+      format(startOfMonth(displayMonth), 'yyyy-MM-dd'),
+      format(endOfMonth(displayMonth), 'yyyy-MM-dd'),
+    ),
+    enabled: isManager,
+    placeholderData: keepPreviousData,
+  });
+  const monthlyData = generateMonthlyTrend(startOfMonth(displayMonth), calendarData);
+
+  // Per-user scans for the selected day, today and yesterday (Greek dates)
+  const selectedDay = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
+  const {data: selectedDayScans, isLoading: isLoadingStats} = useDailyUserScans(selectedDay, isManager);
+  const {data: todayScans} = useDailyUserScans(todayStr, isManager);
+  const {data: yesterdayScans} = useDailyUserScans(yesterdayStr, isManager);
 
   // Redirect if not authenticated or not a manager
   React.useEffect(() => {
@@ -62,74 +137,35 @@ const DashboardPage = () => {
   }, [currentUser, navigate]);
 
 
-  // Load calendar data when month changes
-  useEffect(() => {
-    const loadCalendarData = async () => {
-      if (!selectedDate || currentUser?.role !== 'manager') return;
-      
-      setIsLoadingCalendar(true);
-      
-      try {
-        const start = startOfMonth(selectedDate);
-        const end = endOfMonth(selectedDate);
-        
-        const scans = await getScansForDateRange(start, end);
-        
-        // Convert to format needed by calendar
-        const dataByDate: {[key: string]: number} = {};
-        scans.forEach(item => {
-          dataByDate[item.date] = item.count;
-        });
-        
-        setCalendarData(dataByDate);
-        
-        // Also generate monthly trend data
-        const trend = generateMonthlyTrend(start, dataByDate);
-        setMonthlyData(trend);
-      } catch (error) {
-        console.error("Error loading calendar data:", error);
-      } finally {
-        setIsLoadingCalendar(false);
-      }
-    };
-    
-    loadCalendarData();
-  }, [selectedDate, currentUser]);
-
-
   if (!currentUser || currentUser.role !== 'manager') {
     return null;
   }
 
-  // Generate daily trend data for the selected month
-  const generateMonthlyTrend = (monthStart: Date, data: {[key: string]: number}) => {
-    const result = [];
-    const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
-    
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), day);
-      const dateStr = format(date, 'yyyy-MM-dd');
-      result.push({
-        date: format(date, 'MMM dd'),
-        scans: data[dateStr] || 0
-      });
-    }
-    
-    return result;
-  };
-
   // Calculate total scans (sum of scans for all parks)
   const totalScans = parks?.map(park => park.currentBarcodes).reduce((a, b) => a + b, 0) ?? 0;
-  
-  // Calculate today's scans
-  const totalDailyScans = userStats?.map(user => user.dailyScans).reduce((a, b) => a + b, 0) ?? 0;
 
-  //TODO
-  const scanChange = 0;
+  // Today's scans per user (Greek today, from user_stats) and their sum
+  const totalDailyScans = userStats?.map(user => Number(user.dailyScans ?? 0)).reduce((a, b) => a + b, 0) ?? 0;
+
+  // Today's vs yesterday's scans (both Greek dates, from daily_user_scans)
+  const sumScans = (rows?: {scans: number}[]) => rows?.reduce((a, row) => a + row.scans, 0) ?? 0;
+  const todayTotal = todayScans ? sumScans(todayScans) : totalDailyScans;
+  const yesterdayTotal = sumScans(yesterdayScans);
+  // null when there is nothing to compare with (no data yet, or no scans yesterday)
+  const scanChange = yesterdayScans && yesterdayTotal > 0
+    ? ((todayTotal - yesterdayTotal) / yesterdayTotal) * 100
+    : null;
+
+  const selectedDayTotal = sumScans(selectedDayScans);
+
+  const handleSelectDate = (date: Date | undefined) => {
+    setSelectedDate(date);
+    if (date && !isSameMonth(date, displayMonth)) setDisplayMonth(startOfMonth(date));
+  };
 
 
-  // Calendar day render function
-  const renderDay = (day: Date) => {
+  // Calendar day contents (rendered inside the day button, so clicking still selects it)
+  const renderDay = (day: Date, isSelected: boolean) => {
     const dateStr = format(day, 'yyyy-MM-dd');
     const scanCount = calendarData[dateStr] || 0;
     let intensity = "";
@@ -144,7 +180,7 @@ const DashboardPage = () => {
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="relative h-9 w-9 p-0">
-              <div className={`absolute inset-1 rounded-sm ${scanCount ? intensity : ""}`}></div>
+              <div className={`absolute inset-1 rounded-sm ${scanCount && !isSelected ? intensity : ""}`}></div>
               <div className="relative z-10 flex h-full w-full items-center justify-center">
                 {format(day, "d")}
               </div>
@@ -185,16 +221,16 @@ const DashboardPage = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {totalDailyScans}
-                    {scanChange > 0 ? (
+                    {todayTotal}
+                    {scanChange !== null && scanChange > 0 ? (
                       <ArrowUpRight className="inline-block ml-1 text-green-500 h-4 w-4" />
-                    ) : scanChange < 0 ? (
+                    ) : scanChange !== null && scanChange < 0 ? (
                       <ArrowDownRight className="inline-block ml-1 text-red-500 h-4 w-4" />
                     ) : null}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {scanChange !== 0 ?
-                      `${scanChange > 0 ? '+' : ''}${Math.abs(scanChange).toFixed(1)}% vs previous day` :
+                    {scanChange !== null ?
+                      `${scanChange > 0 ? '+' : scanChange < 0 ? '-' : ''}${Math.abs(scanChange).toFixed(1)}% vs previous day` :
                       'No comparison data available'}
                   </div>
                 </CardContent>
@@ -213,7 +249,7 @@ const DashboardPage = () => {
                     <ParkProgress key={index} name={park.name}
                                   expected={park.expectedBarcodes}
                                   current={park.currentBarcodes}
-                                  percentage={park.currentBarcodes / park.expectedBarcodes * 100} />
+                                  percentage={percentOf(park.currentBarcodes, park.expectedBarcodes)} />
                 ))}
               </CardContent>
             </Card>
@@ -267,7 +303,7 @@ const DashboardPage = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {userStats?.length > 0 ? (
+                {userStats && userStats.length > 0 ? (
                   <div className="space-y-4">
                     {userStats.map(user => (
                       <div key={user.username} className="space-y-2">
@@ -280,7 +316,7 @@ const DashboardPage = () => {
                           <span>{user.daysActive} days active | Avg: {user.averageDailyScans}/day</span>
                         </div>
                         <Progress 
-                          value={Math.min(100, (user.dailyScans / totalDailyScans) * 100)}
+                          value={Math.min(100, percentOf(Number(user.dailyScans ?? 0), totalDailyScans) ?? 0)}
                           className="h-2"
                         />
                       </div>
@@ -316,7 +352,7 @@ const DashboardPage = () => {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="username" />
                       <YAxis />
-                      <Tooltip />
+                      <ChartTooltip />
                       <Legend />
                       <Bar dataKey="totalScans" name="Total Scans" fill="#8884d8" />
                       <Bar dataKey="dailyScans" name="Today's Scans" fill="#82ca9d" />
@@ -349,10 +385,14 @@ const DashboardPage = () => {
                       <Calendar
                         mode="single"
                         selected={selectedDate}
-                        onSelect={setSelectedDate}
+                        onSelect={handleSelectDate}
+                        month={displayMonth}
+                        onMonthChange={setDisplayMonth}
+                        today={today}
                         className="border rounded-md pointer-events-auto"
                         components={{
-                          Day: ({ date, ...props }) => renderDay(date)
+                          DayContent: ({ date, activeModifiers }: DayContentProps) =>
+                            renderDay(date, !!activeModifiers.selected)
                         }}
                       />
                     </div>
@@ -375,7 +415,7 @@ const DashboardPage = () => {
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="date" />
                             <YAxis />
-                            <Tooltip />
+                            <ChartTooltip />
                             <Area type="monotone" dataKey="scans" stroke="#8884d8" fill="#8884d8" />
                           </AreaChart>
                         </ResponsiveContainer>
@@ -394,22 +434,22 @@ const DashboardPage = () => {
                       <div className="flex justify-center py-4">
                         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                       </div>
-                    ) : userStats?.length > 0 ? (
+                    ) : selectedDayScans && selectedDayScans.length > 0 ? (
                       <>
                         <div className="text-2xl font-bold mb-4">
-                          {totalDailyScans} total scans page here
+                          {selectedDayTotal} total scans
                         </div>
                         
                         <h5 className="text-sm font-medium mb-2">Breakdown by User</h5>
                         <div className="space-y-2">
-                          {userStats.map((user, index) => (
-                            <div key={index} className="flex justify-between items-center">
+                          {selectedDayScans.map(user => (
+                            <div key={user.username} className="flex justify-between items-center">
                               <span>{user.username}</span>
                               <div className="flex items-center">
-                                <span className="font-medium">{user.totalScans} scans</span>
+                                <span className="font-medium">{user.scans} scans</span>
                                 <div 
                                   className="ml-2 h-3 bg-blue-500 rounded"
-                                  style={{ width: `${Math.max(8, (user.totalScans / totalScans)*1500)}px` }}
+                                  style={{ width: `${Math.max(8, Math.min(100, percentOf(user.scans, selectedDayTotal) ?? 0))}px` }}
                                 ></div>
                               </div>
                             </div>

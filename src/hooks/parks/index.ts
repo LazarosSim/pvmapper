@@ -1,5 +1,5 @@
 // Park queries and mutations - split for maintainability
-export { useParkStats, useParkById } from './park-queries';
+export { useParkStats, type ParkStats } from './park-queries';
 export { 
   useAddPark, 
   useUpdatePark, 
