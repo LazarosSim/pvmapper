@@ -14,8 +14,11 @@ the dashboard and export each park to Excel.
 - **Every change goes to the copy and to an outbox** in one step (`src/lib/local/repo.ts`).
   Scans have fixed ids, so uploading again never creates duplicates.
 - **Sync** (`src/lib/local/sync.ts`) uploads the outbox in batches and downloads only rows whose
-  `version` changed. It runs on start, on reconnect, when the app comes back to the front,
-  shortly after a change, and every minute; one sync at a time across tabs. Changes the server
+  `version` changed. It runs on start, on reconnect, when the app comes back to the front and
+  every minute; shortly after a change only the upload runs. One sync at a time across tabs.
+- **Scanning never waits**: the scan screen checks a code in memory, plays the sound and counts
+  it at once, then saves it. Screens that re-read after every scan count from the indexes
+  instead of reading every barcode. Changes the server
   refuses are set aside and shown in the sync chip in the header, never dropped.
 - **The service worker** (`vite-plugin-pwa`, generated at build time) caches only the app
   itself, so it opens without a connection after one online visit. It never caches Supabase

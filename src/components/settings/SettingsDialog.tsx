@@ -17,7 +17,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { useAppSettings } from '@/hooks/use-app-settings';
 import { useCurrentUser } from '@/hooks/use-user';
-import { useParks, useSyncSummary } from '@/lib/local/hooks';
+import { useActiveParkCount, useSyncSummary } from '@/lib/local/hooks';
 
 interface SettingsDialogProps {
     open: boolean;
@@ -27,9 +27,8 @@ interface SettingsDialogProps {
 export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
     const { data: currentUser } = useCurrentUser();
     const { showArchived, setShowArchived } = useAppSettings();
-    const parks = useParks();
+    const activeParkCount = useActiveParkCount() ?? 0;
     const { lastSyncedAt } = useSyncSummary();
-    const activeParks = parks?.filter((p) => !p.archived) ?? [];
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -70,7 +69,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                         <div className="flex items-start gap-2 text-sm text-muted-foreground">
                             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
                             <p>
-                                All {activeParks.length} active park{activeParks.length === 1 ? ' is' : 's are'} kept
+                                All {activeParkCount} active park{activeParkCount === 1 ? ' is' : 's are'} kept
                                 on this phone and updated automatically whenever there is a connection
                                 {lastSyncedAt ? ` (last ${formatDistanceToNow(new Date(lastSyncedAt), { addSuffix: true })})` : ''}.
                                 Scans made offline are uploaded when the connection returns.

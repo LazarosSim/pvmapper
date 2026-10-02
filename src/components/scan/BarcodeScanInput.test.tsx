@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto';
-import { createRef } from 'react';
+import { useRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { db, codeKey } from '@/lib/local/db';
 import { sortBarcodes } from '@/lib/local/apply-ops';
+import { useLiveQuery } from 'dexie-react-hooks';
 import BarcodeScanInput from './BarcodeScanInput';
 
 const toast = vi.hoisted(() => ({
@@ -17,9 +18,8 @@ const toast = vi.hoisted(() => ({
 }));
 
 vi.mock('sonner', () => ({ toast }));
-vi.mock('@/hooks/use-sound-effects', () => ({
-  default: () => ({ playSuccessSound: vi.fn(), playErrorSound: vi.fn() }),
-}));
+const sounds = vi.hoisted(() => ({ playSuccessSound: vi.fn(), playErrorSound: vi.fn() }));
+vi.mock('@/hooks/use-sound-effects', () => ({ default: () => sounds }));
 vi.mock('@/lib/supabase-provider', () => ({ useSupabase: () => ({ user: { id: 'user-1' } }) }));
 
 const saved = async (rowId = 'row-1') =>
@@ -39,9 +39,29 @@ const seed = async ({ validateLength = false, existing = [] as string[] } = {}) 
   })));
 };
 
-const renderInput = (captureLocation = false) => {
-  const inputRef = createRef<HTMLInputElement>();
-  render(<BarcodeScanInput rowId="row-1" inputRef={inputRef} captureLocation={captureLocation} />);
+// Wired like the scan page: the row's live barcodes and the park's length rule
+const Harness = ({ captureLocation }: { captureLocation: boolean }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const barcodes = useLiveQuery(() => db.barcodes.where('rowId').equals('row-1').toArray(), []);
+  const park = useLiveQuery(async () => (await db.parks.get('park-1')) ?? null, []);
+  return (
+    <>
+    {barcodes && park !== undefined && <span data-testid="ready" />}
+    <BarcodeScanInput
+      rowId="row-1"
+      inputRef={inputRef}
+      captureLocation={captureLocation}
+      barcodes={barcodes}
+      validateLength={park?.validateBarcodeLength}
+    />
+    </>
+  );
+};
+
+const renderInput = async (captureLocation = false) => {
+  render(<Harness captureLocation={captureLocation} />);
+  // Ready once the phone's copy of the row has been read
+  await screen.findByTestId('ready');
   return screen.getByPlaceholderText('Scan or enter barcode') as HTMLInputElement;
 };
 
@@ -55,14 +75,14 @@ afterEach(cleanup);
 describe('BarcodeScanInput', () => {
   it('is ready for the scanner as soon as the page opens', async () => {
     await seed();
-    const input = renderInput();
+    const input = await renderInput();
     expect(document.activeElement).toBe(input);
   });
 
   it('saves fast consecutive scans in order, each at its own position', async () => {
     await seed({ existing: ['EXISTING'] });
     const user = userEvent.setup();
-    const input = renderInput();
+    const input = await renderInput();
 
     // A scanner types each code and presses Enter, without waiting for the save
     await user.type(input, 'AAA{Enter}BBB{Enter}CCC{Enter}');
@@ -81,7 +101,7 @@ describe('BarcodeScanInput', () => {
   it('rejects a duplicate even with spaces or different case', async () => {
     await seed({ existing: ['ABC123'] });
     const user = userEvent.setup();
-    const input = renderInput();
+    const input = await renderInput();
 
     await user.type(input, '  abc123 {Enter}');
 
@@ -92,7 +112,7 @@ describe('BarcodeScanInput', () => {
   it('rejects a second scan of a code that is still being saved', async () => {
     await seed();
     const user = userEvent.setup();
-    const input = renderInput();
+    const input = await renderInput();
 
     await user.type(input, 'SAME{Enter}SAME{Enter}');
 
@@ -107,7 +127,7 @@ describe('BarcodeScanInput', () => {
       timestamp: '', userId: 'u', pending: 0,
     });
     const user = userEvent.setup();
-    const input = renderInput();
+    const input = await renderInput();
 
     await user.type(input, 'SHARED{Enter}');
 
@@ -118,7 +138,7 @@ describe('BarcodeScanInput', () => {
   it('keeps focus in the input after the placeholder button, so the next Enter scans', async () => {
     await seed();
     const user = userEvent.setup();
-    const input = renderInput();
+    const input = await renderInput();
 
     await user.click(screen.getByRole('button', { name: /placeholder/i }));
     await waitFor(async () => expect(await saved()).toHaveLength(1));
@@ -134,7 +154,7 @@ describe('BarcodeScanInput', () => {
   it('adds a scan with the Add button as well as with Enter', async () => {
     await seed();
     const user = userEvent.setup();
-    const input = renderInput();
+    const input = await renderInput();
 
     await user.type(input, 'TAPPED');
     await user.click(screen.getByRole('button', { name: /add$/i }));
@@ -145,7 +165,7 @@ describe('BarcodeScanInput', () => {
   it('applies the park length rule', async () => {
     await seed({ validateLength: true });
     const user = userEvent.setup();
-    const input = renderInput();
+    const input = await renderInput();
 
     await user.type(input, 'SHORT{Enter}');
 
@@ -162,7 +182,7 @@ describe('BarcodeScanInput', () => {
     );
     Object.defineProperty(navigator, 'geolocation', { value: { getCurrentPosition }, configurable: true });
     const user = userEvent.setup();
-    const input = renderInput(true);
+    const input = await renderInput(true);
 
     await user.type(input, 'FIRST{Enter}SECOND{Enter}');
 
@@ -173,13 +193,29 @@ describe('BarcodeScanInput', () => {
     expect(second.latitude).toBeNull();
   });
 
-  it('shows a rejected scan next to the input', async () => {
+  it('plays the success sound as soon as a scan passes the checks, before it is saved', async () => {
+    await seed();
+    const input = await renderInput();
+
+    fireEvent.change(input, { target: { value: 'FAST' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    // Synchronously: saving to the phone's database has not even started yet
+    expect(sounds.playSuccessSound).toHaveBeenCalledTimes(1);
+    expect(await db.barcodes.count()).toBe(0);
+    await waitFor(async () => expect(await saved()).toHaveLength(1));
+    expect(sounds.playErrorSound).not.toHaveBeenCalled();
+  });
+
+  it('plays the error sound right away for a duplicate and saves nothing', async () => {
     await seed({ existing: ['SAME'] });
-    const user = userEvent.setup();
-    const input = renderInput();
+    const input = await renderInput();
 
-    await user.type(input, 'same{Enter}');
+    fireEvent.change(input, { target: { value: ' same ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
 
-    expect((await screen.findByRole('status')).textContent).toContain('Duplicate barcode detected');
+    expect(sounds.playErrorSound).toHaveBeenCalledTimes(1);
+    expect(sounds.playSuccessSound).not.toHaveBeenCalled();
+    expect(await db.outbox.count()).toBe(0);
   });
 });

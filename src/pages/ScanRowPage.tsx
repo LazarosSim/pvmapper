@@ -2,17 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/layout';
 import { useDB } from '@/lib/db-provider';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Check, CheckCircle2, X } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
 import { toast } from 'sonner';
 import AuthGuard from '@/components/auth/auth-guard';
-import BarcodeScanInput from '@/components/scan/BarcodeScanInput';
+import BarcodeScanInput, { type QueuedScan } from '@/components/scan/BarcodeScanInput';
 import RecentScans from '@/components/scan/RecentScans';
 import ResetRowDialog from '@/components/scan/ResetRowDialog';
-import { useParkRows, useRow, useRowBarcodes, useSyncSummary } from '@/lib/local/hooks';
+import { useNextRow, usePark, useRow, useRowBarcodes } from '@/lib/local/hooks';
 import { resetRow as resetLocalRow } from '@/lib/local/repo';
 import { OfflineStatusBanner } from "@/components/offline/OfflineStatusBanner";
 
@@ -50,20 +49,26 @@ const ScanRowPage = () => {
   // Scanning works on the phone's copy of active parks
   const row = isLocal ? localOrServerRow : null;
 
-  // The row after this one in the park, for "Next row" when this one is complete
-  const { rows: parkRows } = useParkRows(row?.parkId);
-  const nextRow = parkRows ? parkRows[parkRows.findIndex(r => r.id === rowId) + 1] : undefined;
+  const park = usePark(row?.parkId);
 
-  // Sync state - shown on the card; scanning continues while a sync runs
-  const { syncing: isSyncing } = useSyncSummary();
+  // The row after this one in the park, for "Next row" when this one is complete
+  const nextRow = useNextRow(row?.parkId, rowId);
+
+  // Scans accepted but not saved yet: counted and listed right away
+  const [queued, setQueued] = useState<QueuedScan[]>([]);
 
   // Persist selected row/park for convenience elsewhere (not for refresh routing)
   useEffect(() => {
     if (rowId) localStorage.setItem('selectedRowId', rowId);
   }, [rowId]);
 
-  const latestBarcodes = barcodes?.slice(-10).reverse().map(b => ({ ...b, isPending: b.pending === 1 }));
-  const scanCount = barcodes?.length ?? 0;
+  const savedIds = new Set(barcodes?.map(b => b.id));
+  const allScans = [
+    ...(barcodes ?? []).map(b => ({ id: b.id, code: b.code, isPending: b.pending === 1 })),
+    ...queued.filter(q => !savedIds.has(q.id)).map(q => ({ id: q.id, code: q.code, isPending: true })),
+  ];
+  const latestBarcodes = allScans.slice(-10).reverse();
+  const scanCount = allScans.length;
   const expected = row?.expectedBarcodes ?? 0;
   const isComplete = expected > 0 && scanCount >= expected;
 
@@ -192,48 +197,33 @@ const ScanRowPage = () => {
         )}
         <Card className="glass-card relative overflow-hidden">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center">
+            <CardTitle className="flex items-center justify-between gap-2">
+              <span className={`flex items-center gap-1 ${isComplete ? 'text-green-700' : ''}`}>
                 <span>
                   Scanned: <span className="font-bold">{scanCount}</span>
                   {expected > 0 ? ` / ${expected}` : ''}
                 </span>
-              </div>
-              {isSyncing && (
-                <span className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
-                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                  Syncing...
-                </span>
+                {isComplete && <CheckCircle2 className="h-5 w-5" aria-label="Row complete" />}
+              </span>
+              {isComplete && nextRow && (
+                <Button asChild size="sm" variant="outline" className="shrink-0">
+                  <Link to={`/scan/row/${nextRow.id}`} replace title={`Next row: ${nextRow.name}`}>
+                    Next <ArrowRight className="ml-1 h-4 w-4" />
+                  </Link>
+                </Button>
               )}
             </CardTitle>
-            {expected > 0 && (
-              <Progress value={Math.min(100, (scanCount / expected) * 100)} className="h-2" />
-            )}
-            <CardDescription>
-              Scan or enter a barcode to add it to this row
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {isComplete && (
-              <div className="flex items-center justify-between gap-2 rounded-md border border-green-300 bg-green-50 p-3 text-green-800">
-                <span className="flex items-center gap-2 text-sm font-medium">
-                  <CheckCircle2 className="h-5 w-5 shrink-0" />
-                  {scanCount > expected ? `Row complete (+${scanCount - expected} over)` : 'Row complete'}
-                </span>
-                {nextRow && (
-                  <Button asChild size="sm" className="shrink-0">
-                    <Link to={`/scan/row/${nextRow.id}`} replace>
-                      {nextRow.name} <ArrowRight className="ml-1 h-4 w-4" />
-                    </Link>
-                  </Button>
-                )}
-              </div>
-            )}
             <div className="pr-12 relative">
               <BarcodeScanInput
+                key={rowId}
                 rowId={rowId}
                 inputRef={inputRef}
                 captureLocation={captureLocation}
+                barcodes={barcodes}
+                validateLength={park?.validateBarcodeLength}
+                onQueuedChange={setQueued}
               />
             </div>
             <RecentScans barcodes={latestBarcodes} />

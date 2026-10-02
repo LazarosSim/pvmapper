@@ -54,8 +54,8 @@ const tx = <T>(fn: () => Promise<T>) =>
     return result;
   });
 
-export type ScanCheck =
-  | { ok: true; isFirstInRow: boolean; alsoInRows: string[] }
+type ScanCheck =
+  | { ok: true; alsoInRows: string[] }
   | { ok: false; reason: 'duplicate' | 'length' | 'unknown-row' };
 
 /** Rules for a scanned code: length (when the park asks for it), duplicates in the row
@@ -63,8 +63,7 @@ export type ScanCheck =
 async function checkCode(rowId: string, code: string, isPlaceholder: boolean): Promise<ScanCheck> {
   const row = await db.rows.get(rowId);
   if (!row) return { ok: false, reason: 'unknown-row' };
-  const isFirstInRow = (await db.barcodes.where('rowId').equals(rowId).count()) === 0;
-  if (isPlaceholder) return { ok: true, isFirstInRow, alsoInRows: [] };
+  if (isPlaceholder) return { ok: true, alsoInRows: [] };
 
   const park = await db.parks.get(row.parkId);
   if (park?.validateBarcodeLength && !hasValidLength(code)) return { ok: false, reason: 'length' };
@@ -74,22 +73,18 @@ async function checkCode(rowId: string, code: string, isPlaceholder: boolean): P
 
   const otherRowIds = [...new Set(sameCode.map((b) => b.rowId))];
   const otherRows = await db.rows.bulkGet(otherRowIds);
-  return { ok: true, isFirstInRow, alsoInRows: otherRows.map((r) => r?.name ?? '?') };
-}
-
-/** Check a scan before saving it (e.g. to know whether GPS is needed). Writes nothing. */
-export function checkScan(rowId: string, rawCode: string, isPlaceholder = false): Promise<ScanCheck> {
-  return db.transaction('r', [db.parks, db.rows, db.barcodes], () =>
-    checkCode(rowId, normalizeCode(rawCode), isPlaceholder)
-  );
+  return { ok: true, alsoInRows: otherRows.map((r) => r?.name ?? '?') };
 }
 
 export type ScanResult =
   | { ok: true; barcode: BarcodeData; alsoInRows: string[] }
   | { ok: false; reason: 'duplicate' | 'length' | 'unknown-row' };
 
-/** Save a scan at the end of the row. Placeholders get a unique code. */
+/** Save a scan at the end of the row. Placeholders get a unique code. The scan screen gives
+ *  the id and time of the scan itself, so it can show the scan before it is saved. */
 export async function addScan(input: {
+  id?: string;
+  timestamp?: string;
   rowId: string;
   code: string;
   userId: string;
@@ -98,14 +93,14 @@ export async function addScan(input: {
   longitude?: number | null;
 }): Promise<ScanResult> {
   return tx<ScanResult>(async () => {
-    const timestamp = new Date().toISOString();
+    const timestamp = input.timestamp ?? new Date().toISOString();
     const code = input.isPlaceholder ? `X_PLACEHOLDER_${timestamp}` : normalizeCode(input.code);
     const check = await checkCode(input.rowId, code, !!input.isPlaceholder);
     if (check.ok === false) return { ok: false as const, reason: (check as { reason: 'duplicate' | 'length' | 'unknown-row' }).reason };
 
     const orders = (await db.barcodes.where('rowId').equals(input.rowId).toArray()).map((b) => b.orderInRow);
     const barcode: BarcodeData = {
-      id: crypto.randomUUID(),
+      id: input.id ?? crypto.randomUUID(),
       rowId: input.rowId,
       code,
       orderInRow: nextOrderInRow(orders),

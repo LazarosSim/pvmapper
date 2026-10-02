@@ -1,12 +1,12 @@
-import React, {useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {toast} from 'sonner';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
-import {ArrowRight, CheckCircle2, Loader2, MapPin, X, XCircle} from 'lucide-react';
+import {ArrowRight, X} from 'lucide-react';
 import useSoundEffects from '@/hooks/use-sound-effects';
 import {useSupabase} from "@/lib/supabase-provider";
-import {normalizeCode} from '@/lib/scan-rules';
-import {addScan, checkScan} from '@/lib/local/repo';
+import {hasValidLength, isDuplicateCode, normalizeCode} from '@/lib/scan-rules';
+import {addScan} from '@/lib/local/repo';
 
 const REJECTED: Record<'duplicate' | 'length' | 'unknown-row', string> = {
   duplicate: 'Duplicate barcode detected',
@@ -14,10 +14,19 @@ const REJECTED: Record<'duplicate' | 'length' | 'unknown-row', string> = {
   'unknown-row': 'This row is not on this phone yet. Connect once to download it.',
 };
 
+/** A scan that passed the checks and is on its way to the phone's database. */
+export type QueuedScan = { id: string; code: string; timestamp: string };
+
 interface BarcodeScanInputProps {
   rowId: string;
   inputRef: React.RefObject<HTMLInputElement>;
   captureLocation: boolean;
+  /** The row's saved barcodes, for the instant duplicate check */
+  barcodes?: ReadonlyArray<{ id: string; code: string }>;
+  /** The park's length rule */
+  validateLength?: boolean;
+  /** Scans accepted but not saved yet, so the page can count and list them right away */
+  onQueuedChange?: (scans: QueuedScan[]) => void;
 }
 
 type Location = { latitude: number; longitude: number };
@@ -32,46 +41,62 @@ const getLocation = () =>
     );
   });
 
-type LastResult = { ok: boolean; text: string; gps?: boolean };
-
 const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
   rowId,
   inputRef,
   captureLocation,
+  barcodes,
+  validateLength = false,
+  onQueuedChange,
 }) => {
   const [barcodeInput, setBarcodeInput] = useState('');
-  const [last, setLast] = useState<LastResult | null>(null);
-  const [scansInProgress, setScansInProgress] = useState(0);
   const {
     playSuccessSound,
     playErrorSound
   } = useSoundEffects();
   const { user } = useSupabase();
 
-  // Scans are processed one at a time, in the order they were made; the phone's
-  // database applies the rules and picks the position inside one transaction.
+  // A scanner can send the next code before the last one is saved, so the checks run on
+  // what is in memory: the saved barcodes plus the scans accepted since.
   const captureRef = useRef(captureLocation);
   captureRef.current = captureLocation;
-  const scanQueue = useRef<Promise<void>>(Promise.resolve());
+  const barcodesRef = useRef(barcodes);
+  barcodesRef.current = barcodes;
+  const queuedRef = useRef<QueuedScan[]>([]);
+  const [queued, setQueued] = useState<QueuedScan[]>([]);
+  const updateQueued = (change: (scans: QueuedScan[]) => QueuedScan[]) => {
+    queuedRef.current = change(queuedRef.current);
+    setQueued(queuedRef.current);
+  };
+  // Saves run one at a time, in the order of the scans
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    onQueuedChange?.(queued);
+  }, [queued, onQueuedChange]);
+
+  // A queued scan is dropped once the saved barcodes include it, so the count never dips
+  useEffect(() => {
+    if (!barcodes) return;
+    const saved = new Set(barcodes.map((b) => b.id));
+    if (queuedRef.current.some((scan) => saved.has(scan.id))) {
+      updateQueued((scans) => scans.filter((scan) => !saved.has(scan.id)));
+    }
+  }, [barcodes]);
 
   const focusInput = () => inputRef.current?.focus();
 
   const reject = (message: string) => {
     playErrorSound();
     toast.error(message);
-    setLast({ ok: false, text: message });
   };
 
-  const processScan = async (scannedCode: string, isPlaceholder: boolean) => {
-    const check = await checkScan(rowId, scannedCode, isPlaceholder);
-    if (check.ok === false) {
-      reject(REJECTED[(check as { reason: keyof typeof REJECTED }).reason]);
-      return;
-    }
+  const drop = (id: string) => updateQueued((scans) => scans.filter((scan) => scan.id !== id));
 
+  const save = async (scan: QueuedScan, isPlaceholder: boolean, isFirstInRow: boolean) => {
     // Capture GPS location only for the first barcode in the row, when location capture is enabled
     let location = null;
-    if (check.isFirstInRow && captureRef.current) {
+    if (isFirstInRow && captureRef.current) {
       location = await getLocation();
       if (!location) {
         // The scan is saved anyway
@@ -80,41 +105,55 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
     }
 
     const result = await addScan({
+      id: scan.id,
+      timestamp: scan.timestamp,
       rowId,
-      code: scannedCode,
+      code: scan.code,
       userId: user?.id ?? '',
       isPlaceholder,
       latitude: location?.latitude,
       longitude: location?.longitude,
     });
     if (result.ok === false) {
+      // Rare: the database knew something memory didn't (e.g. a change from another screen)
+      drop(scan.id);
       reject(REJECTED[(result as { reason: keyof typeof REJECTED }).reason]);
       return;
     }
-
-    playSuccessSound();
-    setLast({ ok: true, text: isPlaceholder ? 'Placeholder added' : `${scannedCode} added`, gps: !!location });
+    if (!barcodesRef.current) drop(scan.id);
     if (result.alsoInRows.length > 0) {
       toast.warning(`${result.barcode.code} is also in ${result.alsoInRows.join(', ')}`);
     }
   };
 
-  // The input is cleared as soon as a scan is submitted, so a scanner can send the
-  // next code right away; queued scans are never dropped or merged together.
+  // The sound plays as soon as the scan passes the checks: the worker moves on while it is
+  // saved and uploaded in the background.
   const queueScan = (rawCode: string, isPlaceholder = false) => {
     const code = normalizeCode(rawCode);
     if (!code && !isPlaceholder) return;
 
-    setScansInProgress(count => count + 1);
-    scanQueue.current = scanQueue.current
-      .then(() => processScan(code, isPlaceholder))
+    if (!isPlaceholder) {
+      if (validateLength && !hasValidLength(code)) return reject(REJECTED.length);
+      const known = [...(barcodesRef.current ?? []), ...queuedRef.current].map((b) => b.code);
+      if (isDuplicateCode(code, known)) return reject(REJECTED.duplicate);
+    }
+
+    const isFirstInRow = barcodesRef.current?.length === 0 && queuedRef.current.length === 0;
+    const timestamp = new Date().toISOString();
+    const scan: QueuedScan = {
+      id: crypto.randomUUID(),
+      code: isPlaceholder ? `X_PLACEHOLDER_${timestamp}` : code,
+      timestamp,
+    };
+    updateQueued((scans) => [...scans, scan]);
+    playSuccessSound();
+
+    saveQueue.current = saveQueue.current
+      .then(() => save(scan, isPlaceholder, isFirstInRow))
       .catch((error) => {
         console.error(isPlaceholder ? "Error adding placeholder:" : "Error registering barcode:", error);
+        drop(scan.id);
         reject(isPlaceholder ? "Failed to add placeholder" : "Failed to add barcode");
-      })
-      .finally(() => {
-        setScansInProgress(count => count - 1);
-        focusInput();
       });
   };
 
@@ -147,10 +186,10 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
           autoFocus
         />
         <Button type="submit" disabled={!barcodeInput.trim()} className="absolute right-0 top-0 bg-inventory-primary hover:bg-inventory-primary/90 h-full px-3 text-sm">
-          {scansInProgress > 0 ? <Loader2 className="h-4 w-4 animate-spin" /> : <span className="flex items-center">
-              <span className="hidden sm:inline mr-1">Add</span>
-              <ArrowRight className="h-4 w-4" />
-            </span>}
+          <span className="flex items-center">
+            <span className="hidden sm:inline mr-1">Add</span>
+            <ArrowRight className="h-4 w-4" />
+          </span>
         </Button>
       </div>
 
@@ -170,17 +209,6 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
           <X className="h-4 w-4" />
         </Button>
       </div>
-
-      {last && (
-        <p
-          role="status"
-          className={`mt-2 flex items-center gap-2 text-sm font-medium ${last.ok ? 'text-green-700' : 'text-destructive'}`}
-        >
-          {last.ok ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
-          <span className="truncate">{last.text}</span>
-          {last.gps && <MapPin className="h-4 w-4 shrink-0" aria-label="with GPS location" />}
-        </p>
-      )}
     </form>;
 };
 

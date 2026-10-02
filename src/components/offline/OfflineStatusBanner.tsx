@@ -21,12 +21,12 @@ export const OfflineStatusBanner = ({ className }: OfflineStatusBannerProps) => 
   return (
     <div
       className={cn(
-        'flex items-center justify-center gap-2 bg-amber-500 px-4 py-2 text-sm font-medium text-amber-950',
+        'flex items-center justify-center gap-2 bg-amber-500 px-4 py-1 text-sm font-medium text-amber-950',
         className
       )}
     >
       <WifiOff className="h-4 w-4" />
-      <span>You're offline. Scans will be saved and synced when you reconnect.</span>
+      <span className="truncate">Offline · scans are kept on this phone</span>
     </div>
   );
 };

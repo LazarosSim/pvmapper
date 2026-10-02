@@ -4,8 +4,9 @@
  *     are set aside as "failed" instead of blocking everything behind them;
  *  2. download parks, then the rows of active parks, then the barcodes of rows whose
  *     version changed; unsent local changes are re-applied on top.
- * Runs on its own (start, reconnect, shortly after a change, every minute) and only one
- * sync runs at a time, also across tabs.
+ * Runs on its own (start, reconnect, back to the front, every minute) and only one sync runs
+ * at a time, also across tabs. Shortly after a change only the upload runs: downloading
+ * after every scan would slow scanning down for nothing.
  */
 import { applyOps } from './apply-ops';
 import { codeKey, db, type LocalBarcode, type OutboxEntry, type OutboxOp } from './db';
@@ -28,6 +29,7 @@ let status: SyncStatus = { syncing: false, lastSyncedAt: null, lastError: null }
 const listeners = new Set<() => void>();
 let inFlight: Promise<void> | null = null;
 let changeTimer: ReturnType<typeof setTimeout> | null = null;
+let uploadAgain = false;
 let pushedListener: (rowIds: string[]) => void = () => undefined;
 
 function setStatus(patch: Partial<SyncStatus>) {
@@ -180,13 +182,13 @@ async function pull(api: ServerApi) {
   }
 }
 
-async function runSync() {
+async function runSync(download: boolean) {
   if (!server) return;
   setStatus({ syncing: true });
   try {
     const touchedRows = await push(server);
     if (touchedRows.length) pushedListener(touchedRows);
-    await pull(server);
+    if (download) await pull(server);
     setStatus({ syncing: false, lastSyncedAt: new Date().toISOString(), lastError: null });
   } catch (error) {
     const message = error instanceof ServerError || error instanceof Error ? error.message : String(error);
@@ -195,17 +197,25 @@ async function runSync() {
   }
 }
 
-/** Upload and download now. Resolves when done; rejects if the server could not be reached. */
-export function syncNow(): Promise<void> {
+function start(download: boolean): Promise<void> {
   if (inFlight) return inFlight;
   const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
   const run = locks
-    ? locks.request('pvmapper-sync', { ifAvailable: true }, (lock) => (lock ? runSync() : undefined))
-    : runSync();
+    ? locks.request('pvmapper-sync', { ifAvailable: true }, (lock) => (lock ? runSync(download) : undefined))
+    : runSync(download);
   inFlight = Promise.resolve(run).finally(() => {
     inFlight = null;
+    if (uploadAgain) {
+      uploadAgain = false;
+      uploadQuietly();
+    }
   });
   return inFlight;
+}
+
+/** Upload and download now. Resolves when done; rejects if the server could not be reached. */
+export function syncNow(): Promise<void> {
+  return start(true);
 }
 
 const isOnline = () => typeof navigator === 'undefined' || navigator.onLine;
@@ -213,6 +223,16 @@ const isOnline = () => typeof navigator === 'undefined' || navigator.onLine;
 function syncQuietly() {
   if (!isOnline()) return;
   syncNow().catch((error) => console.warn('[Sync] Will retry:', error));
+}
+
+/** Upload only; a change made while a sync runs is uploaded right after it. */
+function uploadQuietly() {
+  if (!isOnline()) return;
+  if (inFlight) {
+    uploadAgain = true;
+    return;
+  }
+  start(false).catch((error) => console.warn('[Sync] Will retry:', error));
 }
 
 /** Uploads interrupted by closing the app are sent again. */
@@ -224,7 +244,7 @@ export async function recoverInterruptedUploads() {
 export function startAutoSync(): () => void {
   onLocalChange(() => {
     if (changeTimer) clearTimeout(changeTimer);
-    changeTimer = setTimeout(syncQuietly, CHANGE_DELAY_MS);
+    changeTimer = setTimeout(uploadQuietly, CHANGE_DELAY_MS);
   });
   const onVisible = () => {
     if (document.visibilityState === 'visible') syncQuietly();

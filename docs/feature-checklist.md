@@ -32,8 +32,9 @@ them working; check them before merging a phase.
 - [ ] Duplicate rejected within the row (ignoring case and spaces)
 - [ ] Placeholder for a missing/unreadable panel
 - [ ] GPS saved with the first barcode of a row when enabled
-- [ ] Success and error sounds, vibration, inline confirmation under the input
-- [ ] Progress bar; "Row complete" with a button to the next row
+- [ ] The original click (accepted) and buzz (rejected) sounds, plus vibration; they play the
+      moment a scan passes the checks, offline too; the count and the list update at once
+- [ ] Count turns green with a check when the row is complete, with a small "Next" button
 - [ ] Last 10 scans with sync status
 - [ ] Counter "Scanned: n / expected"
 

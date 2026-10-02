@@ -96,6 +96,10 @@ export class LocalDB extends Dexie {
       outbox: '++seq, &id, rowId, status',
       meta: 'key',
     });
+    // Counting barcodes per park and row from the indexes, without reading every barcode
+    this.version(2).stores({
+      barcodes: 'id, rowId, parkId, [rowId+orderInRow], [parkId+codeKey], [parkId+pending], [rowId+pending]',
+    });
   }
 }
 

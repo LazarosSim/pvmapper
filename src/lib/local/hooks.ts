@@ -41,10 +41,11 @@ export function useParks(): ParkSummary[] | undefined {
         if (park.archived) {
           return { ...park, barcodeCount: park.currentBarcodes, rowCount: null, pendingCount: 0 };
         }
+        // Index counts only: this runs again after every scan, so it must not read the barcodes
         const [barcodeCount, rowCount, pendingCount] = await Promise.all([
           db.barcodes.where('parkId').equals(park.id).count(),
           db.rows.where('parkId').equals(park.id).count(),
-          db.barcodes.where('parkId').equals(park.id).filter((b) => b.pending === 1).count(),
+          db.barcodes.where('[parkId+pending]').equals([park.id, 1]).count(),
         ]);
         return { ...park, barcodeCount, rowCount, pendingCount };
       })
@@ -90,25 +91,17 @@ export function useParkRows(parkId: string | undefined): { rows: RowSummary[] | 
 
   const local = useLiveQuery(async () => {
     if (!parkId || !isLocal) return undefined;
-    const [rows, barcodes] = await Promise.all([
-      db.rows.where('parkId').equals(parkId).toArray(),
-      db.barcodes.where('parkId').equals(parkId).toArray(),
-    ]);
-    const counts = new Map<string, { total: number; pending: number }>();
-    for (const b of barcodes) {
-      const count = counts.get(b.rowId) ?? { total: 0, pending: 0 };
-      count.total++;
-      count.pending += b.pending;
-      counts.set(b.rowId, count);
-    }
-    return rows
-      .map((row) => ({
+    const rows = await db.rows.where('parkId').equals(parkId).toArray();
+    // Index counts per row instead of reading every barcode of the park
+    const summaries = await Promise.all(
+      rows.map(async (row) => ({
         ...row,
-        barcodeCount: counts.get(row.id)?.total ?? 0,
-        pendingCount: counts.get(row.id)?.pending ?? 0,
+        barcodeCount: await db.barcodes.where('rowId').equals(row.id).count(),
+        pendingCount: await db.barcodes.where('[rowId+pending]').equals([row.id, 1]).count(),
         parkName: park!.name,
       }))
-      .sort((a, b) => naturalCompare(a.name, b.name));
+    );
+    return summaries.sort((a, b) => naturalCompare(a.name, b.name));
   }, [parkId, isLocal, park?.name]);
 
   const remote = useQuery({
@@ -123,6 +116,21 @@ export function useParkRows(parkId: string | undefined): { rows: RowSummary[] | 
   return isLocal
     ? { rows: local, isLoading: local === undefined }
     : { rows: remote.data, isLoading: remote.isLoading };
+}
+
+/** Number of active parks (reads the parks only, so scanning doesn't make it run again). */
+export function useActiveParkCount(): number | undefined {
+  return useLiveQuery(() => db.parks.filter((p) => !p.archived).count(), []);
+}
+
+/** The row after this one in the park, in natural order. Reads the rows only, so it doesn't
+ *  run again after every scan. */
+export function useNextRow(parkId: string | undefined, rowId: string | undefined): LocalRow | undefined {
+  return useLiveQuery(async () => {
+    if (!parkId || !rowId) return undefined;
+    const rows = (await db.rows.where('parkId').equals(parkId).toArray()).sort((a, b) => naturalCompare(a.name, b.name));
+    return rows[rows.findIndex((r) => r.id === rowId) + 1];
+  }, [parkId, rowId]);
 }
 
 /** One row with its park name; null when it is not on the phone and not on the server. */
