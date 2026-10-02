@@ -15,6 +15,10 @@ const stripLovableEditorScript = (): Plugin => ({
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  define: {
+    // Shown in Settings, to tell which version a phone is running
+    __APP_VERSION__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ')),
+  },
   server: {
     host: "::",
     port: 8080,

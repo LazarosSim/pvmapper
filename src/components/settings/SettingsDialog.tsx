@@ -76,6 +76,8 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                             </p>
                         </div>
                     </div>
+
+                    <p className="text-xs text-muted-foreground">App version {__APP_VERSION__} UTC</p>
                 </div>
             </DialogContent>
         </Dialog>
