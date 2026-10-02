@@ -100,18 +100,29 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
     reopening.current = false;
   }, [typing, inputRef]);
 
-  // The scanner types into whatever has focus, so the field keeps it: a touch elsewhere on
-  // the screen, or a scan while something else has focus, puts it back. Dialogs, menus and
-  // other fields keep their focus.
+  // The scanner types into whatever has focus, so the field keeps it while scanning:
+  // - a touch on anything that is not a control (button, link, field, menu, dialog) does
+  //   nothing at all: no focus change, no text selection, no long-press menu;
+  // - if focus is lost anyway, the next touch or scanned key puts it back.
+  // Dialogs, menus and other fields keep their focus.
   useEffect(() => {
+    const CONTROLS =
+      'button, a, input, textarea, select, label, [role="button"], [role="menuitem"], [role="menuitemcheckbox"], ' +
+      '[role="switch"], [role="dialog"], [role="alertdialog"], [role="menu"], [data-sonner-toast]';
     const isEditable = (el: Element | null) =>
       el instanceof HTMLElement && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
     const overlayOpen = () => !!document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]');
+    const isDeadTouch = (e: Event) =>
+      !overlayOpen() && !(e.target instanceof Element && e.target.closest(CONTROLS));
     const refocus = () => {
       const input = inputRef.current;
       if (!input || document.activeElement === input) return;
       if (isEditable(document.activeElement) || overlayOpen()) return;
       input.focus({ preventScroll: true });
+    };
+    // Cancelling the press keeps focus where it is (scrolling still works)
+    const ignoreDeadTouch = (e: Event) => {
+      if (isDeadTouch(e)) e.preventDefault();
     };
     const afterTouch = () => setTimeout(refocus, 0);
     const beforeKey = (e: KeyboardEvent) => {
@@ -120,10 +131,22 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
     const onVisible = () => {
       if (document.visibilityState === 'visible') refocus();
     };
+    const body = document.body.style;
+    const previousSelect = body.userSelect;
+    body.userSelect = 'none';
+    body.setProperty('-webkit-user-select', 'none');
+    document.addEventListener('pointerdown', ignoreDeadTouch, true);
+    document.addEventListener('mousedown', ignoreDeadTouch, true);
+    document.addEventListener('contextmenu', ignoreDeadTouch, true);
     document.addEventListener('pointerup', afterTouch, true);
     document.addEventListener('keydown', beforeKey, true);
     document.addEventListener('visibilitychange', onVisible);
     return () => {
+      body.userSelect = previousSelect;
+      body.removeProperty('-webkit-user-select');
+      document.removeEventListener('pointerdown', ignoreDeadTouch, true);
+      document.removeEventListener('mousedown', ignoreDeadTouch, true);
+      document.removeEventListener('contextmenu', ignoreDeadTouch, true);
       document.removeEventListener('pointerup', afterTouch, true);
       document.removeEventListener('keydown', beforeKey, true);
       document.removeEventListener('visibilitychange', onVisible);
@@ -213,8 +236,8 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
     submitInput();
   };
 
-  return <form onSubmit={handleSubmit} className="relative">
-      <div className="relative">
+  return <form onSubmit={handleSubmit} className="flex items-stretch gap-2">
+      <div className="relative min-w-0 flex-1">
         <Input
           ref={inputRef}
           value={barcodeInput}
@@ -226,7 +249,7 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
             }
           }}
           placeholder="Scan or enter barcode"
-          className="text-lg bg-white/80 backdrop-blur-sm border-inventory-secondary/30 pr-16"
+          className="text-lg select-text bg-white/80 backdrop-blur-sm border-inventory-secondary/30 pr-16"
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="off"
@@ -260,22 +283,20 @@ const BarcodeScanInput: React.FC<BarcodeScanInputProps> = ({
         )}
       </div>
 
-      <div className="absolute right-0 top-0 flex h-full">
-        {/* Never takes focus: a scanner's Enter must go to the input, not re-press this button */}
-        <Button
-          type="button"
-          tabIndex={-1}
-          onMouseDown={e => e.preventDefault()}
-          onClick={() => queueScan('', true)}
-          variant="ghost"
-          size="icon"
-          title="Add placeholder for a missing or unreadable panel"
-          aria-label="Add placeholder for a missing or unreadable panel"
-          className="h-full rounded-md ml-1 px-[2px] py-[2px] mx-0 my-[40px] text-center text-base bg-gray-400 hover:bg-gray-300 text-zinc-950"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
+      {/* Next to the field, always in view. Never takes focus: a scanner's Enter must go to
+          the input, not re-press this button */}
+      <Button
+        type="button"
+        tabIndex={-1}
+        onMouseDown={e => e.preventDefault()}
+        onClick={() => queueScan('', true)}
+        variant="ghost"
+        title="Add placeholder for a missing or unreadable panel"
+        aria-label="Add placeholder for a missing or unreadable panel"
+        className="h-auto w-11 shrink-0 rounded-md p-0 bg-gray-400 hover:bg-gray-300 text-zinc-950"
+      >
+        <X className="h-5 w-5" />
+      </Button>
     </form>;
 };
 

@@ -223,7 +223,7 @@ const ScanRowPage = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 p-3 pt-0">
-            <div className="pr-12 relative">
+            <div>
               <BarcodeScanInput
                 key={rowId}
                 rowId={rowId}

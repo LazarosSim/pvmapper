@@ -255,4 +255,18 @@ describe('BarcodeScanInput', () => {
 
     await waitFor(async () => expect((await saved()).map((b) => b.code)).toEqual(['LOST']));
   });
+
+  it('ignores touches on anything that is not a control, but not on buttons', async () => {
+    await seed();
+    const input = await renderInput();
+
+    // fireEvent returns false when the event was cancelled
+    expect(fireEvent.pointerDown(document.body)).toBe(false);
+    expect(fireEvent.mouseDown(document.body)).toBe(false);
+    expect(fireEvent.contextMenu(document.body)).toBe(false);
+    expect(document.activeElement).toBe(input);
+
+    const placeholder = screen.getByRole('button', { name: /placeholder/i });
+    expect(fireEvent.pointerDown(placeholder)).toBe(true);
+  });
 });

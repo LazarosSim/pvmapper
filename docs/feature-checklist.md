@@ -35,8 +35,10 @@ them working; check them before merging a phase.
 - [ ] The original click (accepted) and buzz (rejected) sounds, plus vibration; they play the
       moment a scan passes the checks, offline too; the count and the list update at once
 - [ ] Count turns green with a check when the row is complete, with a small "Next" button
-- [ ] Scan field keeps focus (a touch elsewhere or a scan while focus is elsewhere puts it
-      back); on-screen keyboard hidden, keyboard button to type one code by hand
+- [ ] Scan field keeps focus: touches on anything that is not a control do nothing (no
+      focus change, no text selection, no long-press menu); a scan while focus is elsewhere
+      still lands in the field; on-screen keyboard hidden, keyboard button to type by hand
+- [ ] Placeholder (X) button next to the field, also on an empty row
 - [ ] Thin scan header: park abbreviation and row name, no logos
 - [ ] Last 10 scans with sync status
 - [ ] Counter "Scanned: n / expected"
